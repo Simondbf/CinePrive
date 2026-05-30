@@ -1,0 +1,10 @@
+{
+  "name": "CinéPrivé",
+  "description": "Votre plateforme de streaming privée. Films, multi-comptes, enrichissement automatique et optimisation vidéo.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

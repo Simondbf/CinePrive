@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant amoled (&:where(.amoled, .amoled *));
+
+body {
+  transition: background-color 0.3s ease;
+}
