@@ -114,7 +114,7 @@ app.post('/api/register', (req, res) => {
 
     if (!username || !password || !name) return res.status(400).json({ error: 'Champs manquants' });
 
-    if (db.users.find((u: any) => u.username === username)) {
+    if (db.users.find((u: any) => (u.username || '').toLowerCase() === username.toLowerCase())) {
         return res.status(400).json({ error: 'Ce pseudo est déjà pris' });
     }
 
@@ -144,7 +144,13 @@ app.post('/api/register', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    const user = db.users.find((u: any) => u.username === username && u.password === password);
+    const user = db.users.find((u: any) => 
+        (
+            (u.username || '').toLowerCase() === username.toLowerCase() || 
+            (u.email || '').toLowerCase() === username.toLowerCase()
+        ) && 
+        u.password === password
+    );
     
     if (user) {
         if (user.status === 'pending') {

@@ -181,8 +181,8 @@ export default function App() {
                         Compte en attente de vérification
                     </span>
                 )}
-                <div className={`w-8 h-8 rounded shrink-0 ${activeUser.color} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700`}>
-                    {activeUser.name.charAt(0)}
+                <div className={`w-8 h-8 rounded shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700`}>
+                    {(activeUser.name || activeUser.username || '?').charAt(0).toUpperCase()}
                 </div>
                 <button 
                    onClick={() => { setActiveUser(null); setViewMode('viewer'); }}

@@ -14,7 +14,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser }: P
     const [searchQuery, setSearchQuery] = useState('');
 
     const toggleMyList = async (filmId: string) => {
-        const action = activeUser.myList.includes(filmId) ? 'remove' : 'add';
+        const action = (activeUser.myList || []).includes(filmId) ? 'remove' : 'add';
         try {
             const res = await fetch(`/api/users/${activeUser.id}/mylist`, {
                 method: 'POST',
