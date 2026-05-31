@@ -80,6 +80,12 @@ app.post('/api/settings', (req, res) => {
     if (req.body.allowRegistrations !== undefined) {
         db.settings.allowRegistrations = req.body.allowRegistrations;
     }
+    if (req.body.fundingCurrent !== undefined) {
+        db.settings.fundingCurrent = parseFloat(req.body.fundingCurrent);
+    }
+    if (req.body.fundingGoal !== undefined) {
+        db.settings.fundingGoal = parseFloat(req.body.fundingGoal);
+    }
     saveDb();
     res.json(db.settings);
 });
@@ -220,6 +226,21 @@ app.post('/api/users/:id/upgrade', (req, res) => {
     if (!userToUpgrade) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
     userToUpgrade.role = 'admin';
+    saveDb();
+    res.json({ success: true });
+});
+
+app.post('/api/users/:id/role', (req, res) => {
+    const { role } = req.body;
+    const userToEdit = db.users.find((u: any) => u.id === req.params.id);
+    if (!userToEdit) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    userToEdit.role = role;
+    saveDb();
+    res.json({ success: true });
+});
+
+app.delete('/api/users/:id', (req, res) => {
+    db.users = db.users.filter((u: any) => u.id !== req.params.id);
     saveDb();
     res.json({ success: true });
 });

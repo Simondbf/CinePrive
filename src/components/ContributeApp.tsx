@@ -6,10 +6,11 @@ interface Props {
   activeUser: User;
   films: Film[];
   onRefresh: () => void;
+  initialTab?: 'upload' | 'library' | 'users' | 'requests';
 }
 
-export default function ContributeApp({ activeUser, films, onRefresh }: Props) {
-  const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests'>('upload');
+export default function ContributeApp({ activeUser, films, onRefresh, initialTab = 'upload' }: Props) {
+  const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests'>(initialTab);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [invitesList, setInvitesList] = useState<{code: string, used: boolean, maxUses?: number, currentUses?: number}[]>([]);
@@ -69,6 +70,14 @@ export default function ContributeApp({ activeUser, films, onRefresh }: Props) {
           await fetch(`/api/invites/${code}`, { method: 'DELETE' });
           fetchData();
       } catch(e) { console.error(e); }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+      if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.")) return;
+      try {
+          await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+          fetchData();
+      } catch (e) { console.error(e); }
   };
 
   const handleToggleRegistration = async () => {
@@ -369,25 +378,53 @@ export default function ContributeApp({ activeUser, films, onRefresh }: Props) {
         {tab === 'users' && (activeUser.role === 'owner' || activeUser.role === 'admin') && (
             <div className="space-y-6">
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                    <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-4">Paramètres Globaux</h3>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="font-medium text-zinc-800 dark:text-zinc-200">Ouverture des inscriptions</p>
-                            <p className="text-sm text-zinc-500">Autoriser ou non les nouvelles demandes de compte. Même si ouvert, les comptes doivent être approuvés manuellement par la suite.</p>
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6">Paramètres Globaux</h3>
+                    <div className="flex flex-col gap-6">
+                        <div className="flex items-center justify-between pb-6 border-b border-zinc-100 dark:border-zinc-800">
+                            <div>
+                                <p className="font-medium text-zinc-800 dark:text-zinc-200">Ouverture des inscriptions</p>
+                                <p className="text-sm text-zinc-500">Autoriser ou non les nouvelles demandes de compte. Même si ouvert, les comptes doivent être approuvés manuellement par la suite.</p>
+                            </div>
+                            <button 
+                                onClick={handleToggleRegistration}
+                                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${settings.allowRegistrations ? 'bg-green-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}
+                            >
+                                <span className={`${settings.allowRegistrations ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
+                            </button>
                         </div>
-                        <button 
-                            onClick={handleToggleRegistration}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${settings.allowRegistrations ? 'bg-green-500' : 'bg-zinc-200 dark:bg-zinc-700'}`}
-                        >
-                            <span className={`${settings.allowRegistrations ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
-                        </button>
+                        
+                        {(activeUser.role === 'owner') && (
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium text-zinc-800 dark:text-zinc-200">État du Financement</p>
+                                    <p className="text-sm text-zinc-500 mb-2">Mettez à jour manuellement la page "Soutenir" avec l'état actuel de la cagnotte.</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number" step="0.5" 
+                                        placeholder="Actuel" 
+                                        defaultValue={(settings as any).fundingCurrent || 0}
+                                        onBlur={(e) => fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fundingCurrent: e.target.value })})}
+                                        className="w-20 px-3 py-1.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded"
+                                    />
+                                    <span className="text-zinc-500">/</span>
+                                    <input 
+                                        type="number" step="0.5" 
+                                        placeholder="Objectif" 
+                                        defaultValue={(settings as any).fundingGoal || 12}
+                                        onBlur={(e) => fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fundingGoal: e.target.value })})}
+                                        className="w-20 px-3 py-1.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {activeUser.role === 'owner' && (
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-                            <h3 className="text-lg font-medium text-zinc-900 dark:text-white">Codes d'Invitation (Pass Maison)</h3>
+                            <h3 className="text-lg font-medium text-zinc-900 dark:text-white">Codes d'Invitation</h3>
                             <div className="flex flex-wrap items-center gap-2">
                                 <input 
                                     type="text"
@@ -396,14 +433,30 @@ export default function ContributeApp({ activeUser, films, onRefresh }: Props) {
                                     onChange={e => setCustomCodeInput(e.target.value)}
                                     className="px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded"
                                 />
-                                <input 
-                                    type="number"
-                                    placeholder="Nombre max d'utilisations"
-                                    value={maxUsesInput}
-                                    min="1"
-                                    onChange={e => setMaxUsesInput(e.target.value)}
-                                    className="px-3 py-2 text-sm w-48 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded"
-                                />
+                                <div className="flex bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded">
+                                    <select
+                                        value={maxUsesInput}
+                                        onChange={e => setMaxUsesInput(e.target.value)}
+                                        className="px-3 py-2 text-sm bg-transparent outline-none text-zinc-900 dark:text-white border-r border-zinc-200 dark:border-zinc-800"
+                                    >
+                                        <option value="">Illimité</option>
+                                        {Array.from({length: 10}).map((_, i) => (
+                                            <option key={i+1} value={i+1}>{i+1}</option>
+                                        ))}
+                                        <option value="15">15</option>
+                                        <option value="20">20</option>
+                                        <option value="custom">Val. perso</option>
+                                    </select>
+                                    {maxUsesInput === 'custom' ? (
+                                        <input 
+                                            type="number"
+                                            min="1"
+                                            placeholder="Valeur libre"
+                                            onChange={(e) => setMaxUsesInput(e.target.value)}
+                                            className="px-3 py-2 text-sm w-24 bg-transparent outline-none text-zinc-900 dark:text-white"
+                                        />
+                                    ) : null}
+                                </div>
                                 <button onClick={generateInvite} className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black rounded text-sm font-medium">Générer</button>
                             </div>
                         </div>
@@ -452,27 +505,43 @@ export default function ContributeApp({ activeUser, films, onRefresh }: Props) {
                                     <td className="px-6 py-4 uppercase text-xs">
                                         {u.role}
                                         {activeUser.role === 'owner' && u.id !== activeUser.id && (
-                                            <select 
-                                                value={u.role}
-                                                onChange={(e) => handleChangeRole(u.id, e.target.value)}
-                                                className="ml-2 bg-transparent text-zinc-500 border-none outline-none cursor-pointer underline"
-                                            >
-                                                <option value="user" className="text-black">Devient Utilisateur</option>
-                                                <option value="admin" className="text-black">Déléguer Admin</option>
-                                            </select>
+                                            <div className="mt-2 flex items-center gap-1">
+                                                <button 
+                                                    onClick={() => handleChangeRole(u.id, 'user')}
+                                                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'user' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'}`}
+                                                >
+                                                    User
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleChangeRole(u.id, 'admin')}
+                                                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'admin' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'}`}
+                                                >
+                                                    Admin
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                     <td className="px-6 py-4">
-                                        {u.status === 'pending' ? (
-                                            <button 
-                                                onClick={() => handleApproveUser(u.id)}
-                                                className="px-3 py-1 bg-green-500/10 text-green-600 font-medium rounded hover:bg-green-500/20"
-                                            >
-                                                Approuver l'accès
-                                            </button>
-                                        ) : (
-                                            <span className="text-zinc-400 cursor-default">Actif</span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {u.status === 'pending' ? (
+                                                <button 
+                                                    onClick={() => handleApproveUser(u.id)}
+                                                    className="px-3 py-1 bg-green-500/10 text-green-600 font-medium rounded hover:bg-green-500/20"
+                                                >
+                                                    Approuver
+                                                </button>
+                                            ) : (
+                                                <span className="text-zinc-400 cursor-default">Actif</span>
+                                            )}
+                                            {activeUser.role === 'owner' && u.id !== activeUser.id && (
+                                                <button
+                                                    onClick={() => handleDeleteUser(u.id)}
+                                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
+                                                >
+                                                    {u.status === 'pending' ? 'Refuser' : 'Bannir'}
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

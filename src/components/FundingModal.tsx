@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Heart, X, Server, Coins } from 'lucide-react';
 
@@ -7,9 +7,16 @@ interface Props {
 }
 
 export default function FundingModal({ onClose }: Props) {
-    // Dans une version finale, ces montants pourraient venir de l'API
-    const monthlyCost = 12.00;
-    const currentFunds = 9.50;
+    const [monthlyCost, setMonthlyCost] = useState(12.00);
+    const [currentFunds, setCurrentFunds] = useState(0.00); // requested default
+
+    useEffect(() => {
+        fetch('/api/settings').then(r => r.json()).then(data => {
+            if (data.fundingGoal !== undefined) setMonthlyCost(data.fundingGoal);
+            if (data.fundingCurrent !== undefined) setCurrentFunds(data.fundingCurrent);
+        }).catch(err => console.error(err));
+    }, []);
+
     const progress = Math.min((currentFunds / monthlyCost) * 100, 100);
 
     return (

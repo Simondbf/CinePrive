@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
-import { CheckCircle, BarChart3 } from 'lucide-react';
+import { CheckCircle, BarChart3, Edit3 } from 'lucide-react';
 
 export default function Polls() {
-    // Simple state local pour simuler un vote.
-    // Dans une vraie app, cela serait envoyé à l'API via POST /api/polls
     const [votes, setVotes] = useState<Record<string, string>>({});
+    const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
     const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
 
     const handleVote = (pollId: string, optionId: string) => {
         setVotes(v => ({ ...v, [pollId]: optionId }));
     };
+    
+    const handleCustomInput = (pollId: string, text: string) => {
+        setCustomInputs(prev => ({ ...prev, [pollId]: text }));
+        if (text) {
+            handleVote(pollId, 'custom');
+        }
+    };
 
     const submitVote = (pollId: string) => {
         setSubmitted(v => ({ ...v, [pollId]: true }));
-        // API call would go here
     };
 
     const polls = [
@@ -41,22 +46,8 @@ export default function Polls() {
         {
             id: 'p3',
             title: 'Nom de domaine',
-            desc: "Dans l'éventualité d'étendre la plateforme avec Gringotts (inventaire global), quel type de nom serait le meilleur ?",
-            options: [
-                { id: 'o1', label: 'Neutre et court (ex: nexo.uk, vault.fr)' },
-                { id: 'o2', label: 'Explicite Cinéma (ex: cineprive.fr)' },
-                { id: 'o3', label: 'Orienté Écosystème (ex: mediacore.net)' }
-            ]
-        },
-        {
-            id: 'p4',
-            title: 'Intégration Gringotts',
-            desc: "Lier la gestion de l'inventaire physique/virtuel Gringotts et le streaming CinéPrivé vous semble-t-il pertinent ?",
-            options: [
-                { id: 'o1', label: 'Oui, tout au même endroit sous un même nom' },
-                { id: 'o2', label: 'Non, garder les deux apps séparées' },
-                { id: 'o3', label: 'Peu importe' }
-            ]
+            desc: "Je souhaite ne plus utiliser rpisimon.uk mais un nom de domaine plus neutre.",
+            options: [] // text only
         }
     ];
 
@@ -68,7 +59,7 @@ export default function Polls() {
                     Sondages Fondateurs
                 </h2>
                 <p className="text-red-100 text-sm max-w-xl">
-                    Participez à la construction de la plateforme. En tant qu'utilisateur de la première heure, votre avis compte sur la Direction Artistique et les prochaines fonctionnalités (notamment Gringotts).
+                    Participez à la construction de la plateforme. En tant qu'utilisateur de la première heure, votre avis compte sur la Direction Artistique et les prochaines fonctionnalités.
                 </p>
             </div>
 
@@ -99,6 +90,40 @@ export default function Polls() {
                                         <span className="ml-3 font-medium text-zinc-900 dark:text-white">{opt.label}</span>
                                     </label>
                                 ))}
+                                
+                                {poll.options.length > 0 && (
+                                    <label className={`flex flex-col p-4 border rounded cursor-pointer transition ${votes[poll.id] === 'custom' ? 'border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>
+                                        <div className="flex items-center">
+                                            <input 
+                                                type="radio" name={poll.id} 
+                                                checked={votes[poll.id] === 'custom'} 
+                                                onChange={() => handleVote(poll.id, 'custom')}
+                                                className="w-4 h-4 text-red-600 border-zinc-300 focus:ring-red-500 mt-1"
+                                            />
+                                            <span className="ml-3 font-medium text-zinc-900 dark:text-white flex items-center gap-2"><Edit3 className="w-4 h-4"/> Autre suggestion :</span>
+                                        </div>
+                                        <input 
+                                            type="text"
+                                            value={customInputs[poll.id] || ''}
+                                            onChange={(e) => handleCustomInput(poll.id, e.target.value)}
+                                            onClick={() => handleVote(poll.id, 'custom')}
+                                            placeholder="Votre proposition..."
+                                            className="mt-3 ml-7 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                        />
+                                    </label>
+                                )}
+                                
+                                {poll.options.length === 0 && (
+                                    <div className="pt-2">
+                                        <textarea 
+                                            value={customInputs[poll.id] || ''}
+                                            onChange={(e) => handleCustomInput(poll.id, e.target.value)}
+                                            placeholder="Saisissez vos idées de noms de domaine ici..."
+                                            className="w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded p-4 text-sm text-zinc-900 dark:text-white min-h-[100px] resize-none"
+                                        />
+                                    </div>
+                                )}
+                                
                                 <button 
                                     onClick={() => submitVote(poll.id)}
                                     disabled={!votes[poll.id]}
