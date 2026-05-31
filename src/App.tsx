@@ -33,28 +33,35 @@ export default function App() {
   const [amoledActive, setAmoledActive] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
+  const [notification, setNotification] = useState<{title: string, message: string, action?: {label: string, onClick: () => void}} | null>(null);
 
   useEffect(() => {
      const handleNotify = (e: Event) => {
          const customEvent = e as CustomEvent;
          setNotification(customEvent.detail);
          if ((window as any)._notifyTimeout) clearTimeout((window as any)._notifyTimeout);
-         (window as any)._notifyTimeout = setTimeout(() => setNotification(null), 5000);
+         if (!customEvent.detail.action) {
+             (window as any)._notifyTimeout = setTimeout(() => setNotification(null), 5000);
+         }
      };
      window.addEventListener('app-notify', handleNotify);
      return () => window.removeEventListener('app-notify', handleNotify);
   }, []);
 
   useEffect(() => {
-     if (!activeUser) return;
+     if (!activeUser) {
+         setAmoledUnlocked(false);
+         setAmoledActive(false);
+         setThemeMode('system');
+         return;
+     }
      // Retrieve saved settings
      const savedAmoledUnlocked = localStorage.getItem(`salleObscureUnlocked_${activeUser.id}`) === 'true';
      const savedAmoledActive = localStorage.getItem(`salleObscureActive_${activeUser.id}`) === 'true';
      const savedTheme = localStorage.getItem(`themeMode_${activeUser.id}`) as 'light'|'dark'|'system' || 'system';
      
-     if (savedAmoledUnlocked) setAmoledUnlocked(true);
-     if (savedAmoledActive && savedAmoledUnlocked) setAmoledActive(true);
+     setAmoledUnlocked(savedAmoledUnlocked);
+     setAmoledActive(savedAmoledActive && savedAmoledUnlocked);
      setThemeMode(savedTheme);
   }, [activeUser]);
 
@@ -140,8 +147,22 @@ export default function App() {
           if (nres.ok) {
               const ndata = await nres.json();
               setAdminNotifs(ndata.reverse());
-              if (ndata.some((n: any) => !n.readBy.includes(activeUser.id))) {
+              const unread = ndata.filter((n: any) => !n.readBy.includes(activeUser.id));
+              if (unread.length > 0) {
                   setHasUnread(true);
+                  const firstActionable = unread.find((n: any) => n.type === 'register' || n.type === 'request');
+                  if (firstActionable && firstActionable.referenceId) {
+                      notify(firstActionable.message, "Action Requise", {
+                          label: "Voir (Admin)", 
+                          onClick: () => {
+                              setViewMode('admin');
+                              // Automatically mark as read if they click the action
+                              fetch(`/api/notifications/${firstActionable.id}/read`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: activeUser.id})});
+                          }
+                      });
+                  }
+              } else {
+                  setHasUnread(false);
               }
           }
       }
@@ -269,6 +290,7 @@ export default function App() {
                                 onClick={() => { 
                                     localStorage.removeItem('cine_remember');
                                     localStorage.removeItem('cine_remember_password');
+                                    sessionStorage.removeItem('cine_session');
                                     setActiveUser(null); 
                                     setViewMode('viewer'); 
                                     setShowUserMenu(false);
@@ -368,18 +390,34 @@ export default function App() {
           {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
           
           {notification && (
-              <div className="fixed top-24 right-4 z-[9999]">
+              <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999]">
                   <motion.div 
-                     initial={{ opacity: 0, scale: 0.95, y: -20, x: 20 }}
+                     initial={{ opacity: 0, scale: 0.95, y: -20, x: 0 }}
                      animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                     exit={{ opacity: 0, scale: 0.95, y: -20, x: 20 }}
-                     className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-72 flex flex-col gap-2"
+                     exit={{ opacity: 0, scale: 0.95, y: -20, x: 0 }}
+                     className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-80 text-center flex flex-col gap-3"
                   >
-                      <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-sm text-red-500">{notification.title}</h3>
-                          <button onClick={() => setNotification(null)} className="text-zinc-500 hover:text-white"><Check className="w-4 h-4"/></button>
+                      <div className="flex flex-col items-center">
+                          <h3 className="font-bold text-sm text-red-500 mb-1">{notification.title}</h3>
+                          <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
                       </div>
-                      <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
+                      
+                      <div className="flex gap-2 justify-center mt-2">
+                          {notification.action && (
+                              <button 
+                                  onClick={() => {
+                                      notification.action!.onClick();
+                                      setNotification(null);
+                                  }} 
+                                  className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition"
+                              >
+                                  {notification.action.label}
+                              </button>
+                          )}
+                          <button onClick={() => setNotification(null)} className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded transition">
+                              Fermer
+                          </button>
+                      </div>
                   </motion.div>
               </div>
           )}

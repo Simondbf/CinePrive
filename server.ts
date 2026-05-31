@@ -224,7 +224,7 @@ app.post('/api/register', (req, res) => {
         name,
         color: colors[db.users.length % colors.length],
         role: isFirstUser ? 'owner' : 'user', // Le 1er est propriétaire !
-        status: (isFirstUser || bypassWithCode) ? 'active' : 'pending',
+        status: isFirstUser ? 'active' : 'pending',
         myList: []
     };
 
@@ -236,6 +236,7 @@ app.post('/api/register', (req, res) => {
         db.notifications.push({
             id: Date.now().toString(),
             type: 'register',
+            referenceId: newUser.id,
             message: `Un nouvel utilisateur ("${username}") s'est inscrit avec succès et attend validation.`,
             readBy: [],
             createdAt: Date.now()
@@ -407,6 +408,7 @@ app.post('/api/requests', (req, res) => {
     db.notifications.push({
         id: Date.now().toString(),
         type: 'request',
+        referenceId: newRequest.id,
         message: `L'utilisateur "${userName}" a demandé l'ajout du film "${title}".`,
         readBy: [],
         createdAt: Date.now()

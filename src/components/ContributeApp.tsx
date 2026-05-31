@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { notify } from '../lib/notify';
 import { Film, User } from '../types';
-import { UploadCloud, Search, CheckCircle, Database, Server } from 'lucide-react';
+import { UploadCloud, Search, CheckCircle, Database, Server, X } from 'lucide-react';
 
 interface Props {
   activeUser: User;
@@ -22,12 +22,15 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [customCodeInput, setCustomCodeInput] = useState('');
   const [maxUsesInput, setMaxUsesInput] = useState('');
 
+  const [pollsConfig, setPollsConfig] = useState<any[]>([]);
+
   const fetchData = React.useCallback(() => {
      fetch('/api/users').then(r => r.json()).then(setUsersList).catch(console.error);
      fetch('/api/requests').then(r => r.json()).then(setRequestsList).catch(console.error);
      fetch('/api/settings').then(r => r.json()).then(setSettings).catch(console.error);
      fetch('/api/invites').then(r => r.json()).then(setInvitesList).catch(console.error);
      fetch('/api/polls/results').then(r => r.json()).then(setPollResults).catch(console.error);
+     fetch('/api/polls/config').then(r => r.json()).then(setPollsConfig).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -134,6 +137,48 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       } catch (e) {
           console.error(e);
       }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (f) {
+          setFile(f);
+          setUploadStatus('idle');
+          // Parse title from filename
+          const nameWithoutExt = f.name.replace(/\.[^/.]+$/, "");
+          const cleanName = nameWithoutExt.replace(/[\._-]/g, ' ')
+                                          .replace(/[\[\(].*?[\]\)]/g, '')
+                                          .replace(/\b(1080p|720p|480p|mkv|av1|x264|x265|bluray|webrip|hdrip|dvdrip|cam|fr|vostfr|truefrench)\b/gi, '')
+                                          .trim();
+          setTmdbQuery(cleanName);
+          
+          if (cleanName.length > 1) {
+              setSearchLoading(true);
+              try {
+                  const res = await fetch(`/api/tmdb/search?query=${encodeURIComponent(cleanName)}`);
+                  const data = await res.json();
+                  if (data.results && data.results.length > 0) {
+                      setTmdbResults(data.results.slice(0, 4));
+                      setSelectedMeta(data.results[0]);
+                  } else {
+                      setTmdbResults([]);
+                  }
+              } catch (err) {
+                  console.error(err);
+              } finally {
+                  setSearchLoading(false);
+              }
+          }
+      }
+  };
+
+  const resetUpload = () => {
+      setFile(null);
+      setSelectedMeta(null);
+      setTmdbQuery('');
+      setTmdbResults([]);
+      setUploadStatus('idle');
+      setIsUploading(false);
   };
 
   const submitUpload = async () => {
@@ -314,7 +359,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     </p>
 
                     <label className={`block border-2 border-dashed ${file ? 'border-zinc-500 bg-zinc-800/50' : 'border-zinc-700 bg-zinc-950'} rounded-lg p-8 relative cursor-pointer hover:border-zinc-500 transition`}>
-                        <input type="file" accept="video/mp4,video/webm,video/mkv" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                        <input type="file" accept="video/mp4,video/webm,video/mkv,video/x-matroska,video/avi" className="hidden" onChange={handleFileSelect} />
                         <div className="text-center">
                             {file ? (
                                 <div>
@@ -333,15 +378,26 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
 
                     <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                         {uploadStatus === 'success' && <p className="text-green-500 text-sm font-medium mb-3 text-center">✓ Upload du fichier terminé avec succès.</p>}
-                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert (serveur).</p>}
+                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Le fichier est probablement trop volumineux ou corrompu pour le serveur Cloud Run actuel.</p>}
                         
-                        <button 
-                           onClick={submitUpload}
-                           disabled={!file || !selectedMeta || isUploading}
-                           className="w-full bg-red-600 text-white font-semibold py-3 rounded hover:bg-red-500 transition disabled:opacity-50 flex justify-center"
-                        >
-                            {isUploading ? 'Transfert et Traitement en cours...' : 'Envoyer vers CinéPrivé Serveur'}
-                        </button>
+                        <div className="flex gap-2">
+                            {file && (
+                                <button
+                                    onClick={resetUpload}
+                                    className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded transition flex items-center justify-center"
+                                    title="Réinitialiser l'upload"
+                                >
+                                    <X className="w-5 h-5 mx-1" />
+                                </button>
+                            )}
+                            <button 
+                               onClick={submitUpload}
+                               disabled={!file || !selectedMeta || isUploading}
+                               className="flex-1 bg-red-600 text-white font-semibold py-3 rounded hover:bg-red-500 transition disabled:opacity-50 flex justify-center"
+                            >
+                               {isUploading ? 'Transfert et Traitement en cours...' : 'Envoyer vers CinéPrivé Serveur'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -623,11 +679,13 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     ) : (
                         Object.keys(pollResults).map(pollId => {
                             const data = pollResults[pollId];
+                            const config = pollsConfig.find((p:any) => p.id === pollId);
+                            const title = config ? config.question : `Sondage ID : ${pollId}`;
                             const totalVotes = Object.values(data.options).reduce((a: any, b: any) => a + b, 0) as number;
                             return (
                                 <div key={pollId} className="space-y-4">
                                     <div className="flex justify-between items-center">
-                                        <h4 className="font-medium text-zinc-900 dark:text-white capitalize">Sondage ID : {pollId} ({totalVotes} votes)</h4>
+                                        <h4 className="font-medium text-zinc-900 dark:text-white capitalize">{title} ({totalVotes} votes)</h4>
                                         {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                                             <button 
                                                 onClick={async () => {
@@ -636,7 +694,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                                         fetch('/api/polls/results').then(r => r.json()).then(setPollResults);
                                                     }
                                                 }}
-                                                className="text-xs text-red-600 hover:underline"
+                                                className="text-xs text-red-600 hover:underline px-2 py-1 bg-red-50 dark:bg-red-900/10 rounded"
                                             >
                                                 Vider les résultats
                                             </button>
@@ -645,14 +703,16 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     <div className="space-y-2">
                                         {Object.entries(data.options).map(([optionId, count]: [string, any]) => {
                                             const percentage = totalVotes === 0 ? 0 : Math.round((count / totalVotes) * 100);
+                                            const optionConfig = config?.options?.find((o:any) => o.id === optionId);
+                                            const label = optionConfig ? optionConfig.label : optionId;
                                             return (
                                                 <div key={optionId} className="flex flex-col gap-1">
                                                     <div className="flex justify-between text-sm">
-                                                        <span className="text-zinc-700 dark:text-zinc-300 capitalize">{optionId}</span>
+                                                        <span className="text-zinc-700 dark:text-zinc-300 capitalize">{label}</span>
                                                         <span className="font-medium">{count} ({percentage}%)</span>
                                                     </div>
                                                     <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-red-600 rounded-full" style={{ width: `${percentage}%` }} />
+                                                        <div className="h-full bg-red-600 rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
                                                     </div>
                                                 </div>
                                             );

@@ -21,7 +21,20 @@ export default function AuthScreen({ onLogin }: Props) {
     const [settings, setSettings] = useState<{allowRegistrations: boolean} | null>(null);
 
     useEffect(() => {
-        if (localStorage.getItem('cine_remember') === 'true') {
+        const sessionStr = sessionStorage.getItem('cine_session');
+        if (sessionStr) {
+            const parsed = JSON.parse(sessionStr);
+            setUsername(parsed.username);
+            setPassword(parsed.password);
+            fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(parsed)
+            })
+            .then(res => res.json())
+            .then(data => { if (data.id || data.user) onLogin(data.user || data); })
+            .catch(console.error);
+        } else if (localStorage.getItem('cine_remember') === 'true') {
             const savedUsername = localStorage.getItem('cine_remember_username') || '';
             const savedPassword = localStorage.getItem('cine_remember_password') || '';
             setRememberMe(true);
@@ -37,7 +50,7 @@ export default function AuthScreen({ onLogin }: Props) {
                 })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.id) onLogin(data);
+                    if (data.id || data.user) onLogin(data.user || data);
                 })
                 .catch(console.error);
             }
@@ -88,6 +101,7 @@ export default function AuthScreen({ onLogin }: Props) {
           const data = await res.json();
 
           if (res.ok) {
+              sessionStorage.setItem('cine_session', JSON.stringify({ username, password }));
               if (rememberMe) {
                   localStorage.setItem('cine_remember', 'true');
                   localStorage.setItem('cine_remember_username', username);
