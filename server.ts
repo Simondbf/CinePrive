@@ -1,14 +1,41 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import multer from 'multer';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { createServer as createViteServer } from 'vite';
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+app.use(cookieParser());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
+
+const requireAuth = (req: any, res: any, next: any) => {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ error: 'Non autorisé' });
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        req.user = db.users.find((u: any) => u.id === decoded.userId);
+        if (!req.user) throw new Error();
+        next();
+    } catch {
+        res.status(401).json({ error: 'Token invalide' });
+    }
+};
+
+const requireRole = (roles: string[]) => (req: any, res: any, next: any) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+        return res.status(403).json({ error: 'Accès interdit' });
+    }
+    next();
+};
 
 // Sécurité : Bloquer l'IP nue (Autoriser uniquement via Cloudflare avec le bon nom de domaine)
 app.use((req, res, next) => {
@@ -88,7 +115,7 @@ app.get('/api/polls/config', (req, res) => {
     res.json(db.pollsConfig);
 });
 
-app.post('/api/polls/config', (req, res) => {
+app.post('/api/polls/config', requireAuth, requireRole(['owner']), (req, res) => {
     db.pollsConfig = req.body;
     saveDb();
     res.json({ success: true, pollsConfig: db.pollsConfig });
@@ -96,8 +123,15 @@ app.post('/api/polls/config', (req, res) => {
 
 app.post('/api/polls/vote', (req, res) => {
     const { pollId, vote, customText, userId } = req.body;
-    if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [] };
+    if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [], votedUsers: [] };
+    if (!db.polls[pollId].votedUsers) db.polls[pollId].votedUsers = [];
     
+    if (userId && db.polls[pollId].votedUsers.includes(userId)) {
+        return res.status(400).json({ error: "Vous avez déjà voté." });
+    }
+    
+    if (userId) db.polls[pollId].votedUsers.push(userId);
+
     if (vote === 'custom' && customText) {
         db.polls[pollId].custom.push(customText);
     } else if (vote) {
@@ -111,10 +145,10 @@ app.get('/api/polls/results', (req, res) => {
     res.json(db.polls);
 });
 
-app.delete('/api/polls/reset/:pollId', (req, res) => {
+app.delete('/api/polls/reset/:pollId', requireAuth, requireRole(['owner']), (req, res) => {
     const { pollId } = req.params;
     if (db.polls[pollId]) {
-        db.polls[pollId] = { options: {}, custom: [] };
+        db.polls[pollId] = { options: {}, custom: [], votedUsers: [] };
         saveDb();
     }
     res.json({ success: true, pollData: db.polls[pollId] });
@@ -138,7 +172,7 @@ const TMDB_GENRES: Record<number, string> = {
 
 // Settings
 app.get('/api/settings', (req, res) => res.json(db.settings || { allowRegistrations: true }));
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     if (req.body.allowRegistrations !== undefined) {
         db.settings.allowRegistrations = req.body.allowRegistrations;
     }
@@ -154,7 +188,7 @@ app.post('/api/settings', (req, res) => {
 
 // Invites
 app.get('/api/invites', (req, res) => res.json(db.invites || []));
-app.post('/api/invites', (req, res) => {
+app.post('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     let newCode = req.body.customCode || Math.random().toString(36).substring(2, 8).toUpperCase();
     if (!db.invites) db.invites = [];
     db.invites.push({ 
@@ -167,7 +201,7 @@ app.post('/api/invites', (req, res) => {
     saveDb();
     res.json({ success: true, code: newCode });
 });
-app.delete('/api/invites/:code', (req, res) => {
+app.delete('/api/invites/:code', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     if (!db.invites) db.invites = [];
     db.invites = db.invites.filter((i: any) => i.code !== req.params.code);
     saveDb();
@@ -180,7 +214,7 @@ app.get('/api/users', (req, res) => {
   res.json(db.users.map((u: any) => ({ ...u, password: '' })));
 });
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
     const { username, password, email, name, inviteCode } = req.body;
     
     let bypassWithCode = false;
@@ -216,10 +250,12 @@ app.post('/api/register', (req, res) => {
     // Attribuer des couleurs aléatoires
     const colors = ['bg-amber-600', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-orange-600'];
     
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
     const newUser = {
         id: uuidv4(),
         username,
-        password, // EN PROD: HASHER!
+        password: hashedPassword,
         email: email || '',
         name,
         color: colors[db.users.length % colors.length],
@@ -249,24 +285,34 @@ app.post('/api/register', (req, res) => {
     res.json({ ...newUser, password: '' });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     const user = db.users.find((u: any) => 
         (
             (u.username || '').toLowerCase() === username.toLowerCase() || 
             (u.email || '').toLowerCase() === username.toLowerCase()
-        ) && 
-        u.password === password
+        )
     );
     
-    if (user) {
+    if (user && (await bcrypt.compare(password, user.password))) {
         if (user.status === 'pending') {
             return res.status(403).json({ error: "Votre compte est en attente d'approbation par le propriétaire." });
         }
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
         res.json({ ...user, password: '' });
     } else {
         res.status(401).json({ error: 'Identifiants incorrects' });
     }
+});
+
+app.post('/api/logout', (req, res) => {
+    res.clearCookie('token');
+    res.json({ success: true });
+});
+
+app.get('/api/me', requireAuth, (req: any, res) => {
+    res.json({ ...req.user, password: '' });
 });
 
 // Auth : Réinitialisation de mot de passe (Simulation)
@@ -277,11 +323,11 @@ app.post('/api/auth/reset-password', (req, res) => {
 });
 
 // Auth : Changement de mot de passe
-app.post('/api/auth/change-password', (req, res) => {
-    const { userId, oldPassword, newPassword } = req.body;
-    const user = db.users.find((u: any) => u.id === userId && u.password === oldPassword);
+app.post('/api/auth/change-password', requireAuth, async (req: any, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const user = db.users.find((u: any) => u.id === req.user.id);
     
-    if (!user) {
+    if (!user || !(await bcrypt.compare(oldPassword, user.password))) {
         return res.status(401).json({ error: "Ancien mot de passe incorrect." });
     }
 
@@ -289,21 +335,13 @@ app.post('/api/auth/change-password', (req, res) => {
         return res.status(400).json({ error: "Le mot de passe doit faire au moins 6 caractères." });
     }
 
-    user.password = newPassword;
+    user.password = await bcrypt.hash(newPassword, 10);
     saveDb();
     res.json({ success: true });
 });
 
 // Admin : Promouvoir un utilisateur
-app.post('/api/users/:id/upgrade', (req, res) => {
-    const { adminId } = req.body;
-    const adminUser = db.users.find((u: any) => u.id === adminId);
-    
-    // Seul le owner peut promouvoir qqn en admin
-    if (!adminUser || adminUser.role !== 'owner') {
-        return res.status(403).json({ error: 'Non autorisé' });
-    }
-
+app.post('/api/users/:id/upgrade', requireAuth, requireRole(['owner']), (req, res) => {
     const userToUpgrade = db.users.find((u: any) => u.id === req.params.id);
     if (!userToUpgrade) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
@@ -312,7 +350,7 @@ app.post('/api/users/:id/upgrade', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/users/:id/role', (req, res) => {
+app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) => {
     const { role } = req.body;
     const userToEdit = db.users.find((u: any) => u.id === req.params.id);
     if (!userToEdit) return res.status(404).json({ error: 'Utilisateur non trouvé' });
@@ -321,20 +359,15 @@ app.post('/api/users/:id/role', (req, res) => {
     res.json({ success: true });
 });
 
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req, res) => {
     db.users = db.users.filter((u: any) => u.id !== req.params.id);
     saveDb();
     res.json({ success: true });
 });
 
 // Admin : Approuver un utilisateur
-app.post('/api/users/:id/approve', (req, res) => {
-    const { adminId } = req.body;
-    const adminUser = db.users.find((u: any) => u.id === adminId);
-    
-    if (!adminUser || (adminUser.role !== 'owner' && adminUser.role !== 'admin')) {
-        return res.status(403).json({ error: 'Non autorisé' });
-    }
+app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const adminUser = req.user;
 
     const userToApprove = db.users.find((u: any) => u.id === req.params.id);
     if (!userToApprove) return res.status(404).json({ error: 'Utilisateur non trouvé' });
@@ -454,7 +487,7 @@ app.post('/api/notifications/read-all', (req, res) => {
 
 // Recherche TMDB
 app.get('/api/tmdb/search', async (req, res) => {
-    const query = req.query.query;
+    const query = req.query.query as string;
     const apiKey = process.env.TMDB_API_KEY;
     
     if (!apiKey) {
@@ -466,7 +499,7 @@ app.get('/api/tmdb/search', async (req, res) => {
     }
 
     try {
-        const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${query}&language=fr-FR`);
+        const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR`);
         const data = await response.json();
         res.json(data);
     } catch (err: any) {
@@ -476,7 +509,7 @@ app.get('/api/tmdb/search', async (req, res) => {
 });
 
 // Upload Video Local
-app.post('/api/films/upload', upload.single('video'), async (req, res) => {
+app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: any, res) => {
     const file = req.file;
     const body = req.body;
 
@@ -540,7 +573,7 @@ app.post('/api/films/upload', upload.single('video'), async (req, res) => {
 });
 
 // Distribution Vidéos Static
-app.use('/videos', express.static(UPLOADS_DIR));
+app.use('/videos', requireAuth, express.static(UPLOADS_DIR));
 
 
 // ======================= VITE MIDDLEWARE =======================

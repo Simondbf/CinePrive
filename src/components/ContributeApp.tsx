@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function ContributeApp({ activeUser, films, onRefresh, mode }: Props) {
-  const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests' | 'polls'>(mode === 'upload' ? 'upload' : 'users');
+  const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests' | 'polls' | 'funding'>(mode === 'upload' ? 'upload' : 'users');
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [invitesList, setInvitesList] = useState<{code: string, used: boolean, maxUses?: number, currentUses?: number}[]>([]);
@@ -123,6 +123,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   // Upload State
   const [tmdbQuery, setTmdbQuery] = useState('');
   const [tmdbResults, setTmdbResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [selectedMeta, setSelectedMeta] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -680,7 +681,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                         Object.keys(pollResults).map(pollId => {
                             const data = pollResults[pollId];
                             const config = pollsConfig.find((p:any) => p.id === pollId);
-                            const title = config ? config.question : `Sondage ID : ${pollId}`;
+                            const title = config ? config.title : `Sondage ID : ${pollId}`;
                             const totalVotes = Object.values(data.options).reduce((a: any, b: any) => a + b, 0) as number;
                             return (
                                 <div key={pollId} className="space-y-4">

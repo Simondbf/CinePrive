@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from './types';
+import { notify } from './lib/notify';
 import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
@@ -287,9 +288,10 @@ export default function App() {
                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Fondateur' : activeUser.role}</p>
                             </div>
                             <button 
-                                onClick={() => { 
+                                onClick={async () => { 
+                                    await fetch('/api/logout', { method: 'POST' });
                                     localStorage.removeItem('cine_remember');
-                                    localStorage.removeItem('cine_remember_password');
+                                    localStorage.removeItem('cine_remember_username');
                                     sessionStorage.removeItem('cine_session');
                                     setActiveUser(null); 
                                     setViewMode('viewer'); 
@@ -313,7 +315,7 @@ export default function App() {
       
       <main>
         {viewMode === 'polls' ? (
-           <Polls />
+           <Polls activeUser={activeUser} />
         ) : viewMode === 'viewer' ? (
            <ViewerApp 
                activeUser={activeUser} 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, BarChart3, Edit3 } from 'lucide-react';
+import { User } from '../types';
 
-export default function Polls() {
+export default function Polls({ activeUser }: { activeUser: User }) {
     const [votes, setVotes] = useState<Record<string, string>>({});
     const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
     const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
@@ -28,12 +29,14 @@ export default function Polls() {
         const customText = customInputs[pollId];
         
         try {
-            await fetch('/api/polls/vote', {
+            const res = await fetch('/api/polls/vote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pollId, vote: optionId, customText })
+                body: JSON.stringify({ pollId, vote: optionId, customText, userId: activeUser?.id })
             });
-            setSubmitted(v => ({ ...v, [pollId]: true }));
+            if (res.ok) {
+                setSubmitted(v => ({ ...v, [pollId]: true }));
+            }
         } catch (e) { console.error(e) }
     };
 

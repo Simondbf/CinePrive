@@ -21,40 +21,27 @@ export default function AuthScreen({ onLogin }: Props) {
     const [settings, setSettings] = useState<{allowRegistrations: boolean} | null>(null);
 
     useEffect(() => {
-        const sessionStr = sessionStorage.getItem('cine_session');
-        if (sessionStr) {
-            const parsed = JSON.parse(sessionStr);
-            setUsername(parsed.username);
-            setPassword(parsed.password);
-            fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(parsed)
+        // Clear insecure storages if they exist (cleanup legacy)
+        sessionStorage.removeItem('cine_session');
+        localStorage.removeItem('cine_remember_password');
+        
+        // Auto login attempt using HttpOnly cookie session
+        fetch('/api/me')
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error('Not logged in');
             })
-            .then(res => res.json())
-            .then(data => { if (data.id || data.user) onLogin(data.user || data); })
-            .catch(console.error);
-        } else if (localStorage.getItem('cine_remember') === 'true') {
-            const savedUsername = localStorage.getItem('cine_remember_username') || '';
-            const savedPassword = localStorage.getItem('cine_remember_password') || '';
-            setRememberMe(true);
-            setUsername(savedUsername);
-            setPassword(savedPassword);
-            
-            if (savedUsername && savedPassword) {
-                // Auto login attempt
-                fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: savedUsername, password: savedPassword })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.id || data.user) onLogin(data.user || data);
-                })
-                .catch(console.error);
-            }
-        }
+            .then(data => {
+                if (data.id) onLogin(data);
+            })
+            .catch(() => {
+                // Not logged in via cookie, fallback to remembering username visually if checked
+                if (localStorage.getItem('cine_remember') === 'true') {
+                    const savedUsername = localStorage.getItem('cine_remember_username') || '';
+                    setRememberMe(true);
+                    setUsername(savedUsername);
+                }
+            });
 
         fetch('/api/settings')
             .then(res => res.json())
@@ -101,15 +88,12 @@ export default function AuthScreen({ onLogin }: Props) {
           const data = await res.json();
 
           if (res.ok) {
-              sessionStorage.setItem('cine_session', JSON.stringify({ username, password }));
               if (rememberMe) {
                   localStorage.setItem('cine_remember', 'true');
                   localStorage.setItem('cine_remember_username', username);
-                  localStorage.setItem('cine_remember_password', password);
               } else {
                   localStorage.removeItem('cine_remember');
                   localStorage.removeItem('cine_remember_username');
-                  localStorage.removeItem('cine_remember_password');
               }
               onLogin(data);
           } else {
