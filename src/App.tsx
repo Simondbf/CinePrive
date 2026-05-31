@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from './types';
 import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
 import ViewerApp from './components/ViewerApp';
@@ -10,6 +10,7 @@ import FundingModal from './components/FundingModal';
 import EasterEgg from './components/EasterEgg';
 import SettingsModal from './components/SettingsModal';
 import Polls from './components/Polls';
+import Loader from './components/Loader';
 
 export default function App() {
   const [activeUser, setActiveUser] = useState<User | null>(null);
@@ -114,6 +115,10 @@ export default function App() {
       setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return <Loader />;
+  }
 
   if (playingFilm) {
     return <Player film={playingFilm} activeUser={activeUser} onClose={() => setPlayingFilm(null)} />;

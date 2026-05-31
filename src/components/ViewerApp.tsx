@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Film, User } from '../types';
 import MovieGrid from './MovieGrid';
 import { Search } from 'lucide-react';
@@ -34,7 +34,11 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser }: P
     const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
     
     useEffect(() => {
-        setDownloadedIds(JSON.parse(localStorage.getItem(`downloads_${activeUser.id}`) || '[]'));
+        try {
+            setDownloadedIds(JSON.parse(localStorage.getItem(`downloads_${activeUser.id}`) || '[]'));
+        } catch (e) {
+            setDownloadedIds([]);
+        }
     }, [activeUser.id]);
 
     const filteredFilms = useMemo(() => {

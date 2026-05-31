@@ -10,6 +10,25 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Sécurité : Bloquer l'IP nue (Autoriser uniquement via Cloudflare avec le bon nom de domaine)
+app.use((req, res, next) => {
+    // Si l'application tourne derrière un proxy (Cloudflare), 
+    // le header 'x-forwarded-host' ou 'host' contiendra le domaine d'origine
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    
+    // Si nous ne sommes pas en dev et si le host pointe vers l'IP pure au lieu du nom de domaine
+    if (process.env.NODE_ENV === 'production' && typeof host === 'string') {
+        const isIp = /^[0-9.]+(:[0-9]+)?$/.test(host);
+        
+        // Bloquer si le host est l'IP directe
+        // On permet 'localhost' pour le développement interne
+        if (isIp && !host.startsWith('127.0.0.1') && !host.startsWith('localhost')) {
+            return res.status(403).send("Accès direct par IP bloqué. Veuillez utiliser CinePrive.rpisimon.uk");
+        }
+    }
+    next();
+});
+
 // Dossier de stockage des vidéos
 const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
