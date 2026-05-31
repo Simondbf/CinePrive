@@ -15,7 +15,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [invitesList, setInvitesList] = useState<{code: string, used: boolean, maxUses?: number, currentUses?: number}[]>([]);
   const [pollResults, setPollResults] = useState<any>({});
-  const [settings, setSettings] = useState<{ allowRegistrations: boolean }>({ allowRegistrations: true });
+  const [settings, setSettings] = useState<{ allowRegistrations: boolean, fundingCurrent?: number, fundingGoal?: number }>({ allowRegistrations: true });
 
   // Nouveaux états locaux pour les super-codes
   const [customCodeInput, setCustomCodeInput] = useState('');
@@ -191,6 +191,14 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                   >
                      Demandes ({requestsList.length})
                   </button>
+                  {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                      <button 
+                         className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'funding' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
+                         onClick={() => setTab('funding')}
+                      >
+                         Financement
+                      </button>
+                  )}
                   <button 
                      className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'polls' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
                      onClick={() => setTab('polls')}
@@ -577,6 +585,55 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             ))}
                         </tbody>
                     </table>
+                </div>
+            </div>
+        )}
+
+        {tab === 'funding' && (activeUser.role === 'owner' || activeUser.role === 'admin') && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6">Gestion Financière du Serveur</h3>
+                <div className="max-w-md space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Montant actuel de la cagnotte (€)</label>
+                        <div className="flex gap-2">
+                            <input 
+                                type="number" 
+                                value={settings.fundingCurrent || 0}
+                                onChange={e => {
+                                    const val = parseFloat(e.target.value);
+                                    setSettings(s => ({ ...s, fundingCurrent: val }));
+                                    fetch('/api/settings', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ fundingCurrent: val })
+                                    });
+                                }}
+                                className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Objectif mensuel (€)</label>
+                        <div className="flex gap-2">
+                            <input 
+                                type="number" 
+                                value={settings.fundingGoal || 12}
+                                onChange={e => {
+                                    const val = parseFloat(e.target.value);
+                                    setSettings(s => ({ ...s, fundingGoal: val }));
+                                    fetch('/api/settings', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ fundingGoal: val })
+                                    });
+                                }}
+                                className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-4">
+                        Ces valeurs sont mises à jour en temps réel et s'affichent publiquement dans la modal "Soutenir".
+                    </p>
                 </div>
             </div>
         )}

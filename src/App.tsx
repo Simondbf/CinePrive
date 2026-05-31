@@ -235,6 +235,8 @@ export default function App() {
                             </div>
                             <button 
                                 onClick={() => { 
+                                    localStorage.removeItem('cine_remember');
+                                    localStorage.removeItem('cine_remember_password');
                                     setActiveUser(null); 
                                     setViewMode('viewer'); 
                                     setShowUserMenu(false);
