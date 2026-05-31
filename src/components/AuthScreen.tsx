@@ -22,8 +22,25 @@ export default function AuthScreen({ onLogin }: Props) {
 
     useEffect(() => {
         if (localStorage.getItem('cine_remember') === 'true') {
+            const savedUsername = localStorage.getItem('cine_remember_username') || '';
+            const savedPassword = localStorage.getItem('cine_remember_password') || '';
             setRememberMe(true);
-            setUsername(localStorage.getItem('cine_remember_username') || '');
+            setUsername(savedUsername);
+            setPassword(savedPassword);
+            
+            if (savedUsername && savedPassword) {
+                // Auto login attempt
+                fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: savedUsername, password: savedPassword })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.id) onLogin(data);
+                })
+                .catch(console.error);
+            }
         }
 
         fetch('/api/settings')
@@ -71,6 +88,15 @@ export default function AuthScreen({ onLogin }: Props) {
           const data = await res.json();
 
           if (res.ok) {
+              if (rememberMe) {
+                  localStorage.setItem('cine_remember', 'true');
+                  localStorage.setItem('cine_remember_username', username);
+                  localStorage.setItem('cine_remember_password', password);
+              } else {
+                  localStorage.removeItem('cine_remember');
+                  localStorage.removeItem('cine_remember_username');
+                  localStorage.removeItem('cine_remember_password');
+              }
               onLogin(data);
           } else {
               setError(data.error || 'Erreur lors de la connexion');
@@ -83,7 +109,7 @@ export default function AuthScreen({ onLogin }: Props) {
   };
 
   return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-[#111315] dark:amoled:bg-black flex flex-col items-center justify-center text-zinc-900 dark:text-white px-4 transition-colors">
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#16181c] dark:amoled:bg-black flex flex-col items-center justify-center text-zinc-900 dark:text-white px-4 transition-colors">
           <div className="w-full max-w-md">
               <h1 className="text-4xl md:text-5xl font-bold font-sans tracking-tight text-center mb-12 text-zinc-900 dark:text-zinc-100 flex items-center justify-center gap-3">
                   <Monitor className="w-10 h-10 text-red-600" />

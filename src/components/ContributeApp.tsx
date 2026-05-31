@@ -6,16 +6,17 @@ interface Props {
   activeUser: User;
   films: Film[];
   onRefresh: () => void;
-  initialTab?: 'upload' | 'library' | 'users' | 'requests';
+  mode: 'upload' | 'admin';
 }
 
-export default function ContributeApp({ activeUser, films, onRefresh, initialTab = 'upload' }: Props) {
-  const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests'>(initialTab);
+export default function ContributeApp({ activeUser, films, onRefresh, mode }: Props) {
+  const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests' | 'polls'>(mode === 'upload' ? 'upload' : 'users');
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
   const [invitesList, setInvitesList] = useState<{code: string, used: boolean, maxUses?: number, currentUses?: number}[]>([]);
+  const [pollResults, setPollResults] = useState<any>({});
   const [settings, setSettings] = useState<{ allowRegistrations: boolean }>({ allowRegistrations: true });
-  
+
   // Nouveaux états locaux pour les super-codes
   const [customCodeInput, setCustomCodeInput] = useState('');
   const [maxUsesInput, setMaxUsesInput] = useState('');
@@ -25,11 +26,16 @@ export default function ContributeApp({ activeUser, films, onRefresh, initialTab
      fetch('/api/requests').then(r => r.json()).then(setRequestsList).catch(console.error);
      fetch('/api/settings').then(r => r.json()).then(setSettings).catch(console.error);
      fetch('/api/invites').then(r => r.json()).then(setInvitesList).catch(console.error);
+     fetch('/api/polls/results').then(r => r.json()).then(setPollResults).catch(console.error);
   }, []);
 
   useEffect(() => {
      fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+     setTab(mode === 'upload' ? 'upload' : 'users');
+  }, [mode]);
 
   const generateInvite = async () => {
       try {
@@ -162,43 +168,62 @@ export default function ContributeApp({ activeUser, films, onRefresh, initialTab
   };
 
   const AdminPanelNav = () => (
-      <div className="flex gap-4 border-b border-zinc-800 mb-8 pb-4">
-          <button 
-             className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'upload' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
-             onClick={() => setTab('upload')}
-          >
-             Plateforme d'Upload
-          </button>
-          <button 
-             className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'library' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
-             onClick={() => setTab('library')}
-          >
-             Historique Serveur ({films.length})
-          </button>
-          <button 
-             className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'requests' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
-             onClick={() => setTab('requests')}
-          >
-             Demandes ({requestsList.length})
-          </button>
-          {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+      <div className="flex flex-wrap gap-2 border-b border-zinc-200 dark:border-zinc-800 mb-8 pb-4">
+          {mode === 'upload' ? (
               <button 
-                 className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'users' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
-                 onClick={() => setTab('users')}
+                 className={`px-4 py-2 font-medium rounded transition-colors bg-zinc-800 dark:bg-white text-white dark:text-black`}
               >
-                 Membres ({usersList.filter(u => u.status === 'pending').length} en attente)
+                 Plateforme d'Upload
               </button>
+          ) : (
+              <>
+                  {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                      <button 
+                         className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'users' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
+                         onClick={() => setTab('users')}
+                      >
+                         Membres ({usersList.filter(u => u.status === 'pending').length} en attente)
+                      </button>
+                  )}
+                  <button 
+                     className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'requests' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
+                     onClick={() => setTab('requests')}
+                  >
+                     Demandes ({requestsList.length})
+                  </button>
+                  <button 
+                     className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'polls' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
+                     onClick={() => setTab('polls')}
+                  >
+                     Sondages
+                  </button>
+                  <button 
+                     className={`px-4 py-2 font-medium rounded transition-colors ${tab === 'library' ? 'bg-zinc-800 dark:bg-white text-white dark:text-black' : 'text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300'}`}
+                     onClick={() => setTab('library')}
+                  >
+                     Historique ({films.length})
+                  </button>
+              </>
           )}
       </div>
   );
 
   return (
     <div className="p-6 md:p-12 pb-24 max-w-[1200px] mx-auto">
-        <div className="mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-red-600 rounded-r shadow-sm">
-             <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">Espace Contributeur</h2>
-             <p className="text-zinc-600 dark:text-zinc-400 text-sm">
-                 Ici, vous pouvez ajouter vos films à la bibliothèque partagée CinéPrivé depuis votre ordinateur.
-             </p>
+        <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-red-600 rounded-r shadow-sm">
+             <div>
+                 <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">
+                    {mode === 'upload' ? 'Espace Contributeur' : 'Administration'}
+                 </h2>
+                 <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                     {mode === 'upload' ? 'Ici, vous pouvez ajouter vos films à la bibliothèque partagée CinéPrivé depuis votre ordinateur.' : 'Gérez les accès, les demandes et les paramètres globaux de la plateforme.'}
+                 </p>
+             </div>
+             {mode === 'admin' && (
+                 <button onClick={fetchData} className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded text-sm font-medium transition flex items-center gap-2">
+                     Actualiser
+                 </button>
+             )}
         </div>
 
         <AdminPanelNav />
@@ -503,20 +528,25 @@ export default function ContributeApp({ activeUser, films, onRefresh, initialTab
                                     </td>
                                     <td className="px-6 py-4">{u.username}</td>
                                     <td className="px-6 py-4 uppercase text-xs">
-                                        {u.role}
+                                        {u.role === 'owner' ? 'Fondateur' : u.role}
                                         {activeUser.role === 'owner' && u.id !== activeUser.id && (
                                             <div className="mt-2 flex items-center gap-1">
                                                 <button 
                                                     onClick={() => handleChangeRole(u.id, 'user')}
-                                                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'user' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'}`}
+                                                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'user' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-red-500/10 text-red-600 hover:bg-red-500/20'}`}
+                                                    title={u.role === 'admin' ? "Rétrograder ce compte en simple utilisateur" : ""}
                                                 >
-                                                    User
+                                                    {u.role === 'admin' ? 'Rétrograder à User' : 'User'}
                                                 </button>
                                                 <button 
-                                                    onClick={() => handleChangeRole(u.id, 'admin')}
+                                                    onClick={() => {
+                                                        if(window.confirm(`Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`)){
+                                                            handleChangeRole(u.id, 'admin');
+                                                        }
+                                                    }}
                                                     className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'admin' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'}`}
                                                 >
-                                                    Admin
+                                                    Faire Admin
                                                 </button>
                                             </div>
                                         )}
@@ -547,6 +577,55 @@ export default function ContributeApp({ activeUser, films, onRefresh, initialTab
                             ))}
                         </tbody>
                     </table>
+                </div>
+            </div>
+        )}
+
+        {tab === 'polls' && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mx-auto shadow-sm">
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-lg font-medium">Résultats des sondages</h3>
+                </div>
+                <div className="p-6 space-y-8">
+                    {Object.keys(pollResults).length === 0 ? (
+                        <p className="text-zinc-500 text-center py-8">Aucun vote enregistré pour le moment.</p>
+                    ) : (
+                        Object.keys(pollResults).map(pollId => {
+                            const data = pollResults[pollId];
+                            const totalVotes = Object.values(data.options).reduce((a: any, b: any) => a + b, 0) as number;
+                            return (
+                                <div key={pollId} className="space-y-4">
+                                    <h4 className="font-medium text-zinc-900 dark:text-white capitalize">Sondage ID : {pollId} ({totalVotes} votes)</h4>
+                                    <div className="space-y-2">
+                                        {Object.entries(data.options).map(([optionId, count]: [string, any]) => {
+                                            const percentage = totalVotes === 0 ? 0 : Math.round((count / totalVotes) * 100);
+                                            return (
+                                                <div key={optionId} className="flex flex-col gap-1">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-zinc-700 dark:text-zinc-300 capitalize">{optionId}</span>
+                                                        <span className="font-medium">{count} ({percentage}%)</span>
+                                                    </div>
+                                                    <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-red-600 rounded-full" style={{ width: `${percentage}%` }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {data.custom && data.custom.length > 0 && (
+                                        <div className="mt-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700/50">
+                                            <h5 className="text-sm font-medium mb-2">Suggestions des membres :</h5>
+                                            <ul className="list-disc pl-4 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                                {data.custom.map((text: string, i: number) => (
+                                                    <li key={i}>{text}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })
+                    )}
                 </div>
             </div>
         )}

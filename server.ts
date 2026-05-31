@@ -53,10 +53,29 @@ if (fs.existsSync(dbFile)) {
 if (!db.users) db.users = [];
 if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
-if (!db.settings) db.settings = { allowRegistrations: true };
+if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
 if (!db.invites) db.invites = [];
+if (!db.polls) db.polls = {};
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
+
+// --- API POLLS ---
+app.post('/api/polls/vote', (req, res) => {
+    const { pollId, vote, customText, userId } = req.body;
+    if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [] };
+    
+    if (vote === 'custom' && customText) {
+        db.polls[pollId].custom.push(customText);
+    } else if (vote) {
+        db.polls[pollId].options[vote] = (db.polls[pollId].options[vote] || 0) + 1;
+    }
+    saveDb();
+    res.json({ success: true, pollData: db.polls[pollId] });
+});
+
+app.get('/api/polls/results', (req, res) => {
+    res.json(db.polls);
+});
 
 const upload = multer({ 
     dest: UPLOADS_DIR,

@@ -138,7 +138,7 @@ export default function App() {
 
   // Navbar shared between Viewer and Admin
   const Navbar = () => (
-      <nav className={`sticky top-0 w-full z-40 ${amoledActive ? 'bg-zinc-50/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#111315]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-900 flex items-center px-4 md:px-12 py-4 transition-colors`}>
+      <nav className={`sticky top-0 w-full z-40 ${amoledActive ? 'bg-zinc-50/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 md:px-12 py-4 transition-colors`}>
         <div className="flex items-center gap-4">
             {viewMode !== 'viewer' && (
                 <button 
@@ -211,28 +211,38 @@ export default function App() {
                 <Settings className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 group relative">
+            <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 group relative h-full">
                 {activeUser.status === 'pending' && (
                     <span className="hidden md:inline text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-500 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-700/50 mr-2">
-                        Compte en attente de vérification
+                        Compte en attente
                     </span>
                 )}
-                <div className={`w-8 h-8 rounded shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700`}>
+                <div className={`w-8 h-8 rounded shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer`}>
                     {(activeUser.name || activeUser.username || '?').charAt(0).toUpperCase()}
                 </div>
-                <button 
-                   onClick={() => { setActiveUser(null); setViewMode('viewer'); }}
-                   className="absolute right-0 opacity-0 group-hover:opacity-100 translate-x-12 group-hover:translate-x-10 px-3 py-1 bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs rounded transition-all shadow border border-zinc-300 dark:border-zinc-700 whitespace-nowrap z-50 flex items-center gap-1"
-                >
-                   <LogOut className="w-3 h-3" /> Quitter
-                </button>
+                
+                {/* Netflix-style hover dropdown */}
+                <div className="absolute top-10 right-0 w-48 pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden flex flex-col">
+                        <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                            <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Fondateur' : activeUser.role}</p>
+                        </div>
+                        <button 
+                            onClick={() => { setActiveUser(null); setViewMode('viewer'); }}
+                            className="w-full text-left px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400 hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-2"
+                        >
+                           <LogOut className="w-4 h-4" /> Se déconnecter
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
       </nav>
   );
 
   return (
-    <div className={`min-h-screen ${amoledActive ? 'bg-zinc-50 dark:bg-black' : 'bg-zinc-50 dark:bg-[#111315]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
+    <div className={`min-h-screen ${amoledActive ? 'bg-zinc-50 dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
       <Navbar />
       
       <main>
@@ -267,11 +277,6 @@ export default function App() {
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 rounded-lg">
-                              <span className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1 block">Aujourd'hui</span>
-                              <h3 className="font-semibold text-sm mb-1">Mise à jour v1.2</h3>
-                              <p className="text-sm text-zinc-600 dark:text-zinc-400">Ajout du mode Noir profond et de la gestion de profils.</p>
-                          </div>
                           <div className="bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 p-8 text-center rounded-lg text-sm">
                               Les notifications Web Push arriveront bientôt pour être toujours informé des nouvelles sorties ! 🚀
                           </div>

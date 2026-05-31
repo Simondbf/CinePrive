@@ -17,8 +17,18 @@ export default function Polls() {
         }
     };
 
-    const submitVote = (pollId: string) => {
-        setSubmitted(v => ({ ...v, [pollId]: true }));
+    const submitVote = async (pollId: string) => {
+        const optionId = votes[pollId];
+        const customText = customInputs[pollId];
+        
+        try {
+            await fetch('/api/polls/vote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pollId, vote: optionId, customText })
+            });
+            setSubmitted(v => ({ ...v, [pollId]: true }));
+        } catch (e) { console.error(e) }
     };
 
     const polls = [
