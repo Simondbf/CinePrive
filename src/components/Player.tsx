@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { notify } from '../lib/notify';
 import { Film, User } from '../types';
 import { ArrowLeft, Play, Pause, Maximize, Volume2, VolumeX, Download, Settings, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -147,7 +148,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             
                             {/* Top Right Action tools */}
                             <div className="flex items-center gap-4 text-white">
-                                <button className="hover:text-gold-500 transition-colors p-2" title="Sous-titres & Audio (Bientôt disponible sur serveur complet)" onClick={() => alert("Le multiplexage (Sous-titres & multi-audio) nécessite un transcodage côté serveur (via FFmpeg comme sur Jellyfin complet). Dans ce prototype AI Studio, seul le flux par défaut est streamé.")}>
+                                <button className="hover:text-gold-500 transition-colors p-2" title="Sous-titres & Audio (Bientôt disponible sur serveur complet)" onClick={() => notify("Le multiplexage (Sous-titres & multi-audio) nécessite un transcodage côté serveur (via FFmpeg comme sur Jellyfin complet). Dans ce prototype, seul le flux par défaut est streamé.", "Information Technique")}>
                                     <Settings className="w-5 h-5" />
                                 </button>
                                 {film.cast && film.cast.length > 0 && (
@@ -169,7 +170,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                                         if (!stored.includes(film.id)) {
                                             localStorage.setItem(key, JSON.stringify([...stored, film.id]));
                                         }
-                                        alert("Le fichier source est en cours de téléchargement.\n\nNote Technique : Sur ce prototype (sans transcoding FFmpeg), la taille du fichier est la taille d'origine du fichier uploadé.\nSur le serveur complet avec Jellyfin, un transcodage compressé pourra être proposé pour les mobiles.");
+                                        notify("Le fichier source est en cours de téléchargement.\n\nNote Technique : Sur ce prototype (sans transcoding FFmpeg), la taille du fichier est la taille d'origine du fichier uploadé.\nSur le serveur complet avec Jellyfin, un transcodage compressé pourra être proposé pour les mobiles.", "Mode Hors-Ligne");
                                     }} 
                                     title="Télécharger pour visionnage hors-ligne" 
                                     className="hover:text-gold-500 transition-colors p-2 bg-white/10 rounded-full"

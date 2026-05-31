@@ -16,6 +16,7 @@ export default function App() {
   const [activeUser, setActiveUser] = useState<User | null>(null);
   const [films, setFilms] = useState<Film[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [adminNotifs, setAdminNotifs] = useState<any[]>([]);
 
   // Routing Local Mode: 'viewer', 'upload', 'polls', 'admin'
   const [viewMode, setViewMode] = useState<'viewer' | 'upload' | 'polls' | 'admin'>('viewer');
@@ -32,22 +33,36 @@ export default function App() {
   const [amoledActive, setAmoledActive] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [notification, setNotification] = useState<{title: string, message: string} | null>(null);
 
   useEffect(() => {
+     const handleNotify = (e: Event) => {
+         const customEvent = e as CustomEvent;
+         setNotification(customEvent.detail);
+         if ((window as any)._notifyTimeout) clearTimeout((window as any)._notifyTimeout);
+         (window as any)._notifyTimeout = setTimeout(() => setNotification(null), 5000);
+     };
+     window.addEventListener('app-notify', handleNotify);
+     return () => window.removeEventListener('app-notify', handleNotify);
+  }, []);
+
+  useEffect(() => {
+     if (!activeUser) return;
      // Retrieve saved settings
-     const savedAmoledUnlocked = localStorage.getItem('salleObscureUnlocked') === 'true';
-     const savedAmoledActive = localStorage.getItem('salleObscureActive') === 'true';
-     const savedTheme = localStorage.getItem('themeMode') as 'light'|'dark'|'system' || 'system';
+     const savedAmoledUnlocked = localStorage.getItem(`salleObscureUnlocked_${activeUser.id}`) === 'true';
+     const savedAmoledActive = localStorage.getItem(`salleObscureActive_${activeUser.id}`) === 'true';
+     const savedTheme = localStorage.getItem(`themeMode_${activeUser.id}`) as 'light'|'dark'|'system' || 'system';
      
      if (savedAmoledUnlocked) setAmoledUnlocked(true);
      if (savedAmoledActive && savedAmoledUnlocked) setAmoledActive(true);
      setThemeMode(savedTheme);
-  }, []);
+  }, [activeUser]);
 
   // Theme Applier Effect
   useEffect(() => {
-      localStorage.setItem('themeMode', themeMode);
-      localStorage.setItem('salleObscureActive', amoledActive.toString());
+      if (!activeUser) return;
+      localStorage.setItem(`themeMode_${activeUser.id}`, themeMode);
+      localStorage.setItem(`salleObscureActive_${activeUser.id}`, amoledActive.toString());
 
       const root = window.document.documentElement;
       
@@ -79,8 +94,11 @@ export default function App() {
       if (newTaps === 7 && !amoledUnlocked) {
           setAmoledUnlocked(true);
           setAmoledActive(true);
-          localStorage.setItem('salleObscureUnlocked', 'true');
-          alert("« On ne laisse pas bébé dans un coin... » 💃\n\nFélicitations, vous avez déverrouillé le Mode Salle Obscure ! Rendez-vous dans les paramètres (engrenage).");
+          localStorage.setItem(`salleObscureUnlocked_${activeUser?.id}`, 'true');
+          window.dispatchEvent(new CustomEvent('app-notify', { detail: {
+              title: "Cinéma déverrouillé",
+              message: "« Il va faire tout noir ! » 💃\nFélicitations, vous avez déverrouillé le Mode Salle Obscure ! Rendez-vous dans les paramètres (engrenage)."
+          }}));
           setLogoTaps(0);
       }
       
@@ -117,12 +135,26 @@ export default function App() {
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
+      if (activeUser && (activeUser.role === 'admin' || activeUser.role === 'owner')) {
+          const nres = await fetch('/api/notifications');
+          if (nres.ok) {
+              const ndata = await nres.json();
+              setAdminNotifs(ndata.reverse());
+              if (ndata.some((n: any) => !n.readBy.includes(activeUser.id))) {
+                  setHasUnread(true);
+              }
+          }
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+     if (activeUser) fetchFilms();
+  }, [activeUser]);
 
   if (isLoading) {
     return <Loader />;
@@ -289,14 +321,33 @@ export default function App() {
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                          <div className="bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 p-8 text-center rounded-lg text-sm">
-                              Les notifications Web Push arriveront bientôt pour être toujours informé des nouvelles sorties ! 🚀
-                          </div>
+                           {(activeUser.role === 'owner' || activeUser.role === 'admin') && adminNotifs.length > 0 ? (
+                               adminNotifs.map(n => (
+                                   <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
+                                       <div className="flex justify-between items-start mb-1">
+                                           <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">{n.type}</span>
+                                           <span className="text-[10px] text-zinc-500">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                       </div>
+                                       <p className="text-sm font-medium">{n.message}</p>
+                                   </div>
+                               ))
+                           ) : (
+                               <div className="bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 p-8 text-center rounded-lg text-sm">
+                                   Les notifications Web Push arriveront bientôt pour être toujours informé des nouvelles sorties ! 🚀
+                               </div>
+                           )}
                       </div>
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
-                          <button onClick={() => { setShowInbox(false); }} className="px-4 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-medium rounded text-sm hover:opacity-80 transition flex items-center gap-2">
-                              <Check className="w-4 h-4"/> Lu
-                          </button>
+                           <button onClick={async () => {
+                               setShowInbox(false);
+                               if (activeUser.role === 'owner' || activeUser.role === 'admin') {
+                                   await fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: activeUser.id}) });
+                                   setHasUnread(false);
+                                   fetchFilms();
+                               }
+                           }} className="px-4 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-medium rounded text-sm hover:opacity-80 transition flex items-center gap-2">
+                               <Check className="w-4 h-4"/> Lu
+                           </button>
                           <button onClick={() => setShowInbox(false)} className="px-4 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-medium rounded text-sm hover:opacity-80 transition">Fermer</button>
                       </div>
                   </motion.div>
@@ -315,6 +366,23 @@ export default function App() {
               />
           )}
           {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
+          
+          {notification && (
+              <div className="fixed top-24 right-4 z-[9999]">
+                  <motion.div 
+                     initial={{ opacity: 0, scale: 0.95, y: -20, x: 20 }}
+                     animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                     exit={{ opacity: 0, scale: 0.95, y: -20, x: 20 }}
+                     className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-72 flex flex-col gap-2"
+                  >
+                      <div className="flex justify-between items-start">
+                          <h3 className="font-bold text-sm text-red-500">{notification.title}</h3>
+                          <button onClick={() => setNotification(null)} className="text-zinc-500 hover:text-white"><Check className="w-4 h-4"/></button>
+                      </div>
+                      <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
+                  </motion.div>
+              </div>
+          )}
       </AnimatePresence>
       
       {showEasterEgg && <EasterEgg onClose={() => setShowEasterEgg(false)} />}

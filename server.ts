@@ -55,6 +55,7 @@ if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
 if (!db.invites) db.invites = [];
+if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};
 if (!db.pollsConfig) db.pollsConfig = [
     {
@@ -184,7 +185,7 @@ app.post('/api/register', (req, res) => {
     
     let bypassWithCode = false;
     if (inviteCode && db.invites) {
-        const inviteIndex = db.invites.findIndex((i: any) => i.code === inviteCode && !i.used);
+        const inviteIndex = db.invites.findIndex((i: any) => i.code.toLowerCase() === inviteCode.toLowerCase() && !i.used);
         if (inviteIndex >= 0) {
             bypassWithCode = true;
             // Gérer les tickets multi-uses
@@ -228,6 +229,19 @@ app.post('/api/register', (req, res) => {
     };
 
     db.users.push(newUser);
+    
+    // Notification for admins
+    if (newUser.status === 'pending') {
+        if (!db.notifications) db.notifications = [];
+        db.notifications.push({
+            id: Date.now().toString(),
+            type: 'register',
+            message: `Un nouvel utilisateur ("${username}") s'est inscrit avec succès et attend validation.`,
+            readBy: [],
+            createdAt: Date.now()
+        });
+    }
+    
     saveDb();
 
     // Renvoyer l'utilisateur sans le mdp
@@ -325,6 +339,8 @@ app.post('/api/users/:id/approve', (req, res) => {
     if (!userToApprove) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
     userToApprove.status = 'active';
+    userToApprove.validatedBy = adminUser.username;
+    userToApprove.validatedAt = Date.now();
     saveDb();
     res.json({ success: true, user: { ...userToApprove, password: '' } });
 });
@@ -385,6 +401,17 @@ app.post('/api/requests', (req, res) => {
 
     if (!db.requests) db.requests = [];
     db.requests.push(newRequest);
+    
+    // Notification for admins
+    if (!db.notifications) db.notifications = [];
+    db.notifications.push({
+        id: Date.now().toString(),
+        type: 'request',
+        message: `L'utilisateur "${userName}" a demandé l'ajout du film "${title}".`,
+        readBy: [],
+        createdAt: Date.now()
+    });
+    
     saveDb();
     
     res.json({ success: true, request: newRequest });
@@ -393,6 +420,32 @@ app.post('/api/requests', (req, res) => {
 app.delete('/api/requests/:id', (req, res) => {
     if (!db.requests) db.requests = [];
     db.requests = db.requests.filter((r: any) => r.id !== req.params.id);
+    saveDb();
+    res.json({ success: true });
+});
+
+// Notifications
+app.get('/api/notifications', (req, res) => {
+    res.json(db.notifications || []);
+});
+app.post('/api/notifications/:id/read', (req, res) => {
+    const { userId } = req.body;
+    if (!db.notifications) db.notifications = [];
+    const notif = db.notifications.find((n: any) => n.id === req.params.id);
+    if (notif && !notif.readBy.includes(userId)) {
+        notif.readBy.push(userId);
+        saveDb();
+    }
+    res.json({ success: true });
+});
+app.post('/api/notifications/read-all', (req, res) => {
+    const { userId } = req.body;
+    if (!db.notifications) db.notifications = [];
+    db.notifications.forEach((n: any) => {
+        if (!n.readBy.includes(userId)) {
+            n.readBy.push(userId);
+        }
+    });
     saveDb();
     res.json({ success: true });
 });

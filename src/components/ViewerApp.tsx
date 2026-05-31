@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { notify } from '../lib/notify';
 import { Film, User } from '../types';
 import MovieGrid from './MovieGrid';
 import { Search } from 'lucide-react';
@@ -115,10 +116,10 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser }: P
                                              headers: { 'Content-Type': 'application/json' },
                                              body: JSON.stringify({ userId: activeUser.id, userName: activeUser.name, title: searchQuery })
                                          });
-                                         alert('Votre demande a bien été envoyée à l\'administrateur !');
+                                         notify('Votre demande a bien été envoyée à l\'administrateur !', 'Succès');
                                          setSearchQuery('');
                                      } catch (e) {
-                                         alert('Erreur lors de la demande.');
+                                         notify('Erreur lors de la demande.', 'Erreur');
                                      }
                                  }}
                                  className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition shadow-lg"

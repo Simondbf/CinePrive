@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notify } from '../lib/notify';
 import { motion } from 'motion/react';
 import { Heart, X, Server, Coins } from 'lucide-react';
 
@@ -80,9 +81,9 @@ export default function FundingModal({ onClose }: Props) {
                             onClick={async () => {
                                 try {
                                     await navigator.clipboard.writeText('+33600000000'); // TODO: L'admin changera ce numéro en production
-                                    alert('Numéro Wero de Simon copié dans le presse-papier !');
+                                    notify('Numéro Wero copié dans le presse-papier !', 'Succès');
                                 } catch (err) {
-                                    alert('Copie manuelle : +33 6 XX XX XX XX');
+                                    notify('Copie manuelle : +33 6 XX XX XX XX', 'Information');
                                 }
                             }}
                             className="w-full bg-purple-600 text-white font-semibold py-3 rounded hover:bg-purple-500 transition flex items-center justify-center gap-2"

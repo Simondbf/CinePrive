@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notify } from '../lib/notify';
 import { Film, User } from '../types';
 import { UploadCloud, Search, CheckCircle, Database, Server } from 'lucide-react';
 
@@ -51,7 +52,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
           
           if (!res.ok) {
               const err = await res.json();
-              alert(err.error);
+              notify(err.error, "Erreur");
           } else {
               setCustomCodeInput('');
               setMaxUsesInput('');
@@ -598,14 +599,14 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ fundingCurrent: settings.fundingCurrent, fundingGoal: settings.fundingGoal })
-                            }).then(() => alert('Modifications sauvegardées avec succès !'));
+                            }).then(() => notify('Modifications sauvegardées avec succès !', 'Cagnotte mise à jour'));
                         }}
                         className="mt-4 w-full bg-red-600 text-white font-medium py-2 rounded hover:bg-red-500 transition"
                     >
                         Valider les modifications
                     </button>
                     <p className="text-xs text-zinc-500 mt-4">
-                        Ces valeurs s'affichent publiquement dans la modal "Soutenir". Note: Sans API bancaire externe, cette valeur doit être mise à jour manuellement.
+                        Ces valeurs s'affichent publiquement dans la modal "Soutenir". Note: N'ayant pas d'intégration externe vers une banque, l'incrémentation doit être mise à jour manuellement par les soins de l'administrateur lors de l'arrivée de dons pour CinéPrivé.
                     </p>
                 </div>
             </div>
