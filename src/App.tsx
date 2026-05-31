@@ -35,8 +35,8 @@ export default function App() {
 
   useEffect(() => {
      // Retrieve saved settings
-     const savedAmoledUnlocked = localStorage.getItem('amoledUnlocked') === 'true';
-     const savedAmoledActive = localStorage.getItem('amoledActive') === 'true';
+     const savedAmoledUnlocked = localStorage.getItem('salleObscureUnlocked') === 'true';
+     const savedAmoledActive = localStorage.getItem('salleObscureActive') === 'true';
      const savedTheme = localStorage.getItem('themeMode') as 'light'|'dark'|'system' || 'system';
      
      if (savedAmoledUnlocked) setAmoledUnlocked(true);
@@ -47,7 +47,7 @@ export default function App() {
   // Theme Applier Effect
   useEffect(() => {
       localStorage.setItem('themeMode', themeMode);
-      localStorage.setItem('amoledActive', amoledActive.toString());
+      localStorage.setItem('salleObscureActive', amoledActive.toString());
 
       const root = window.document.documentElement;
       
@@ -79,8 +79,8 @@ export default function App() {
       if (newTaps === 7 && !amoledUnlocked) {
           setAmoledUnlocked(true);
           setAmoledActive(true);
-          localStorage.setItem('amoledUnlocked', 'true');
-          alert("Option Développeur Déverrouillée : Mode Noir profond ! Vos paramètres ont été mis à jour.");
+          localStorage.setItem('salleObscureUnlocked', 'true');
+          alert("« On ne laisse pas bébé dans un coin... » 💃\n\nFélicitations, vous avez déverrouillé le Mode Salle Obscure ! Rendez-vous dans les paramètres (engrenage).");
           setLogoTaps(0);
       }
       
@@ -268,9 +268,9 @@ export default function App() {
                onUpdateUser={setActiveUser}
            />
         ) : viewMode === 'admin' ? (
-           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} initialTab="users" />
+           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" />
         ) : (
-           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} initialTab="upload" />
+           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" />
         )}
       </main>
 

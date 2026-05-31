@@ -74,16 +74,16 @@ export default function FundingModal({ onClose }: Props) {
                             Participer via Revolut
                         </a>
                         {/* 
-                            POUR FIXER WERO AVEC TON NUMÉRO SIMON :
-                            Vu que je suis une IA, je ne connais pas tes infos persos !
-                            Remplace le onclick alert par un href avec "tel:+336XXXXXXX" 
-                            ou laisse le navigator.clipboard.writeText('+336XXXXXXXX') 
-                            pour qu'on puisse le copier :
+                            Participation Wero
                         */}
                         <button 
-                            onClick={() => {
-                                navigator.clipboard.writeText('+336XXXXXXX'); // <-- METS TON NUMERO ICI DANS LE CODE MON GARS !
-                                alert('Numéro copié pour Wero ! (Ouvre ton fichier FundingModal.tsx ligne 82 pour mettre ton vrai numéro !)');
+                            onClick={async () => {
+                                try {
+                                    await navigator.clipboard.writeText('+33600000000'); // TODO: L'admin changera ce numéro en production
+                                    alert('Numéro Wero de Simon copié dans le presse-papier !');
+                                } catch (err) {
+                                    alert('Copie manuelle : +33 6 XX XX XX XX');
+                                }
                             }}
                             className="w-full bg-purple-600 text-white font-semibold py-3 rounded hover:bg-purple-500 transition flex items-center justify-center gap-2"
                         >

@@ -97,9 +97,9 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                             <label className="flex items-center justify-between cursor-pointer group">
                                 <div>
                                     <h4 className="font-medium text-sm text-zinc-900 dark:text-white flex items-center gap-2">
-                                        <Type className="w-4 h-4 text-purple-500" /> Mode Salle Obscure (Secret)
+                                        <Type className="w-4 h-4 text-purple-500" /> Mode Salle Obscure
                                     </h4>
-                                    <p className="text-xs text-zinc-500 mt-1">Plongez l'interface dans un noir complet, comme au cinéma (économie AMOLED).</p>
+                                    <p className="text-xs text-zinc-500 mt-1">Plongez l'interface dans un noir complet, comme au cinéma.</p>
                                 </div>
                                 <div className={`w-12 h-6 rounded-full transition-colors relative ${amoledActive ? 'bg-purple-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
                                     <div className={`absolute top-1 bottom-1 w-4 bg-white rounded-full transition-all ${amoledActive ? 'left-7' : 'left-1'}`} />

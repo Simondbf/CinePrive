@@ -425,32 +425,6 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                 <span className={`${settings.allowRegistrations ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
                             </button>
                         </div>
-                        
-                        {(activeUser.role === 'owner') && (
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-medium text-zinc-800 dark:text-zinc-200">État du Financement</p>
-                                    <p className="text-sm text-zinc-500 mb-2">Mettez à jour manuellement la page "Soutenir" avec l'état actuel de la cagnotte.</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input 
-                                        type="number" step="0.5" 
-                                        placeholder="Actuel" 
-                                        defaultValue={(settings as any).fundingCurrent || 0}
-                                        onBlur={(e) => fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fundingCurrent: e.target.value })})}
-                                        className="w-20 px-3 py-1.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded"
-                                    />
-                                    <span className="text-zinc-500">/</span>
-                                    <input 
-                                        type="number" step="0.5" 
-                                        placeholder="Objectif" 
-                                        defaultValue={(settings as any).fundingGoal || 12}
-                                        onBlur={(e) => fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ fundingGoal: e.target.value })})}
-                                        className="w-20 px-3 py-1.5 text-sm bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded"
-                                    />
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -472,12 +446,11 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                         onChange={e => setMaxUsesInput(e.target.value)}
                                         className="px-3 py-2 text-sm bg-transparent outline-none text-zinc-900 dark:text-white border-r border-zinc-200 dark:border-zinc-800"
                                     >
-                                        <option value="">Illimité</option>
-                                        {Array.from({length: 10}).map((_, i) => (
-                                            <option key={i+1} value={i+1}>{i+1}</option>
+                                        <option value="1">1 utilisation</option>
+                                        {Array.from({length: 4}).map((_, i) => (
+                                            <option key={i+2} value={i+2}>{i+2} utilisations</option>
                                         ))}
-                                        <option value="15">15</option>
-                                        <option value="20">20</option>
+                                        <option value="10">10 utilisations</option>
                                         <option value="custom">Val. perso</option>
                                     </select>
                                     {maxUsesInput === 'custom' ? (
@@ -535,29 +508,33 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                         {u.name}
                                     </td>
                                     <td className="px-6 py-4">{u.username}</td>
-                                    <td className="px-6 py-4 uppercase text-xs">
-                                        {u.role === 'owner' ? 'Fondateur' : u.role}
-                                        {activeUser.role === 'owner' && u.id !== activeUser.id && (
-                                            <div className="mt-2 flex items-center gap-1">
-                                                <button 
-                                                    onClick={() => handleChangeRole(u.id, 'user')}
-                                                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'user' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-red-500/10 text-red-600 hover:bg-red-500/20'}`}
-                                                    title={u.role === 'admin' ? "Rétrograder ce compte en simple utilisateur" : ""}
-                                                >
-                                                    {u.role === 'admin' ? 'Rétrograder à User' : 'User'}
-                                                </button>
-                                                <button 
-                                                    onClick={() => {
-                                                        if(window.confirm(`Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`)){
-                                                            handleChangeRole(u.id, 'admin');
-                                                        }
-                                                    }}
-                                                    className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium transition ${u.role === 'admin' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white pointer-events-none' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'}`}
-                                                >
-                                                    Faire Admin
-                                                </button>
-                                            </div>
-                                        )}
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-2">
+                                            <span className="uppercase text-xs font-semibold">{u.role === 'owner' ? 'Fondateur' : u.role}</span>
+                                            {activeUser.role === 'owner' && u.id !== activeUser.id && (
+                                                <div className="flex items-center gap-1">
+                                                    {u.role === 'admin' ? (
+                                                        <button 
+                                                            onClick={() => handleChangeRole(u.id, 'user')}
+                                                            className="text-[10px] sm:text-xs text-red-500 hover:underline"
+                                                        >
+                                                            Rétrograder à User
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => {
+                                                                if(window.confirm(`Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`)){
+                                                                    handleChangeRole(u.id, 'admin');
+                                                                }
+                                                            }}
+                                                            className="text-[10px] sm:text-xs text-purple-600 hover:underline"
+                                                        >
+                                                            Promouvoir Admin
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
@@ -599,15 +576,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             <input 
                                 type="number" 
                                 value={settings.fundingCurrent || 0}
-                                onChange={e => {
-                                    const val = parseFloat(e.target.value);
-                                    setSettings(s => ({ ...s, fundingCurrent: val }));
-                                    fetch('/api/settings', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ fundingCurrent: val })
-                                    });
-                                }}
+                                onChange={e => setSettings(s => ({ ...s, fundingCurrent: parseFloat(e.target.value) }))}
                                 className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
                             />
                         </div>
@@ -618,21 +587,25 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             <input 
                                 type="number" 
                                 value={settings.fundingGoal || 12}
-                                onChange={e => {
-                                    const val = parseFloat(e.target.value);
-                                    setSettings(s => ({ ...s, fundingGoal: val }));
-                                    fetch('/api/settings', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ fundingGoal: val })
-                                    });
-                                }}
+                                onChange={e => setSettings(s => ({ ...s, fundingGoal: parseFloat(e.target.value) }))}
                                 className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
                             />
                         </div>
                     </div>
+                    <button 
+                        onClick={() => {
+                            fetch('/api/settings', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ fundingCurrent: settings.fundingCurrent, fundingGoal: settings.fundingGoal })
+                            }).then(() => alert('Modifications sauvegardées avec succès !'));
+                        }}
+                        className="mt-4 w-full bg-red-600 text-white font-medium py-2 rounded hover:bg-red-500 transition"
+                    >
+                        Valider les modifications
+                    </button>
                     <p className="text-xs text-zinc-500 mt-4">
-                        Ces valeurs sont mises à jour en temps réel et s'affichent publiquement dans la modal "Soutenir".
+                        Ces valeurs s'affichent publiquement dans la modal "Soutenir". Note: Sans API bancaire externe, cette valeur doit être mise à jour manuellement.
                     </p>
                 </div>
             </div>

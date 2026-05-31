@@ -154,9 +154,15 @@ app.post('/api/settings', (req, res) => {
 // Invites
 app.get('/api/invites', (req, res) => res.json(db.invites || []));
 app.post('/api/invites', (req, res) => {
-    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    let newCode = req.body.customCode || Math.random().toString(36).substring(2, 8).toUpperCase();
     if (!db.invites) db.invites = [];
-    db.invites.push({ code: newCode, used: false, createdAt: Date.now() });
+    db.invites.push({ 
+        code: newCode, 
+        used: false, 
+        maxUses: req.body.maxUses || 1, // Default to 1 instead of unlimited
+        currentUses: 0,
+        createdAt: Date.now() 
+    });
     saveDb();
     res.json({ success: true, code: newCode });
 });

@@ -52,8 +52,7 @@ export default function Polls() {
             <div className="space-y-6">
                 {pollsConfig.length === 0 ? (
                     <div className="text-center p-12 text-zinc-500">Chargement...</div>
-                ) : (
-                    pollsConfig.map(poll => (
+                ) : pollsConfig.map(poll => (
                     <div key={poll.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                         <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">{poll.title}</h3>
                         <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-6">{poll.desc}</p>
@@ -123,7 +122,7 @@ export default function Polls() {
                             </div>
                         )}
                     </div>
-                )))}
+                ))}
             </div>
         </div>
     );
