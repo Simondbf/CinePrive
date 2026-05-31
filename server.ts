@@ -77,6 +77,15 @@ app.get('/api/polls/results', (req, res) => {
     res.json(db.polls);
 });
 
+app.delete('/api/polls/reset/:pollId', (req, res) => {
+    const { pollId } = req.params;
+    if (db.polls[pollId]) {
+        db.polls[pollId] = { options: {}, custom: [] };
+        saveDb();
+    }
+    res.json({ success: true, pollData: db.polls[pollId] });
+});
+
 const upload = multer({ 
     dest: UPLOADS_DIR,
     limits: { fileSize: 1000 * 1024 * 1024 } // ~1GB limite pour le prototype (à ajuster sur un vrai serveur)

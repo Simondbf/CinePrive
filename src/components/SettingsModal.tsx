@@ -147,7 +147,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                     </div>
                 </div>
 
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center relative">
                     <button 
                         onClick={() => {
                             if (onTriggerEasterEgg) {
@@ -155,10 +155,10 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                                 onClose();
                             }
                         }}
-                        className="w-8 h-8 opacity-0 cursor-default"
+                        className="absolute bottom-0 left-0 w-8 h-8 opacity-0 cursor-default"
                         aria-hidden="true"
                     />
-                    <button onClick={onClose} className="px-5 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium rounded hover:opacity-80 transition">
+                    <button onClick={onClose} className="ml-auto px-5 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium rounded hover:opacity-80 transition">
                         Fermer
                     </button>
                 </div>

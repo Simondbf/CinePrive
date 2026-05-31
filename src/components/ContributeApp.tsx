@@ -595,7 +595,22 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             const totalVotes = Object.values(data.options).reduce((a: any, b: any) => a + b, 0) as number;
                             return (
                                 <div key={pollId} className="space-y-4">
-                                    <h4 className="font-medium text-zinc-900 dark:text-white capitalize">Sondage ID : {pollId} ({totalVotes} votes)</h4>
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="font-medium text-zinc-900 dark:text-white capitalize">Sondage ID : {pollId} ({totalVotes} votes)</h4>
+                                        {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                                            <button 
+                                                onClick={async () => {
+                                                    if(window.confirm('Voulez-vous réinitialiser les résultats de ce sondage ?')) {
+                                                        await fetch(`/api/polls/reset/${pollId}`, { method: 'DELETE' });
+                                                        fetch('/api/polls/results').then(r => r.json()).then(setPollResults);
+                                                    }
+                                                }}
+                                                className="text-xs text-red-600 hover:underline"
+                                            >
+                                                Vider les résultats
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="space-y-2">
                                         {Object.entries(data.options).map(([optionId, count]: [string, any]) => {
                                             const percentage = totalVotes === 0 ? 0 : Math.round((count / totalVotes) * 100);
