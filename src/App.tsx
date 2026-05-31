@@ -31,6 +31,7 @@ export default function App() {
   const [amoledUnlocked, setAmoledUnlocked] = useState(false);
   const [amoledActive, setAmoledActive] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
      // Retrieve saved settings
@@ -211,31 +212,40 @@ export default function App() {
                 <Settings className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 group relative h-full">
+            <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
                 {activeUser.status === 'pending' && (
                     <span className="hidden md:inline text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-500 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-700/50 mr-2">
                         Compte en attente
                     </span>
                 )}
-                <div className={`w-8 h-8 rounded shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer`}>
+                <div 
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className={`w-8 h-8 rounded shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer`}
+                >
                     {(activeUser.name || activeUser.username || '?').charAt(0).toUpperCase()}
                 </div>
                 
-                {/* Netflix-style hover dropdown */}
-                <div className="absolute top-10 right-0 w-48 pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden flex flex-col">
-                        <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
-                            <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Fondateur' : activeUser.role}</p>
+                {/* Netflix-style click dropdown */}
+                {showUserMenu && (
+                    <div className="absolute top-12 right-0 w-48 mt-2 transition-all duration-200 z-50 shadow-xl animate-in fade-in slide-in-from-top-2">
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden flex flex-col">
+                            <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Fondateur' : activeUser.role}</p>
+                            </div>
+                            <button 
+                                onClick={() => { 
+                                    setActiveUser(null); 
+                                    setViewMode('viewer'); 
+                                    setShowUserMenu(false);
+                                }}
+                                className="w-full text-left px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400 hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-2"
+                            >
+                               <LogOut className="w-4 h-4" /> Se déconnecter
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => { setActiveUser(null); setViewMode('viewer'); }}
-                            className="w-full text-left px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400 hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-2"
-                        >
-                           <LogOut className="w-4 h-4" /> Se déconnecter
-                        </button>
                     </div>
-                </div>
+                )}
             </div>
         </div>
       </nav>

@@ -56,10 +56,43 @@ if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
 if (!db.invites) db.invites = [];
 if (!db.polls) db.polls = {};
+if (!db.pollsConfig) db.pollsConfig = [
+    {
+        id: 'p1',
+        title: 'Identité Visuelle & Logo',
+        desc: "Quel emblème me représenterait le mieux selon vous ?",
+        options: [
+            { id: 'o1', label: 'La pellicule classique' },
+            { id: 'o2', label: "L'ordinateur/moniteur" },
+            { id: 'o3', label: 'Une forme géométrique abstraite neutre' }
+        ]
+    },
+    {
+        id: 'p2',
+        title: 'Couleur de Marque',
+        desc: "Quelle couleur d'accent préférez-vous ?",
+        options: [
+            { id: 'o1', label: 'Rouge Cinéma' },
+            { id: 'o2', label: 'Bleu Profond' },
+            { id: 'o3', label: 'Or / Jaune' },
+            { id: 'o4', label: 'Violet Électrique' }
+        ]
+    }
+];
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
 
 // --- API POLLS ---
+app.get('/api/polls/config', (req, res) => {
+    res.json(db.pollsConfig);
+});
+
+app.post('/api/polls/config', (req, res) => {
+    db.pollsConfig = req.body;
+    saveDb();
+    res.json({ success: true, pollsConfig: db.pollsConfig });
+});
+
 app.post('/api/polls/vote', (req, res) => {
     const { pollId, vote, customText, userId } = req.body;
     if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [] };

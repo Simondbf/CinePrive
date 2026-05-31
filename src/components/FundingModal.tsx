@@ -66,20 +66,28 @@ export default function FundingModal({ onClose }: Props) {
 
                     <div className="flex flex-col gap-3">
                         <a 
-                            href="https://revolut.me/" // Remplacer par le vrai lien
+                            href="https://revolut.me/simondeboeuf" 
                             target="_blank" rel="noopener noreferrer"
                             className="w-full bg-blue-600 text-white font-semibold py-3 rounded hover:bg-blue-500 transition flex items-center justify-center gap-2"
                         >
                             <Coins className="w-5 h-5" />
                             Participer via Revolut
                         </a>
-                        <a 
-                            href="#" 
+                        {/* 
+                            POUR FIXER WERO AVEC TON NUMÉRO SIMON :
+                            Remplace le onclick alert par un href avec "tel:+336XXXXXXX" 
+                            ou laisse juste le numéro apparent pour qu'on puisse le copier :
+                        */}
+                        <button 
+                            onClick={() => {
+                                navigator.clipboard.writeText('+336XXXXXXXX'); // <-- METS TON NUMERO ICI
+                                alert('Numéro de Simon copié pour Wero ! Ouvre ton application bancaire pour effectuer le transfert.');
+                            }}
                             className="w-full bg-purple-600 text-white font-semibold py-3 rounded hover:bg-purple-500 transition flex items-center justify-center gap-2"
                         >
                             <Heart className="w-5 h-5" />
-                            Participer via Wero
-                        </a>
+                            Participer via Wero (Copier le n°)
+                        </button>
                     </div>
                 </div>
             </motion.div>

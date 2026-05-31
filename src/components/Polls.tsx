@@ -17,6 +17,12 @@ export default function Polls() {
         }
     };
 
+    const [pollsConfig, setPollsConfig] = useState<any[]>([]);
+
+    useEffect(() => {
+        fetch('/api/polls/config').then(r => r.json()).then(setPollsConfig).catch(console.error);
+    }, []);
+
     const submitVote = async (pollId: string) => {
         const optionId = votes[pollId];
         const customText = customInputs[pollId];
@@ -31,36 +37,6 @@ export default function Polls() {
         } catch (e) { console.error(e) }
     };
 
-    const polls = [
-        {
-            id: 'p1',
-            title: 'Identité Visuelle & Logo',
-            desc: "Quel emblème vous parle le plus pour représenter notre bibliothèque ?",
-            options: [
-                { id: 'o1', label: 'La pellicule classique' },
-                { id: 'o2', label: 'L\'ordinateur/moniteur' },
-                { id: 'o3', label: 'Une forme géométrique abstraite neutre' }
-            ]
-        },
-        {
-            id: 'p2',
-            title: 'Couleur de Marque',
-            desc: "Sachant qu'un mode clair et sombre existe, quelle couleur d'accent préférez-vous ?",
-            options: [
-                { id: 'o1', label: 'Rouge Cinéma (Netflix-like)' },
-                { id: 'o2', label: 'Bleu Profond (Prime/Max)' },
-                { id: 'o3', label: 'Or / Jaune (Prestige)' },
-                { id: 'o4', label: 'Violet Électrique' }
-            ]
-        },
-        {
-            id: 'p3',
-            title: 'Nom de domaine',
-            desc: "Je souhaite ne plus utiliser rpisimon.uk mais un nom de domaine plus neutre.",
-            options: [] // text only
-        }
-    ];
-
     return (
         <div className="p-6 md:p-12 pb-24 max-w-[800px] mx-auto">
             <div className="mb-8 p-6 bg-red-600 border border-red-500 rounded-xl shadow-lg">
@@ -73,8 +49,11 @@ export default function Polls() {
                 </p>
             </div>
 
-            <div className="space-y-8">
-                {polls.map(poll => (
+            <div className="space-y-6">
+                {pollsConfig.length === 0 ? (
+                    <div className="text-center p-12 text-zinc-500">Chargement...</div>
+                ) : (
+                    pollsConfig.map(poll => (
                     <div key={poll.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
                         <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">{poll.title}</h3>
                         <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-6">{poll.desc}</p>
@@ -144,7 +123,7 @@ export default function Polls() {
                             </div>
                         )}
                     </div>
-                ))}
+                )))}
             </div>
         </div>
     );
