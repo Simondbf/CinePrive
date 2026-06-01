@@ -360,7 +360,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     </p>
 
                     <label className={`block border-2 border-dashed ${file ? 'border-zinc-500 bg-zinc-800/50' : 'border-zinc-700 bg-zinc-950'} rounded-lg p-8 relative cursor-pointer hover:border-zinc-500 transition`}>
-                        <input type="file" accept="video/mp4,video/webm,video/mkv,video/x-matroska,video/avi" className="hidden" onChange={handleFileSelect} />
+                        <input type="file" accept="video/mp4,video/webm,video/mkv,video/x-matroska,video/avi,.mp4,.webm,.mkv,.avi" className="hidden" onChange={handleFileSelect} />
                         <div className="text-center">
                             {file ? (
                                 <div>
