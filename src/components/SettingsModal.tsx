@@ -23,8 +23,6 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
     
     // Server settings
     const [webhookUrl, setWebhookUrl] = useState('');
-    const [jellyfinUrl, setJellyfinUrl] = useState('');
-    const [jellyfinApiKey, setJellyfinApiKey] = useState('');
     const [isSavingServer, setIsSavingServer] = useState(false);
     const [serverMsg, setServerMsg] = useState('');
 
@@ -34,8 +32,6 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                 .then(r => r.json())
                 .then(data => {
                     setWebhookUrl(data.webhookUrl || '');
-                    setJellyfinUrl(data.jellyfinUrl || '');
-                    setJellyfinApiKey(data.jellyfinApiKey || '');
                 });
         }
     }, [userRole]);
@@ -75,7 +71,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
             const res = await fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ webhookUrl, jellyfinUrl, jellyfinApiKey })
+                body: JSON.stringify({ webhookUrl })
             });
             if (res.ok) setServerMsg('Paramètres serveur sauvegardés.');
         } catch (error) {
@@ -202,30 +198,6 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                                         className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm"
                                     />
                                     <p className="text-[10px] text-zinc-500 mt-1">Vous recevrez une notification push à chaque rapport de bug/upload posté.</p>
-                                </div>
-                                <div className="p-3 border border-purple-500/30 bg-purple-500/5 rounded-lg space-y-3">
-                                    <h4 className="text-xs font-bold text-purple-600 dark:text-purple-400">Intégration Backend Jellyfin / Emby</h4>
-                                    <div>
-                                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">URL du serveur public (ex: https://vod.mondomaine.com)</label>
-                                        <input 
-                                            type="url"
-                                            value={jellyfinUrl}
-                                            onChange={e => setJellyfinUrl(e.target.value)}
-                                            className="w-full bg-white dark:bg-black border border-purple-200 dark:border-purple-900 rounded px-3 py-2 focus:ring-1 focus:ring-purple-500 outline-none text-zinc-900 dark:text-white text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Clé API (Token généré sur le panel)</label>
-                                        <input 
-                                            type="password"
-                                            value={jellyfinApiKey}
-                                            onChange={e => setJellyfinApiKey(e.target.value)}
-                                            className="w-full bg-white dark:bg-black border border-purple-200 dark:border-purple-900 rounded px-3 py-2 focus:ring-1 focus:ring-purple-500 outline-none text-zinc-900 dark:text-white text-sm"
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-purple-600 dark:text-purple-400/80 leading-tight">
-                                        Remarque : Actuellement l'application Cloud Run est un conteneur Node.js indépendant. Configurer ce lien vous permettra un branchement API direct de "CinéPrivé" vers votre instance Jellyfin pour y puiser les films directement sans double upload.
-                                    </p>
                                 </div>
                                 {serverMsg && <p className="text-green-500 text-xs font-medium">{serverMsg}</p>}
                                 <button 

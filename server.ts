@@ -185,12 +185,6 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, re
     if (req.body.webhookUrl !== undefined) {
         db.settings.webhookUrl = req.body.webhookUrl;
     }
-    if (req.body.jellyfinUrl !== undefined) {
-        db.settings.jellyfinUrl = req.body.jellyfinUrl;
-    }
-    if (req.body.jellyfinApiKey !== undefined) {
-        db.settings.jellyfinApiKey = req.body.jellyfinApiKey;
-    }
     saveDb();
     res.json(db.settings);
 });
@@ -420,32 +414,6 @@ app.post('/api/users/:id/mylist', (req, res) => {
 
 // Films
 app.get('/api/films', async (req, res) => {
-    // Si Jellyfin est configuré, on fusionne ou remplace le catalogue
-    if (db.settings && db.settings.jellyfinUrl && db.settings.jellyfinApiKey) {
-        try {
-            const jfUrl = db.settings.jellyfinUrl.replace(/\/$/, "");
-            const response = await fetch(`${jfUrl}/Items?api_key=${db.settings.jellyfinApiKey}&IncludeItemTypes=Movie&Recursive=true&Fields=Overview,Genres,ProductionYear,PrimaryImageAspectRatio`);
-            if (response.ok) {
-                const jfData = await response.json();
-                const jfFilms = jfData.Items.map((item: any) => ({
-                    id: `jf-${item.Id}`,
-                    title: item.Name,
-                    overview: item.Overview || 'Aucune description',
-                    posterUrl: `${jfUrl}/Items/${item.Id}/Images/Primary?api_key=${db.settings.jellyfinApiKey}`,
-                    videoUrl: `${jfUrl}/Videos/${item.Id}/stream?api_key=${db.settings.jellyfinApiKey}&static=true`,
-                    year: item.ProductionYear || 2024,
-                    genre: (item.Genres && item.Genres.length > 0) ? item.Genres[0] : 'Inconnu',
-                    director: 'Jellyfin',
-                    cast: [],
-                    source: 'jellyfin'
-                }));
-                // Fusion des films locaux et Jellyfin
-                return res.json([...db.films, ...jfFilms]);
-            }
-        } catch (e) {
-            console.error("Erreur de connexion a Jellyfin:", e);
-        }
-    }
   res.json(db.films);
 });
 

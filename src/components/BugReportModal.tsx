@@ -7,7 +7,8 @@ interface Props {
 }
 
 export default function BugReportModal({ onClose }: Props) {
-    const [os, setOs] = useState('');
+    const [osFamily, setOsFamily] = useState('');
+    const [osVersion, setOsVersion] = useState('');
     const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
     const [isUploadRelated, setIsUploadRelated] = useState(false);
     const [description, setDescription] = useState('');
@@ -16,11 +17,14 @@ export default function BugReportModal({ onClose }: Props) {
     const submitBug = async (e: React.FormEvent) => {
         e.preventDefault();
         setStatus('loading');
+        
+        const finalOs = osFamily ? `${osFamily} - ${osVersion}` : osVersion;
+        
         try {
             const res = await fetch('/api/bugs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ os, device, isUploadRelated, description })
+                body: JSON.stringify({ os: finalOs, device, isUploadRelated, description })
             });
             if (res.ok) {
                 setStatus('success');
@@ -72,14 +76,14 @@ export default function BugReportModal({ onClose }: Props) {
                             <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     type="button"
-                                    onClick={() => setDevice('desktop')}
+                                    onClick={() => { setDevice('desktop'); setOsFamily(''); }}
                                     className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition ${device === 'desktop' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'}`}
                                 >
                                     <Monitor className="w-5 h-5" /> Ordinateur
                                 </button>
                                 <button 
                                     type="button"
-                                    onClick={() => setDevice('mobile')}
+                                    onClick={() => { setDevice('mobile'); setOsFamily(''); }}
                                     className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition ${device === 'mobile' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'}`}
                                 >
                                     <Smartphone className="w-5 h-5" /> Smartphone / Tablette
@@ -87,11 +91,28 @@ export default function BugReportModal({ onClose }: Props) {
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium">Système d'exploitation (OS)</label>
+                        <div className="space-y-3">
+                            <label className="text-sm font-medium flex items-center justify-between">
+                                Système d'exploitation (OS)
+                                {osFamily && <span className="text-xs font-normal text-red-500">{osFamily} sélectionné</span>}
+                            </label>
+                            <div className="flex gap-2">
+                                {device === 'desktop' ? (
+                                    <>
+                                        <button type="button" onClick={() => setOsFamily('Windows')} className={`flex-1 py-1.5 text-sm rounded border transition ${osFamily === 'Windows' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 font-medium' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>Windows</button>
+                                        <button type="button" onClick={() => setOsFamily('macOS')} className={`flex-1 py-1.5 text-sm rounded border transition ${osFamily === 'macOS' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 font-medium' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>macOS</button>
+                                        <button type="button" onClick={() => setOsFamily('Linux')} className={`flex-1 py-1.5 text-sm rounded border transition ${osFamily === 'Linux' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 font-medium' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>Linux / Autre</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button type="button" onClick={() => setOsFamily('Apple (iOS)')} className={`flex-1 py-1.5 text-sm rounded border transition ${osFamily === 'Apple (iOS)' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 font-medium' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>Apple (iOS)</button>
+                                        <button type="button" onClick={() => setOsFamily('Android')} className={`flex-1 py-1.5 text-sm rounded border transition ${osFamily === 'Android' ? 'bg-red-50 dark:bg-red-500/10 border-red-500 text-red-600 font-medium' : 'bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'}`}>Android / Autre</button>
+                                    </>
+                                )}
+                            </div>
                             <input 
-                                value={os} onChange={(e) => setOs(e.target.value)} required
-                                placeholder="Ex: Windows 11, iOS 17, Android 13, macOS..."
+                                value={osVersion} onChange={(e) => setOsVersion(e.target.value)} required={!osFamily}
+                                placeholder="Précisez la version (ex: 11, iOS 17, 13...)"
                                 className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-red-500 focus:border-red-500 outline-none text-zinc-900 dark:text-white"
                             />
                         </div>
