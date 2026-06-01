@@ -182,6 +182,15 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, re
     if (req.body.fundingGoal !== undefined) {
         db.settings.fundingGoal = parseFloat(req.body.fundingGoal);
     }
+    if (req.body.webhookUrl !== undefined) {
+        db.settings.webhookUrl = req.body.webhookUrl;
+    }
+    if (req.body.jellyfinUrl !== undefined) {
+        db.settings.jellyfinUrl = req.body.jellyfinUrl;
+    }
+    if (req.body.jellyfinApiKey !== undefined) {
+        db.settings.jellyfinApiKey = req.body.jellyfinApiKey;
+    }
     saveDb();
     res.json(db.settings);
 });
@@ -410,7 +419,33 @@ app.post('/api/users/:id/mylist', (req, res) => {
 });
 
 // Films
-app.get('/api/films', (req, res) => {
+app.get('/api/films', async (req, res) => {
+    // Si Jellyfin est configuré, on fusionne ou remplace le catalogue
+    if (db.settings && db.settings.jellyfinUrl && db.settings.jellyfinApiKey) {
+        try {
+            const jfUrl = db.settings.jellyfinUrl.replace(/\/$/, "");
+            const response = await fetch(`${jfUrl}/Items?api_key=${db.settings.jellyfinApiKey}&IncludeItemTypes=Movie&Recursive=true&Fields=Overview,Genres,ProductionYear,PrimaryImageAspectRatio`);
+            if (response.ok) {
+                const jfData = await response.json();
+                const jfFilms = jfData.Items.map((item: any) => ({
+                    id: `jf-${item.Id}`,
+                    title: item.Name,
+                    overview: item.Overview || 'Aucune description',
+                    posterUrl: `${jfUrl}/Items/${item.Id}/Images/Primary?api_key=${db.settings.jellyfinApiKey}`,
+                    videoUrl: `${jfUrl}/Videos/${item.Id}/stream?api_key=${db.settings.jellyfinApiKey}&static=true`,
+                    year: item.ProductionYear || 2024,
+                    genre: (item.Genres && item.Genres.length > 0) ? item.Genres[0] : 'Inconnu',
+                    director: 'Jellyfin',
+                    cast: [],
+                    source: 'jellyfin'
+                }));
+                // Fusion des films locaux et Jellyfin
+                return res.json([...db.films, ...jfFilms]);
+            }
+        } catch (e) {
+            console.error("Erreur de connexion a Jellyfin:", e);
+        }
+    }
   res.json(db.films);
 });
 
@@ -498,19 +533,35 @@ app.post('/api/notifications/read-all', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/api/bugs', requireAuth, (req: any, res) => {
+app.post('/api/bugs', requireAuth, async (req: any, res) => {
     const { os, device, isUploadRelated, description } = req.body;
     if (!db.notifications) db.notifications = [];
+    
+    const message = `🚨 Bug signalé par ${req.user.username}\nOS : ${os}\nAppareil : ${device}\nLié à l'upload : ${isUploadRelated ? 'Oui' : 'Non'}\nDescription :\n${description}`;
     
     db.notifications.push({
         id: uuidv4(),
         type: 'bug',
-        message: `🚨 Bug signalé par ${req.user.username}\nOS : ${os}\nAppareil : ${device}\nLié à l'upload : ${isUploadRelated ? 'Oui' : 'Non'}\nDescription :\n${description}`,
+        message: message,
         createdAt: new Date().toISOString(),
         readBy: []
     });
     
     saveDb();
+    
+    // Envoyer au webhook Discord si configuré
+    if (db.settings && db.settings.webhookUrl) {
+        try {
+            await fetch(db.settings.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: message })
+            });
+        } catch (e) {
+            console.error("Erreur d'envoi webhook", e);
+        }
+    }
+    
     res.json({ success: true });
 });
 
@@ -592,6 +643,29 @@ app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: a
         };
 
         db.films.push(film);
+        
+        // Notifications
+        if (!db.notifications) db.notifications = [];
+        const notifMessage = `🎬 Nouveau film ajouté par ${req.user.username} : ${film.title}`;
+        db.notifications.push({
+            id: uuidv4(),
+            type: 'upload',
+            message: notifMessage,
+            createdAt: new Date().toISOString(),
+            readBy: []
+        });
+
+        // Webhook Discord
+        if (db.settings && db.settings.webhookUrl) {
+            try {
+                fetch(db.settings.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: notifMessage })
+                }).catch(e => console.error("Discord webhook failed", e));
+            } catch (e) {}
+        }
+        
         saveDb();
 
         res.json({ success: true, film });

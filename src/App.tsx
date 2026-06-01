@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check } from 'lucide-react';
+import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, Bug } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
@@ -194,7 +194,7 @@ export default function App() {
   }
 
   // Navbar shared between Viewer and Admin
-  const Navbar = () => (
+  const navbarContent = (
       <nav className={`sticky top-0 w-full z-40 ${amoledActive ? 'bg-zinc-50/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 md:px-12 py-4 transition-colors`}>
         <div className="flex items-center gap-4">
             {viewMode !== 'viewer' && (
@@ -352,7 +352,7 @@ export default function App() {
 
   return (
     <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-zinc-50 dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
-      <Navbar />
+      {navbarContent}
       
       <main>
         {viewMode === 'polls' ? (
@@ -428,6 +428,7 @@ export default function App() {
                  setAmoledActive={setAmoledActive}
                  onTriggerEasterEgg={() => setShowEasterEgg(true)}
                  userId={activeUser.id}
+                 userRole={activeUser.role}
               />
           )}
           {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
