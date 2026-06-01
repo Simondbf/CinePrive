@@ -10,6 +10,7 @@ import ContributeApp from './components/ContributeApp';
 import FundingModal from './components/FundingModal';
 import EasterEgg from './components/EasterEgg';
 import SettingsModal from './components/SettingsModal';
+import BugReportModal from './components/BugReportModal';
 import Polls from './components/Polls';
 import Loader from './components/Loader';
 
@@ -25,6 +26,7 @@ export default function App() {
   const [showFunding, setShowFunding] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
   const [hasUnread, setHasUnread] = useState(() => localStorage.getItem('inbox_read') !== 'true');
 
@@ -307,8 +309,25 @@ export default function App() {
                                 <button onClick={() => { setShowSettings(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <Settings className="w-4 h-4" /> Paramètres
                                 </button>
+                                <button onClick={() => { setShowBugReport(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                     <Bug className="w-4 h-4" /> Signaler un problème
+                                </button>
                             </div>
 
+                            <div className="hidden md:block border-b border-zinc-100 dark:border-zinc-800 py-1">
+                                <button 
+                                    onClick={() => { setShowSettings(true); setShowUserMenu(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3"
+                                >
+                                   <Settings className="w-4 h-4" /> Paramètres
+                                </button>
+                                <button 
+                                    onClick={() => { setShowBugReport(true); setShowUserMenu(false); }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3"
+                                >
+                                   <Bug className="w-4 h-4" /> Signaler un problème
+                                </button>
+                            </div>
                             <button 
                                 onClick={async () => { 
                                     await fetch('/api/logout', { method: 'POST' });
@@ -411,6 +430,7 @@ export default function App() {
                  userId={activeUser.id}
               />
           )}
+          {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
           {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
           
           {notification && (

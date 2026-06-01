@@ -498,6 +498,22 @@ app.post('/api/notifications/read-all', (req, res) => {
     res.json({ success: true });
 });
 
+app.post('/api/bugs', requireAuth, (req: any, res) => {
+    const { os, device, isUploadRelated, description } = req.body;
+    if (!db.notifications) db.notifications = [];
+    
+    db.notifications.push({
+        id: uuidv4(),
+        type: 'bug',
+        message: `🚨 Bug signalé par ${req.user.username}\nOS : ${os}\nAppareil : ${device}\nLié à l'upload : ${isUploadRelated ? 'Oui' : 'Non'}\nDescription :\n${description}`,
+        createdAt: new Date().toISOString(),
+        readBy: []
+    });
+    
+    saveDb();
+    res.json({ success: true });
+});
+
 // Recherche TMDB
 app.get('/api/tmdb/search', async (req, res) => {
     const query = req.query.query as string;
