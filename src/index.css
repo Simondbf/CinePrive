@@ -9,4 +9,13 @@
 
 body {
   transition: background-color 0.3s ease;
+  overflow-x: hidden;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }

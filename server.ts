@@ -294,16 +294,29 @@ app.post('/api/login', async (req, res) => {
         )
     );
     
-    if (user && (await bcrypt.compare(password, user.password))) {
-        if (user.status === 'pending') {
-            return res.status(403).json({ error: "Votre compte est en attente d'approbation par le propriétaire." });
+    if (user) {
+        let passwordMatch = false;
+        if (user.password.startsWith('$2b$')) {
+            passwordMatch = await bcrypt.compare(password, user.password);
+        } else {
+            if (user.password === password) {
+                passwordMatch = true;
+                user.password = await bcrypt.hash(password, 10);
+                saveDb();
+            }
         }
-        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
-        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
-        res.json({ ...user, password: '' });
-    } else {
-        res.status(401).json({ error: 'Identifiants incorrects' });
+
+        if (passwordMatch) {
+            if (user.status === 'pending') {
+                return res.status(403).json({ error: "Votre compte est en attente d'approbation par le propriétaire." });
+            }
+            const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+            res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+            return res.json({ ...user, password: '' });
+        }
     }
+    
+    res.status(401).json({ error: 'Identifiants incorrects' });
 });
 
 app.post('/api/logout', (req, res) => {

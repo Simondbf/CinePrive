@@ -212,7 +212,7 @@ export default function App() {
             </div>
         </div>
         
-        <div className="flex items-center gap-2 md:gap-4 ml-auto">
+        <div className="flex items-center gap-2 md:gap-4 ml-auto overflow-x-auto hide-scrollbar pb-1 pr-1">
             <button 
                 onClick={() => {
                     setShowInbox(true);
@@ -310,7 +310,7 @@ export default function App() {
   );
 
   return (
-    <div className={`min-h-screen ${amoledActive ? 'bg-zinc-50 dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
+    <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-zinc-50 dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
       <Navbar />
       
       <main>
