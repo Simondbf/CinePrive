@@ -129,7 +129,7 @@ export default function AuthScreen({ onLogin }: Props) {
                               <input 
                                   type="email" value={email} onChange={e => setEmail(e.target.value)} required
                                   placeholder="exemple@email.com"
-                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white"
+                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
                               />
                           </div>
                       ) : (
@@ -142,7 +142,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                           <input 
                                               type="email" value={email} onChange={e => setEmail(e.target.value)} required
                                               placeholder="exemple@email.com"
-                                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white"
+                                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
                                           />
                                       </div>
                                       {settings && !settings.allowRegistrations && (
@@ -154,7 +154,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                               <input 
                                                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                                                   placeholder="Ex: XYZ-123"
-                                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase"
+                                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
                                               />
                                           </div>
                                       )}
@@ -167,7 +167,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                   <input 
                                       value={username} onChange={e => setUsername(e.target.value)} required
                                       placeholder={!isLogin ? "Ex: Simon" : "Votre nom ou email"}
-                                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white"
+                                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
                                   />
                               </div>
                               <div>
@@ -175,9 +175,9 @@ export default function AuthScreen({ onLogin }: Props) {
                                   <div className="relative">
                                       <input 
                                           type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
-                                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white"
+                                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-20 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
                                       />
-                                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">
+                                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">
                                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                       </button>
                                   </div>

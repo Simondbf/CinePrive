@@ -212,7 +212,7 @@ export default function App() {
             </div>
         </div>
         
-        <div className="flex items-center gap-2 md:gap-4 ml-auto overflow-x-auto hide-scrollbar pb-1 pr-1">
+        <div className="flex items-center gap-2 md:gap-4 ml-auto pb-1 pr-1">
             <button 
                 onClick={() => {
                     setShowInbox(true);
@@ -227,41 +227,41 @@ export default function App() {
 
             <button 
                 onClick={() => setViewMode('polls')}
-                className={`flex items-center gap-2 text-sm font-medium p-2 md:px-3 md:py-1.5 rounded-full border transition ${viewMode === 'polls' ? 'bg-red-50 dark:bg-red-500/10 text-red-600 border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}
+                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${viewMode === 'polls' ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Sondages"
             >
-                <ListChecks className="w-5 h-5 md:w-4 md:h-4" /> <span className="hidden md:inline">Sondages</span>
+                <ListChecks className="w-4 h-4" /> <span>Sondages</span>
             </button>
 
             <button 
                 onClick={() => setShowFunding(true)}
-                className="flex items-center gap-2 text-sm font-medium text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 p-2 md:px-3 md:py-1.5 rounded-full border border-pink-200 dark:border-pink-500/20 transition"
+                className="hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20"
                 title="Soutenir"
             >
-                <Heart className="w-5 h-5 md:w-4 md:h-4" /> <span className="hidden md:inline">Soutenir</span>
+                <Heart className="w-4 h-4" /> <span>Soutenir</span>
             </button>
 
             {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                 <button 
                     onClick={() => setViewMode('admin')}
-                    className={`flex items-center gap-2 text-sm font-medium p-2 md:px-3 md:py-1.5 rounded border transition ${viewMode === 'admin' ? 'bg-zinc-800 dark:bg-zinc-700 text-white border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}
+                    className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-zinc-900 dark:text-white bg-zinc-800 dark:bg-zinc-700 border border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                     title="Administration"
                 >
-                    <Shield className="w-5 h-5 md:w-4 md:h-4"/> <span className="hidden md:inline">Administration</span>
+                    <Shield className="w-4 h-4"/> <span>Administration</span>
                 </button>
             )}
 
             <button 
                 onClick={() => setViewMode('upload')}
-                className={`flex items-center gap-2 text-sm font-medium p-2 md:px-3 md:py-1.5 rounded border transition ${viewMode === 'upload' ? 'bg-zinc-800 dark:bg-zinc-700 text-white border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'}`}
+                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-800 dark:bg-zinc-700 border border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Ajouter un film"
             >
-                <UploadCloud className="w-5 h-5 md:w-4 md:h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
+                <UploadCloud className="w-4 h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
             </button>
 
             <button 
                 onClick={() => setShowSettings(true)}
-                className="p-1.5 text-zinc-500 hover:text-red-600 transition ml-2 border-l border-zinc-200 dark:border-zinc-800 pl-4"
+                className="hidden md:flex p-1.5 text-zinc-500 hover:text-red-600 transition ml-2 border-l border-zinc-200 dark:border-zinc-800 pl-4"
             >
                 <Settings className="w-5 h-5" />
             </button>
@@ -287,6 +287,28 @@ export default function App() {
                                 <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Fondateur' : activeUser.role}</p>
                             </div>
+                            
+                            {/* Mobile specific navigation menu items */}
+                            <div className="md:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
+                                <button onClick={() => { setViewMode('polls'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                     <ListChecks className="w-4 h-4" /> Sondages
+                                </button>
+                                <button onClick={() => { setShowFunding(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-500/10 transition flex items-center gap-3">
+                                     <Heart className="w-4 h-4" /> Soutenir
+                                </button>
+                                <button onClick={() => { setViewMode('upload'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                     <UploadCloud className="w-4 h-4" /> Ajouter un film
+                                </button>
+                                {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                                     <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                         <Shield className="w-4 h-4" /> Admin
+                                     </button>
+                                )}
+                                <button onClick={() => { setShowSettings(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                     <Settings className="w-4 h-4" /> Paramètres
+                                </button>
+                            </div>
+
                             <button 
                                 onClick={async () => { 
                                     await fetch('/api/logout', { method: 'POST' });
