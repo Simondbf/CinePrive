@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, Bug } from 'lucide-react';
+import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
@@ -310,7 +310,7 @@ export default function App() {
                                      <Settings className="w-4 h-4" /> Paramètres
                                 </button>
                                 <button onClick={() => { setShowBugReport(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
-                                     <Bug className="w-4 h-4" /> Signaler un problème
+                                     <MessageSquare className="w-4 h-4" /> Signaler un problème
                                 </button>
                             </div>
 
@@ -325,7 +325,7 @@ export default function App() {
                                     onClick={() => { setShowBugReport(true); setShowUserMenu(false); }}
                                     className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3"
                                 >
-                                   <Bug className="w-4 h-4" /> Signaler un problème
+                                   <MessageSquare className="w-4 h-4" /> Signaler un problème
                                 </button>
                             </div>
                             <button 
