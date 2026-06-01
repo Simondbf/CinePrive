@@ -709,7 +709,14 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                             return (
                                                 <div key={optionId} className="flex flex-col gap-1">
                                                     <div className="flex justify-between text-sm">
-                                                        <span className="text-zinc-700 dark:text-zinc-300 capitalize">{label}</span>
+                                                        <span className="text-zinc-700 dark:text-zinc-300 capitalize">
+  {label}
+  {data.userVotes && Object.keys(data.userVotes).filter(uid => data.userVotes[uid] === optionId).length > 0 && (
+      <span className="block text-[11px] text-zinc-500 font-normal mt-0.5" style={{ textTransform: 'none' }}>
+          Votants : {Object.keys(data.userVotes).filter(uid => data.userVotes[uid] === optionId).map(uid => usersList.find((u:any) => u.id === uid)?.username || uid).join(", ")}
+      </span>
+  )}
+</span>
                                                         <span className="font-medium">{count} ({percentage}%)</span>
                                                     </div>
                                                     <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">

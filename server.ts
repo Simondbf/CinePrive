@@ -105,6 +105,15 @@ if (!db.pollsConfig) db.pollsConfig = [
             { id: 'o3', label: 'Or / Jaune' },
             { id: 'o4', label: 'Violet Électrique' }
         ]
+    },
+    {
+        id: 'p3',
+        title: 'Membres Bêta',
+        desc: "Souhaitez-vous devenir membre bêta pour tester les nouveautés en avant-première ?",
+        options: [
+            { id: 'o1', label: 'Oui, je veux bien !' },
+            { id: 'o2', label: 'Non, je préfère la version stable.' }
+        ]
     }
 ];
 
@@ -123,14 +132,20 @@ app.post('/api/polls/config', requireAuth, requireRole(['owner']), (req, res) =>
 
 app.post('/api/polls/vote', (req, res) => {
     const { pollId, vote, customText, userId } = req.body;
-    if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [], votedUsers: [] };
+    if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [], votedUsers: [], userVotes: {} };
     if (!db.polls[pollId].votedUsers) db.polls[pollId].votedUsers = [];
+    if (!db.polls[pollId].userVotes) db.polls[pollId].userVotes = {};
     
     if (userId && db.polls[pollId].votedUsers.includes(userId)) {
         return res.status(400).json({ error: "Vous avez déjà voté." });
     }
     
-    if (userId) db.polls[pollId].votedUsers.push(userId);
+    if (userId) {
+        db.polls[pollId].votedUsers.push(userId);
+        if (vote) {
+             db.polls[pollId].userVotes[userId] = vote;
+        }
+    }
 
     if (vote === 'custom' && customText) {
         db.polls[pollId].custom.push(customText);
@@ -148,7 +163,7 @@ app.get('/api/polls/results', (req, res) => {
 app.delete('/api/polls/reset/:pollId', requireAuth, requireRole(['owner']), (req, res) => {
     const { pollId } = req.params;
     if (db.polls[pollId]) {
-        db.polls[pollId] = { options: {}, custom: [], votedUsers: [] };
+        db.polls[pollId] = { options: {}, custom: [], votedUsers: [], userVotes: {} };
         saveDb();
     }
     res.json({ success: true, pollData: db.polls[pollId] });
