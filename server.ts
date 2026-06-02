@@ -89,6 +89,7 @@ db.pollsConfig = [
         id: 'p1',
         title: 'Identité Visuelle & Logo',
         desc: "Quel emblème me représenterait le mieux selon vous ?",
+        allowMultiple: true,
         options: [
             { id: 'o1', label: 'La pellicule classique' },
             { id: 'o2', label: "L'ordinateur/moniteur" },
@@ -99,6 +100,7 @@ db.pollsConfig = [
         id: 'p2',
         title: 'Couleur de Marque',
         desc: "Quelle couleur d'accent préférez-vous ?",
+        allowMultiple: true,
         options: [
             { id: 'o1', label: 'Rouge Cinéma' },
             { id: 'o2', label: 'Bleu Profond' },
@@ -110,6 +112,7 @@ db.pollsConfig = [
         id: 'p3',
         title: 'Membres Bêta',
         desc: "Souhaitez-vous devenir membre bêta pour tester les nouveautés en avant-première ?",
+        allowMultiple: false,
         options: [
             { id: 'o1', label: 'Oui, je veux bien !' },
             { id: 'o2', label: 'Non, je préfère la version stable.' }
@@ -147,11 +150,15 @@ app.post('/api/polls/vote', requireAuth, (req, res) => {
         }
     }
 
-    if (vote === 'custom' && customText) {
-        db.polls[pollId].custom.push(customText);
-    } else if (vote) {
-        db.polls[pollId].options[vote] = (db.polls[pollId].options[vote] || 0) + 1;
-    }
+    const voteArray = Array.isArray(vote) ? vote : [vote];
+
+    voteArray.forEach((v: string) => {
+        if (v === 'custom' && customText) {
+            db.polls[pollId].custom.push(customText);
+        } else if (v) {
+            db.polls[pollId].options[v] = (db.polls[pollId].options[v] || 0) + 1;
+        }
+    });
     
     // Notification for admins
     if (!db.notifications) db.notifications = [];
@@ -408,7 +415,7 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req, res) => 
 });
 
 // Admin : Approuver un utilisateur
-app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
     const adminUser = req.user;
 
     const userToApprove = db.users.find((u: any) => u.id === req.params.id);
@@ -417,6 +424,31 @@ app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']),
     userToApprove.status = 'active';
     userToApprove.validatedBy = adminUser.username;
     userToApprove.validatedAt = Date.now();
+    
+    // Phase 3: Sync to Jellyfin if configured
+    if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
+        try {
+            const tempPassword = Math.random().toString(36).slice(-8);
+            const jellyfinResponse = await fetch(`${process.env.JELLYFIN_URL}/Users/New`, {
+                method: 'POST',
+                headers: { 
+                    'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ Name: userToApprove.username, Password: tempPassword })
+            });
+
+            if (jellyfinResponse.ok) {
+                const jellyfinUser = await jellyfinResponse.json();
+                userToApprove.jellyfinId = jellyfinUser.Id;
+            } else {
+                console.error("Erreur lors de la création de l'utilisateur Jellyfin:", await jellyfinResponse.text());
+            }
+        } catch (e) {
+            console.error("Échec de la communication avec Jellyfin", e);
+        }
+    }
+
     saveDb();
     res.json({ success: true, user: { ...userToApprove, password: '' } });
 });
@@ -672,10 +704,60 @@ app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: a
     }
 });
 
-// Distribution Vidéos
+// Distribution Vidéos Static & Proxy Jellyfin
 app.get('/videos/:filename', requireAuth, (req, res) => {
     const safeName = path.basename(req.params.filename);
     res.sendFile(path.join(UPLOADS_DIR, safeName));
+});
+
+// Phase 3: Route /api/stream/:filmId via Jellyfin API
+app.get('/api/stream/:filmId', requireAuth, async (req: any, res) => {
+    const user = req.user;
+    const filmId = req.params.filmId;
+    
+    // Find film
+    const films = [];
+    try {
+        if (fs.existsSync(FILMS_FILE)) {
+            films.push(...JSON.parse(fs.readFileSync(FILMS_FILE, 'utf-8')));
+        }
+    } catch (e) {}
+    
+    const film = films.find(f => f.id === filmId || (f as any).jellyfinId === filmId);
+    if (!film) return res.status(404).json({ error: 'Film non trouvé' });
+
+    if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
+        const jellyfinStreamUrl = `${process.env.JELLYFIN_URL}/Videos/${(film as any).jellyfinId || film.id}/stream?api_key=${process.env.JELLYFIN_API_KEY}`;
+        return res.redirect(jellyfinStreamUrl);
+    } else {
+        // Fallback local
+        const filename = film.filename || film.id;
+        return res.redirect(`/videos/${filename}`);
+    }
+});
+
+// Force Download Route
+app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
+    const filmId = req.params.filmId;
+    
+    const films = [];
+    try {
+        if (fs.existsSync(FILMS_FILE)) {
+            films.push(...JSON.parse(fs.readFileSync(FILMS_FILE, 'utf-8')));
+        }
+    } catch (e) {}
+    
+    const film = films.find(f => f.id === filmId || (f as any).jellyfinId === filmId);
+    if (!film) return res.status(404).json({ error: 'Film non trouvé' });
+
+    const safeName = path.basename(film.filename || '');
+    const filePath = path.join(UPLOADS_DIR, safeName);
+    
+    if (fs.existsSync(filePath)) {
+        res.download(filePath, film.originalName || safeName);
+    } else {
+        res.status(404).json({ error: 'Fichier source introuvable' });
+    }
 });
 
 

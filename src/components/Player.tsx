@@ -161,8 +161,8 @@ export default function Player({ film, activeUser, onClose }: Props) {
                                     </button>
                                 )}
                                 <a 
-                                    href={`/videos/${film.filename}`} 
-                                    download={film.originalName} 
+                                    href={`/api/download/${film.id}`} 
+                                    download={film.originalName || film.title} 
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         const key = `downloads_${activeUser.id}`;

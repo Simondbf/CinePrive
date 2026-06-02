@@ -743,6 +743,53 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                 </div>
             </div>
         )}
+            
+        {(activeUser.role === 'owner' || activeUser.role === 'admin') && tab === 'polls' && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mx-auto shadow-sm mt-8">
+                <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-lg font-medium">Créer un nouveau sondage</h3>
+                </div>
+                <form className="p-6 space-y-4" onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const newPoll = {
+                        id: 'p' + Date.now(),
+                        title: formData.get('title'),
+                        desc: formData.get('desc'),
+                        allowMultiple: formData.get('allowMultiple') === 'on',
+                        options: formData.get('options')?.toString().split('\n').filter(s => s.trim()).map((s, i) => ({ id: 'o' + (i + 1), label: s.trim() })) || []
+                    };
+                    const updatedConfig = [...pollsConfig, newPoll];
+                    await fetch('/api/polls/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatedConfig)
+                    });
+                    fetchData();
+                    (e.target as HTMLFormElement).reset();
+                }}>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Titre du sondage</label>
+                        <input name="title" required className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-zinc-900 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Description</label>
+                        <input name="desc" className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-zinc-900 dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Options (une par ligne)</label>
+                        <textarea name="options" rows={4} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded p-2 resize-none text-zinc-900 dark:text-white" placeholder="Option 1&#10;Option 2..." />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input type="checkbox" name="allowMultiple" id="allowMultiple" className="rounded" />
+                        <label htmlFor="allowMultiple" className="text-sm">Autoriser les choix multiples</label>
+                    </div>
+                    <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black rounded font-medium text-sm">
+                        Générer le sondage
+                    </button>
+                </form>
+            </div>
+        )}
     </div>
   );
 }
