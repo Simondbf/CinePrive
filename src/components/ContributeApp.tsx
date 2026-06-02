@@ -675,30 +675,43 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     <h3 className="text-lg font-medium">Résultats des sondages</h3>
                 </div>
                 <div className="p-6 space-y-8">
-                    {Object.keys(pollResults).length === 0 ? (
-                        <p className="text-zinc-500 text-center py-8">Aucun vote enregistré pour le moment.</p>
+                    {pollsConfig.length === 0 ? (
+                        <p className="text-zinc-500 text-center py-8">Aucun sondage actif.</p>
                     ) : (
-                        Object.keys(pollResults).map(pollId => {
-                            const data = pollResults[pollId];
-                            const config = pollsConfig.find((p:any) => p.id === pollId);
-                            const title = config ? config.title : `Sondage ID : ${pollId}`;
+                        pollsConfig.map((config: any) => {
+                            const pollId = config.id;
+                            const data = pollResults[pollId] || { options: {}, custom: [], userVotes: {} };
+                            const title = config.title;
                             const totalVotes = Object.values(data.options).reduce((a: any, b: any) => a + b, 0) as number;
                             return (
-                                <div key={pollId} className="space-y-4">
+                                <div key={pollId} className="space-y-4 pb-6 border-b border-zinc-100 dark:border-zinc-800 last:border-0 last:pb-0">
                                     <div className="flex justify-between items-center">
                                         <h4 className="font-medium text-zinc-900 dark:text-white capitalize">{title} ({totalVotes} votes)</h4>
                                         {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
-                                            <button 
-                                                onClick={async () => {
-                                                    if(window.confirm('Voulez-vous réinitialiser les résultats de ce sondage ?')) {
-                                                        await fetch(`/api/polls/reset/${pollId}`, { method: 'DELETE' });
-                                                        fetch('/api/polls/results').then(r => r.json()).then(setPollResults);
-                                                    }
-                                                }}
-                                                className="text-xs text-red-600 hover:underline px-2 py-1 bg-red-50 dark:bg-red-900/10 rounded"
-                                            >
-                                                Vider les résultats
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={async () => {
+                                                        if(window.confirm('Voulez-vous réinitialiser les résultats de ce sondage ?')) {
+                                                            await fetch(`/api/polls/reset/${pollId}`, { method: 'DELETE' });
+                                                            fetch('/api/polls/results').then(r => r.json()).then(setPollResults);
+                                                        }
+                                                    }}
+                                                    className="text-xs text-orange-600 hover:underline px-2 py-1 bg-orange-50 dark:bg-orange-900/10 rounded"
+                                                >
+                                                    Vider les résultats
+                                                </button>
+                                                <button 
+                                                    onClick={async () => {
+                                                        if(window.confirm('Voulez-vous supprimer définitivement ce sondage ?')) {
+                                                            await fetch(`/api/polls/${pollId}`, { method: 'DELETE' });
+                                                            fetchData();
+                                                        }
+                                                    }}
+                                                    className="text-xs text-red-600 hover:underline px-2 py-1 bg-red-50 dark:bg-red-900/10 rounded"
+                                                >
+                                                    Supprimer
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <div className="space-y-2">
@@ -757,6 +770,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                         title: formData.get('title'),
                         desc: formData.get('desc'),
                         allowMultiple: formData.get('allowMultiple') === 'on',
+                        allowCustom: formData.get('allowCustom') === 'on',
                         options: formData.get('options')?.toString().split('\n').filter(s => s.trim()).map((s, i) => ({ id: 'o' + (i + 1), label: s.trim() })) || []
                     };
                     const updatedConfig = [...pollsConfig, newPoll];
@@ -780,9 +794,15 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                         <label className="block text-sm font-medium mb-1">Options (une par ligne)</label>
                         <textarea name="options" rows={4} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded p-2 resize-none text-zinc-900 dark:text-white" placeholder="Option 1&#10;Option 2..." />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <input type="checkbox" name="allowMultiple" id="allowMultiple" className="rounded" />
-                        <label htmlFor="allowMultiple" className="text-sm">Autoriser les choix multiples</label>
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <input type="checkbox" name="allowMultiple" id="allowMultiple" className="w-4 h-4 rounded border-zinc-300" />
+                            <label htmlFor="allowMultiple" className="text-sm">Autoriser les choix multiples</label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input type="checkbox" name="allowCustom" id="allowCustom" defaultChecked className="w-4 h-4 rounded border-zinc-300" />
+                            <label htmlFor="allowCustom" className="text-sm">Autoriser le choix "Autre suggestion"</label>
+                        </div>
                     </div>
                     <button type="submit" className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black rounded font-medium text-sm">
                         Générer le sondage

@@ -178,6 +178,18 @@ app.get('/api/polls/results', (req, res) => {
     res.json(db.polls);
 });
 
+app.delete('/api/polls/:pollId', requireAuth, requireRole(['owner']), (req, res) => {
+    const { pollId } = req.params;
+    if (db.pollsConfig) {
+        db.pollsConfig = db.pollsConfig.filter((p: any) => p.id !== pollId);
+    }
+    if (db.polls && db.polls[pollId]) {
+        delete db.polls[pollId];
+    }
+    saveDb();
+    res.json({ success: true, pollsConfig: db.pollsConfig });
+});
+
 app.delete('/api/polls/reset/:pollId', requireAuth, requireRole(['owner']), (req, res) => {
     const { pollId } = req.params;
     if (db.polls[pollId]) {

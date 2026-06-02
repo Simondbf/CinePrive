@@ -115,7 +115,7 @@ export default function Polls({ activeUser }: { activeUser: User }) {
                                     </label>
                                 )})}
                                 
-                                {poll.options.length > 0 && (
+                                {(poll.allowCustom !== false) && poll.options.length > 0 && (
                                     <label className={`flex flex-col p-4 border rounded cursor-pointer transition ${currentVotes.includes('custom') ? 'border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>
                                         <div className="flex items-center">
                                             <input 
