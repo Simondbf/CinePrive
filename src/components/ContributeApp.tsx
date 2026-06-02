@@ -107,7 +107,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
           await fetch(`/api/users/${userId}/approve`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ adminId: activeUser.id })
+              body: JSON.stringify({})
           });
           fetchData();
       } catch (e) { console.error(e); }

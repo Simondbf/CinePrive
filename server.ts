@@ -84,7 +84,7 @@ if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, f
 if (!db.invites) db.invites = [];
 if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};
-if (!db.pollsConfig) db.pollsConfig = [
+db.pollsConfig = [
     {
         id: 'p1',
         title: 'Identité Visuelle & Logo',
@@ -130,7 +130,7 @@ app.post('/api/polls/config', requireAuth, requireRole(['owner']), (req, res) =>
     res.json({ success: true, pollsConfig: db.pollsConfig });
 });
 
-app.post('/api/polls/vote', (req, res) => {
+app.post('/api/polls/vote', requireAuth, (req, res) => {
     const { pollId, vote, customText, userId } = req.body;
     if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [], votedUsers: [], userVotes: {} };
     if (!db.polls[pollId].votedUsers) db.polls[pollId].votedUsers = [];
@@ -152,6 +152,17 @@ app.post('/api/polls/vote', (req, res) => {
     } else if (vote) {
         db.polls[pollId].options[vote] = (db.polls[pollId].options[vote] || 0) + 1;
     }
+    
+    // Notification for admins
+    if (!db.notifications) db.notifications = [];
+    db.notifications.push({
+        id: Date.now().toString() + Math.random().toString(36).substring(7),
+        type: 'poll_vote',
+        message: `Un membre a répondu au sondage.`,
+        readBy: [],
+        createdAt: Date.now()
+    });
+
     saveDb();
     res.json({ success: true, pollData: db.polls[pollId] });
 });
@@ -410,10 +421,13 @@ app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']),
     res.json({ success: true, user: { ...userToApprove, password: '' } });
 });
 
-app.post('/api/users/:id/mylist', (req, res) => {
+app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
     const user = db.users.find((u: any) => u.id === req.params.id);
     if (!user) return res.status(404).json({error: 'Utilisateur non trouvé'});
     
+    // Check if the user is modifying their own list
+    if ((req as any).user.id !== user.id) return res.status(403).json({error: 'Accès interdit'});
+
     const { filmId, action } = req.body;
     if(!user.myList) user.myList = [];
 
@@ -433,7 +447,7 @@ app.get('/api/films', async (req, res) => {
 });
 
 // Progression de lecture
-app.post('/api/progress', (req, res) => {
+app.post('/api/progress', requireAuth, (req, res) => {
     const { userId, filmId, time } = req.body;
     db.progress[`${userId}_${filmId}`] = time;
     saveDb();
@@ -450,7 +464,7 @@ app.get('/api/requests', (req, res) => {
     res.json(db.requests || []);
 });
 
-app.post('/api/requests', (req, res) => {
+app.post('/api/requests', requireAuth, (req, res) => {
     const { userId, userName, title, tmdbId } = req.body;
     if (!userId || !title) return res.status(400).json({ error: 'Champs manquants' });
 
@@ -483,7 +497,7 @@ app.post('/api/requests', (req, res) => {
     res.json({ success: true, request: newRequest });
 });
 
-app.delete('/api/requests/:id', (req, res) => {
+app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     if (!db.requests) db.requests = [];
     db.requests = db.requests.filter((r: any) => r.id !== req.params.id);
     saveDb();
@@ -494,7 +508,7 @@ app.delete('/api/requests/:id', (req, res) => {
 app.get('/api/notifications', (req, res) => {
     res.json(db.notifications || []);
 });
-app.post('/api/notifications/:id/read', (req, res) => {
+app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
     const { userId } = req.body;
     if (!db.notifications) db.notifications = [];
     const notif = db.notifications.find((n: any) => n.id === req.params.id);
@@ -504,7 +518,7 @@ app.post('/api/notifications/:id/read', (req, res) => {
     }
     res.json({ success: true });
 });
-app.post('/api/notifications/read-all', (req, res) => {
+app.post('/api/notifications/read-all', requireAuth, (req, res) => {
     const { userId } = req.body;
     if (!db.notifications) db.notifications = [];
     db.notifications.forEach((n: any) => {
@@ -658,8 +672,11 @@ app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: a
     }
 });
 
-// Distribution Vidéos Static
-app.use('/videos', requireAuth, express.static(UPLOADS_DIR));
+// Distribution Vidéos
+app.get('/videos/:filename', requireAuth, (req, res) => {
+    const safeName = path.basename(req.params.filename);
+    res.sendFile(path.join(UPLOADS_DIR, safeName));
+});
 
 
 // ======================= VITE MIDDLEWARE =======================

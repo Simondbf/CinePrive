@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  cineprive-staging:
+    build: 
+      context: ../
+      dockerfile: Dockerfile
+    container_name: cp-staging
+    environment:
+      - NODE_ENV=production
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "3001:3000" # Expose sur le port 3001 en local pour Nginx
+    volumes:
+      - /mnt/films:/films:ro # Lecture seule, même source que la prod
+      - ../data-staging:/app/data # Données séparées pour le staging
+    restart: always
+
+  jellyfin-staging:
+    image: jellyfin/jellyfin:10.10.0 # Version plus récente pour tester
+    container_name: jellyfin-staging
+    user: 1000:1000
+    network_mode: "host" 
+    volumes:
+      - /mnt/films:/media:ro
+      - ./jellyfin-config-staging:/config
+      - ./jellyfin-cache-staging:/cache
+    restart: always
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_MONITOR_ONLY=true
+      - WATCHTOWER_NOTIFICATIONS=email # config email requise, ou utiliser ntfy
+      - WATCHTOWER_NOTIFICATION_EMAIL_TO=votre-email@exemple.fr
+    command: jellyfin-staging
+    restart: always

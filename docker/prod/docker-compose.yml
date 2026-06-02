@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  cineprive-front:
+    build: 
+      context: ../
+      dockerfile: Dockerfile
+    container_name: cp-prod
+    environment:
+      - NODE_ENV=production
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "3000:3000"
+    volumes:
+      - /mnt/films:/films:ro
+      - ../data:/app/data
+    restart: always
+
+  jellyfin:
+    image: jellyfin/jellyfin:10.9.11
+    container_name: jellyfin-prod
+    user: 1000:1000
+    network_mode: "host" # Ou exposez uniquement le port pour usage interne
+    volumes:
+      - /mnt/films:/media:ro
+      - ./jellyfin-config:/config
+      - ./jellyfin-cache:/cache
+    restart: always

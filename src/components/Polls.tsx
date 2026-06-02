@@ -22,7 +22,16 @@ export default function Polls({ activeUser }: { activeUser: User }) {
 
     useEffect(() => {
         fetch('/api/polls/config').then(r => r.json()).then(setPollsConfig).catch(console.error);
-    }, []);
+        fetch('/api/polls/results').then(r => r.json()).then(data => {
+            const alreadyVoted: Record<string, boolean> = {};
+            Object.keys(data).forEach(pollId => {
+                if (data[pollId].votedUsers && data[pollId].votedUsers.includes(activeUser.id)) {
+                    alreadyVoted[pollId] = true;
+                }
+            });
+            setSubmitted(alreadyVoted);
+        }).catch(console.error);
+    }, [activeUser.id]);
 
     const submitVote = async (pollId: string) => {
         const optionId = votes[pollId];
