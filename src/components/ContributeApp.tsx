@@ -485,12 +485,12 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                         </div>
                         <div className="flex items-center justify-between pb-6 border-b border-zinc-100 dark:border-zinc-800">
                             <div>
-                                <p className="font-medium text-zinc-800 dark:text-zinc-200">Synchronisation Jellyfin</p>
-                                <p className="text-sm text-zinc-500">Recherche automatiquement les nouveaux ajouts locaux (films, séries, parodies) présents sur Jellyfin pour les importer à la bibliothèque de CinéPrivé.</p>
+                                <p className="font-medium text-zinc-800 dark:text-zinc-200">Synchronisation du Serveur Local</p>
+                                <p className="text-sm text-zinc-500">Recherche automatiquement les nouveaux ajouts locaux (films, séries, parodies) présents sur le serveur multimédia pour les importer à la bibliothèque de CinéPrivé.</p>
                             </div>
                             <button 
                                 onClick={async () => {
-                                    if(window.confirm('Voulez-vous synchroniser le catalogue Jellyfin ?')) {
+                                    if(window.confirm('Voulez-vous synchroniser le catalogue du serveur multimédia ?')) {
                                         try {
                                             const res = await fetch('/api/jellyfin/sync', { method: 'POST' });
                                             const data = await res.json();
