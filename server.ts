@@ -491,6 +491,62 @@ app.get('/api/films', async (req, res) => {
   res.json(db.films);
 });
 
+app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, res) => {
+    if (!process.env.JELLYFIN_URL || !process.env.JELLYFIN_API_KEY) {
+        return res.status(400).json({ error: "Jellyfin n'est pas configuré" });
+    }
+    
+    try {
+        // 1. Récupérer les utilisateurs pour trouver l'admin (les clés API globales sont souvent rattachées à un utilisateur)
+        const usersResp = await fetch(`${process.env.JELLYFIN_URL}/Users`, {
+            headers: { 'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"` }
+        });
+        const users = await usersResp.json();
+        const admin = users.find((u: any) => u.Policy.IsAdministrator);
+        
+        if (!admin) return res.status(500).json({ error: "Administrateur Jellyfin introuvable" });
+
+        // 2. Fetch les items récursivement
+        const itemsResp = await fetch(`${process.env.JELLYFIN_URL}/Users/${admin.Id}/Items?Recursive=true&IncludeItemTypes=Movie,Series,Video&Fields=Path,Overview,PremiereDate,Genres,Studios`, {
+            headers: { 'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"` }
+        });
+        const itemsData = await itemsResp.json();
+        
+        let addedCount = 0;
+        
+        itemsData.Items.forEach((item: any) => {
+            // Check si on a déjà ce film
+            const existing = db.films.find((f: any) => f.jellyfinId === item.Id);
+            if (!existing) {
+                const isSeries = item.Type === "Series";
+                db.films.push({
+                    id: 'jf_' + item.Id,
+                    jellyfinId: item.Id,
+                    title: item.Name,
+                    synopsis: item.Overview || 'Aucun synopsis disponible.',
+                    year: item.PremiereDate ? new Date(item.PremiereDate).getFullYear() : new Date().getFullYear(),
+                    genre: item.Genres && item.Genres.length > 0 ? item.Genres[0] : (isSeries ? 'Série' : 'Film'),
+                    director: isSeries ? 'Série' : 'Jellyfin',
+                    duration: isSeries ? (item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 600000000) + ' min par ep.' : 'Série TV') : (item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 600000000) + ' min' : 'Inconnu'),
+                    posterUrl: `${process.env.JELLYFIN_URL}/Items/${item.Id}/Images/Primary?api_key=${process.env.JELLYFIN_API_KEY}`,
+                    addedBy: 'Admin',
+                    addedAt: new Date().toISOString(),
+                    filename: '',
+                    originalName: item.Path || item.Name,
+                    status: 'ready'
+                });
+                addedCount++;
+            }
+        });
+        
+        saveDb();
+        res.json({ success: true, count: addedCount, films: db.films });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Erreur lors de la synchronisation Jellyfin" });
+    }
+});
+
 // Progression de lecture
 app.post('/api/progress', requireAuth, (req, res) => {
     const { userId, filmId, time } = req.body;

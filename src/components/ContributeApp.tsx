@@ -483,6 +483,32 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                 <span className={`${settings.allowRegistrations ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
                             </button>
                         </div>
+                        <div className="flex items-center justify-between pb-6 border-b border-zinc-100 dark:border-zinc-800">
+                            <div>
+                                <p className="font-medium text-zinc-800 dark:text-zinc-200">Synchronisation Jellyfin</p>
+                                <p className="text-sm text-zinc-500">Recherche automatiquement les nouveaux ajouts locaux (films, séries, parodies) présents sur Jellyfin pour les importer à la bibliothèque de CinéPrivé.</p>
+                            </div>
+                            <button 
+                                onClick={async () => {
+                                    if(window.confirm('Voulez-vous synchroniser le catalogue Jellyfin ?')) {
+                                        try {
+                                            const res = await fetch('/api/jellyfin/sync', { method: 'POST' });
+                                            const data = await res.json();
+                                            if(data.success) {
+                                                alert(`Synchronisation terminée. ${data.count} nouveautés importées !`);
+                                            } else {
+                                                alert('Erreur: ' + data.error);
+                                            }
+                                        } catch (e) {
+                                            alert("Erreur de requête");
+                                        }
+                                    }
+                                }}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium text-sm transition"
+                            >
+                                Forcer la synchro
+                            </button>
+                        </div>
                     </div>
                 </div>
 
