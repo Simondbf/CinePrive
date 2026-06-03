@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare } from 'lucide-react';
+import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
@@ -391,7 +391,16 @@ export default function App() {
                                    <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
                                        <div className="flex justify-between items-start mb-1">
                                            <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">{n.type}</span>
-                                           <span className="text-[10px] text-zinc-500">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                           <div className="flex items-center gap-2">
+                                               <span className="text-[10px] text-zinc-500">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                               <button onClick={async (e) => {
+                                                   e.stopPropagation();
+                                                   await fetch(`/api/notifications/${n.id}`, { method: 'DELETE' });
+                                                   fetchFilms();
+                                               }} className="text-zinc-500 hover:text-red-500 transition-colors ml-2 -mr-1">
+                                                   <X className="w-3 h-3" />
+                                               </button>
+                                           </div>
                                        </div>
                                        <p className="text-sm font-medium">{n.message}</p>
                                    </div>

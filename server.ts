@@ -84,7 +84,7 @@ if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, f
 if (!db.invites) db.invites = [];
 if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};
-db.pollsConfig = [
+if (!db.pollsConfig) db.pollsConfig = [
     {
         id: 'p1',
         title: 'Identité Visuelle & Logo',
@@ -113,6 +113,7 @@ db.pollsConfig = [
         title: 'Membres Bêta',
         desc: "Souhaitez-vous devenir membre bêta pour tester les nouveautés en avant-première ?",
         allowMultiple: false,
+        allowCustom: false,
         options: [
             { id: 'o1', label: 'Oui, je veux bien !' },
             { id: 'o2', label: 'Non, je préfère la version stable.' }
@@ -570,6 +571,13 @@ app.post('/api/notifications/read-all', requireAuth, (req, res) => {
             n.readBy.push(userId);
         }
     });
+    saveDb();
+    res.json({ success: true });
+});
+
+app.delete('/api/notifications/:id', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+    if (!db.notifications) db.notifications = [];
+    db.notifications = db.notifications.filter((n: any) => n.id !== req.params.id);
     saveDb();
     res.json({ success: true });
 });
