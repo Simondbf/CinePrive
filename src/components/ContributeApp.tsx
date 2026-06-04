@@ -227,7 +227,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
               <button 
                  className={`px-4 py-2 font-medium rounded transition-colors bg-zinc-800 dark:bg-white text-white dark:text-black`}
               >
-                 Plateforme d'Upload
+                 Plateforme de Transfert
               </button>
           ) : (
               <>
@@ -385,15 +385,15 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     </label>
 
                     <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
-                        {uploadStatus === 'success' && <p className="text-green-500 text-sm font-medium mb-3 text-center">✓ Upload du fichier terminé avec succès.</p>}
-                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Vérifiez la connexion ou redémarrez l'upload.</p>}
+                        {uploadStatus === 'success' && <p className="text-green-500 text-sm font-medium mb-3 text-center">✓ Transfert du fichier terminé avec succès.</p>}
+                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Vérifiez la connexion ou redémarrez l'envoi.</p>}
                         
                         <div className="flex gap-2">
                             {file && (
                                 <button
                                     onClick={resetUpload}
                                     className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded transition flex items-center justify-center"
-                                    title="Réinitialiser l'upload"
+                                    title="Réinitialiser l'envoi"
                                 >
                                     <X className="w-5 h-5 mx-1" />
                                 </button>
