@@ -17,6 +17,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [invitesList, setInvitesList] = useState<{code: string, used: boolean, maxUses?: number, currentUses?: number}[]>([]);
   const [pollResults, setPollResults] = useState<any>({});
   const [settings, setSettings] = useState<{ allowRegistrations: boolean, fundingCurrent?: number, fundingGoal?: number }>({ allowRegistrations: true });
+  const [dialogState, setDialogState] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, isAlert?: boolean}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Nouveaux états locaux pour les super-codes
   const [customCodeInput, setCustomCodeInput] = useState('');
@@ -83,11 +84,17 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   };
 
   const handleDeleteUser = async (userId: string) => {
-      if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.")) return;
-      try {
-          await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-          fetchData();
-      } catch (e) { console.error(e); }
+      setDialogState({
+          isOpen: true,
+          title: 'Supprimer un utilisateur',
+          message: 'Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.',
+          onConfirm: async () => {
+              try {
+                  await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+                  fetchData();
+              } catch (e) { console.error(e); }
+          }
+      });
   };
 
   const handleToggleRegistration = async () => {
@@ -490,19 +497,24 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             </div>
                             <button 
                                 onClick={async () => {
-                                    if(window.confirm('Voulez-vous synchroniser le catalogue du serveur multimédia ?')) {
-                                        try {
-                                            const res = await fetch('/api/jellyfin/sync', { method: 'POST' });
-                                            const data = await res.json();
-                                            if(data.success) {
-                                                alert(`Synchronisation terminée. ${data.count} nouveautés importées !`);
-                                            } else {
-                                                alert('Erreur: ' + data.error);
+                                    setDialogState({
+                                        isOpen: true,
+                                        title: 'Synchronisation du Serveur Local',
+                                        message: 'Voulez-vous synchroniser le catalogue du serveur multimédia ?',
+                                        onConfirm: async () => {
+                                            try {
+                                                const res = await fetch('/api/jellyfin/sync', { method: 'POST' });
+                                                const data = await res.json();
+                                                if(data.success) {
+                                                    setDialogState(prev => ({...prev, isOpen: true, title: 'Synchronisation terminée', message: `${data.count} nouveautés importées !`, isAlert: true}));
+                                                } else {
+                                                    setDialogState(prev => ({...prev, isOpen: true, title: 'Erreur', message: data.error, isAlert: true}));
+                                                }
+                                            } catch (e) {
+                                                setDialogState(prev => ({...prev, isOpen: true, title: 'Erreur', message: 'Erreur de requête', isAlert: true}));
                                             }
-                                        } catch (e) {
-                                            alert("Erreur de requête");
                                         }
-                                    }
+                                    });
                                 }}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium text-sm transition"
                             >
@@ -607,9 +619,12 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                                     ) : (
                                                         <button 
                                                             onClick={() => {
-                                                                if(window.confirm(`Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`)){
-                                                                    handleChangeRole(u.id, 'admin');
-                                                                }
+                                                                setDialogState({
+                                                                    isOpen: true,
+                                                                    title: 'Promouvoir Admin',
+                                                                    message: `Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`,
+                                                                    onConfirm: () => handleChangeRole(u.id, 'admin')
+                                                                });
                                                             }}
                                                             className="text-[10px] sm:text-xs text-purple-600 hover:underline"
                                                         >
@@ -717,10 +732,15 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                             <div className="flex items-center gap-2">
                                                 <button 
                                                     onClick={async () => {
-                                                        if(window.confirm('Voulez-vous réinitialiser les résultats de ce sondage ?')) {
-                                                            await fetch(`/api/polls/reset/${pollId}`, { method: 'DELETE' });
-                                                            fetch('/api/polls/results').then(r => r.json()).then(setPollResults);
-                                                        }
+                                                        setDialogState({
+                                                            isOpen: true,
+                                                            title: 'Vider les résultats',
+                                                            message: 'Voulez-vous réinitialiser les résultats de ce sondage ?',
+                                                            onConfirm: async () => {
+                                                                await fetch(`/api/polls/reset/${pollId}`, { method: 'DELETE' });
+                                                                fetch('/api/polls/results').then(r => r.json()).then(setPollResults);
+                                                            }
+                                                        });
                                                     }}
                                                     className="text-xs text-orange-600 hover:underline px-2 py-1 bg-orange-50 dark:bg-orange-900/10 rounded"
                                                 >
@@ -728,10 +748,15 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                                 </button>
                                                 <button 
                                                     onClick={async () => {
-                                                        if(window.confirm('Voulez-vous supprimer définitivement ce sondage ?')) {
-                                                            await fetch(`/api/polls/${pollId}`, { method: 'DELETE' });
-                                                            fetchData();
-                                                        }
+                                                        setDialogState({
+                                                            isOpen: true,
+                                                            title: 'Supprimer ce sondage',
+                                                            message: 'Voulez-vous supprimer définitivement ce sondage ?',
+                                                            onConfirm: async () => {
+                                                                await fetch(`/api/polls/${pollId}`, { method: 'DELETE' });
+                                                                fetchData();
+                                                            }
+                                                        });
                                                     }}
                                                     className="text-xs text-red-600 hover:underline px-2 py-1 bg-red-50 dark:bg-red-900/10 rounded"
                                                 >
@@ -834,6 +859,37 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                         Générer le sondage
                     </button>
                 </form>
+            </div>
+        )}
+
+        {/* Modal de confirmation / alert generic */}
+        {dialogState.isOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl p-6 w-full max-w-sm border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">{dialogState.title}</h3>
+                    <p className="text-zinc-600 dark:text-zinc-400 mb-6">{dialogState.message}</p>
+                    <div className="flex items-center justify-end gap-3">
+                        {!dialogState.isAlert && (
+                            <button 
+                                onClick={() => setDialogState(prev => ({...prev, isOpen: false}))}
+                                className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition"
+                            >
+                                Annuler
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => {
+                                if(!dialogState.isAlert) {
+                                    dialogState.onConfirm();
+                                }
+                                setDialogState(prev => ({...prev, isOpen: false}));
+                            }}
+                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded shadow-sm transition"
+                        >
+                            {dialogState.isAlert ? 'OK' : 'Confirmer'}
+                        </button>
+                    </div>
+                </div>
             </div>
         )}
     </div>
