@@ -135,6 +135,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const searchTMDB = async () => {
       if (!tmdbQuery) return;
@@ -193,18 +194,46 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       if (!file || !selectedMeta) return;
       setIsUploading(true);
       setUploadStatus('idle');
-
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('metadata', JSON.stringify(selectedMeta));
-      formData.append('user', activeUser.id);
+      setUploadProgress(0);
 
       try {
-          const res = await fetch('/api/films/upload', {
+          const uploadId = Date.now().toString() + Math.random().toString().slice(2);
+          const chunkSize = 50 * 1024 * 1024; // 50MB par paquet pour éviter la limite Cloudflare de 100MB
+          const totalChunks = Math.ceil(file.size / chunkSize);
+
+          for (let i = 0; i < totalChunks; i++) {
+              const start = i * chunkSize;
+              const end = Math.min(start + chunkSize, file.size);
+              const chunk = file.slice(start, end);
+
+              const formData = new FormData();
+              formData.append('chunk', chunk);
+              formData.append('uploadId', uploadId);
+
+              const res = await fetch('/api/films/upload-chunk', {
+                  method: 'POST',
+                  body: formData
+              });
+
+              if (!res.ok) throw new Error("Chunk upload failed");
+              
+              setUploadProgress(Math.round(((i + 1) / totalChunks) * 100));
+          }
+
+          // Finalisation / Métadonnées (au format JSON classique)
+          const finRes = await fetch('/api/films/upload-finalize', {
               method: 'POST',
-              body: formData
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  uploadId,
+                  filename: file.name,
+                  originalName: file.name,
+                  metadata: selectedMeta,
+                  user: activeUser.id
+              })
           });
-          if (res.ok) {
+
+          if (finRes.ok) {
               setUploadStatus('success');
               setFile(null);
               setSelectedMeta(null);
@@ -218,6 +247,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
           setUploadStatus('error');
       } finally {
           setIsUploading(false);
+          setUploadProgress(0);
       }
   };
 
@@ -403,7 +433,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                disabled={!file || !selectedMeta || isUploading}
                                className="flex-1 bg-red-600 text-white font-semibold py-3 rounded hover:bg-red-500 transition disabled:opacity-50 flex justify-center"
                             >
-                               {isUploading ? 'Transfert et Traitement en cours...' : 'Envoyer vers CinéPrivé Serveur'}
+                               {isUploading ? `Transfert en cours... ${uploadProgress > 0 ? `(${uploadProgress}%)` : ''}` : 'Envoyer vers CinéPrivé Serveur'}
                             </button>
                         </div>
                     </div>

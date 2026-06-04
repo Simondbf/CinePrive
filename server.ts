@@ -202,7 +202,7 @@ app.delete('/api/polls/reset/:pollId', requireAuth, requireRole(['owner']), (req
 
 const upload = multer({ 
     dest: UPLOADS_DIR,
-    limits: { fileSize: 10000 * 1024 * 1024 } // 10GB
+    limits: { fileSize: 15000 * 1024 * 1024 } // 15GB
 });
 
 // Mapping simplifié des genres TMDB
@@ -777,6 +777,128 @@ app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: a
     } catch (e) {
         console.error("Upload error", e);
         res.status(500).json({ error: 'Internal upload error' });
+    }
+});
+
+// Upload Video par paquets (Chunking pour contourner Cloudflare)
+app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (req: any, res) => {
+    const { uploadId } = req.body;
+    const chunkFile = req.file;
+
+    if (!uploadId || !chunkFile) return res.status(400).json({ error: 'Données manquantes' });
+
+    const targetPath = path.join(UPLOADS_DIR, `temp_${uploadId}`);
+
+    try {
+        fs.appendFileSync(targetPath, fs.readFileSync(chunkFile.path));
+        fs.unlinkSync(chunkFile.path);
+        res.json({ success: true });
+    } catch (e) {
+        console.error("Erreur de chunk:", e);
+        res.status(500).json({ error: 'Erreur écriture chunk' });
+    }
+});
+
+app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: any, res) => {
+    const body = req.body;
+    const { uploadId, filename, originalName } = body;
+
+    // Use multer upload instead to accept multipart if we send it that way? We sent it via express.json? Wait!
+    // No, multipart/form-data requires multer. Let's use upload.none() for the finalize endpoint if formData is used. 
+    // Or we just send it as application/json from the client! (JSON is easier).
+    // The previous request used formData. Let's check how I am planning to send finalize.
+    // Client can do: fetch(..., { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({...}) })
+    
+    if (!uploadId || !filename) return res.status(400).json({ error: 'Données manquantes' });
+
+    const safeName = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const finalFilename = `${Date.now()}_${safeName}`;
+    const tempPath = path.join(UPLOADS_DIR, `temp_${uploadId}`);
+    const finalPath = path.join(UPLOADS_DIR, finalFilename);
+
+    try {
+        if (fs.existsSync(tempPath)) {
+            fs.renameSync(tempPath, finalPath);
+        } else {
+            return res.status(400).json({ error: 'Fichier temporaire introuvable' });
+        }
+
+        const metadata = typeof body.metadata === 'string' ? JSON.parse(body.metadata || '{}') : (body.metadata || {});
+        const genreIds = metadata.genre_ids || [];
+        const mainGenre = genreIds.length > 0 ? (TMDB_GENRES[genreIds[0]] || 'Autre') : 'Autre';
+
+        let castData: any[] = [];
+        let directorData = 'Vérifié par TMDB';
+
+        if (metadata.id && process.env.TMDB_API_KEY) {
+            try {
+                const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${metadata.id}?api_key=${process.env.TMDB_API_KEY}&language=fr-FR&append_to_response=credits`);
+                const fullMeta = await creditsRes.json();
+                
+                if (fullMeta.credits && fullMeta.credits.cast) {
+                    castData = fullMeta.credits.cast.slice(0, 10).map((c: any) => ({
+                        name: c.name,
+                        character: c.character,
+                        profilePath: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null
+                    }));
+                }
+                if (fullMeta.credits && fullMeta.credits.crew) {
+                    const dir = fullMeta.credits.crew.find((c: any) => c.job === 'Director');
+                    if (dir) directorData = dir.name;
+                }
+            } catch (err) {
+                console.error("TMDB Credits fetch error", err);
+            }
+        }
+
+        const film = {
+            id: uuidv4(),
+            tmdbId: metadata.id,
+            title: metadata.title || 'Inconnu',
+            synopsis: metadata.overview || '',
+            year: metadata.release_date ? parseInt(metadata.release_date.split('-')[0]) : new Date().getFullYear(),
+            genre: mainGenre,
+            director: directorData,
+            cast: castData,
+            duration: '~120m',
+            posterUrl: metadata.poster_path ? `https://image.tmdb.org/t/p/w500${metadata.poster_path}` : undefined,
+            addedBy: body.user || 'Unknown',
+            addedAt: new Date().toISOString(),
+            filename: finalFilename,
+            originalName: originalName || filename,
+            status: 'ready'
+        };
+
+        db.films.push(film);
+        
+        // Notifications
+        if (!db.notifications) db.notifications = [];
+        const notifMessage = `🎬 Nouveau film ajouté par ${req.user.username} : ${film.title}`;
+        db.notifications.push({
+            id: uuidv4(),
+            type: 'upload',
+            message: notifMessage,
+            createdAt: new Date().toISOString(),
+            readBy: []
+        });
+
+        // Webhook Discord
+        if (db.settings && db.settings.webhookUrl) {
+            try {
+                fetch(db.settings.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: notifMessage })
+                }).catch(e => console.error("Discord webhook failed", e));
+            } catch (e) {}
+        }
+        
+        saveDb();
+
+        res.json({ success: true, film });
+    } catch (e) {
+        console.error("Upload finalize error", e);
+        res.status(500).json({ error: 'Internal upload finalize error' });
     }
 });
 
