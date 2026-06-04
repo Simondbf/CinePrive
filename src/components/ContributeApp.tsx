@@ -386,7 +386,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
 
                     <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                         {uploadStatus === 'success' && <p className="text-green-500 text-sm font-medium mb-3 text-center">✓ Upload du fichier terminé avec succès.</p>}
-                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Le fichier est probablement trop volumineux ou corrompu pour le serveur Cloud Run actuel.</p>}
+                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Vérifiez la connexion ou redémarrez l'upload.</p>}
                         
                         <div className="flex gap-2">
                             {file && (
