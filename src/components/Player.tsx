@@ -22,7 +22,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
   useEffect(() => {
     if (isMkv) {
-        notify("L'écran risque de rester noir.\n\nLes navigateurs Web ne supportent pas nativement le format .MKV. Téléchargez le fichier pour le lire avec VLC. Sur le projet final, Jellyfin corrigera cela à la volée.", "Format Vidéo Incompatible");
+        notify("L'écran risque de rester noir.\n\nLes navigateurs Web ne supportent pas nativement le format .MKV. Téléchargez le fichier pour le lire avec VLC.", "Format Vidéo Incompatible");
     }
 
     if (videoRef.current) {

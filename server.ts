@@ -914,14 +914,9 @@ app.get('/api/stream/:filmId', requireAuth, async (req: any, res) => {
     const filmId = req.params.filmId;
     
     // Find film
-    const films = [];
-    try {
-        if (fs.existsSync(FILMS_FILE)) {
-            films.push(...JSON.parse(fs.readFileSync(FILMS_FILE, 'utf-8')));
-        }
-    } catch (e) {}
+    const films = db.films || [];
     
-    const film = films.find(f => f.id === filmId || (f as any).jellyfinId === filmId);
+    const film = films.find((f: any) => f.id === filmId || (f as any).jellyfinId === filmId);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
@@ -938,14 +933,9 @@ app.get('/api/stream/:filmId', requireAuth, async (req: any, res) => {
 app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     const filmId = req.params.filmId;
     
-    const films = [];
-    try {
-        if (fs.existsSync(FILMS_FILE)) {
-            films.push(...JSON.parse(fs.readFileSync(FILMS_FILE, 'utf-8')));
-        }
-    } catch (e) {}
+    const films = db.films || [];
     
-    const film = films.find(f => f.id === filmId || (f as any).jellyfinId === filmId);
+    const film = films.find((f: any) => f.id === filmId || (f as any).jellyfinId === filmId);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     const safeName = path.basename(film.filename || '');
