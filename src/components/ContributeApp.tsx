@@ -466,7 +466,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     disabled={isUploadingGlobal || tasks.filter(t => t.status === 'waiting' && t.selectedMeta).length === 0}
                                     className="bg-red-600 text-white font-medium px-6 py-2.5 rounded hover:bg-red-500 transition disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    {isUploadingGlobal ? 'Transfert en cours...' : 'Transférer la file d\'attente'}
+                                    {isUploadingGlobal ? 'Transfert en cours...' : 'Lancer le téléchargement'}
                                 </button>
                             </div>
                         </div>
