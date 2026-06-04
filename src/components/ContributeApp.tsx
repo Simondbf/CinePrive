@@ -182,12 +182,18 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   };
 
   const resetUpload = () => {
+      if (isUploading) {
+          if (!window.confirm("Couper la connexion : Un transfert est en cours vers le serveur. Êtes-vous sûr de vouloir l'annuler ?")) {
+              return;
+          }
+      }
       setFile(null);
       setSelectedMeta(null);
       setTmdbQuery('');
       setTmdbResults([]);
       setUploadStatus('idle');
       setIsUploading(false);
+      setUploadProgress(0);
   };
 
   const submitUpload = async () => {
@@ -329,18 +335,50 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     </p>
                 </div>
             ) : (
-            <div className="grid md:grid-cols-2 gap-8">
-                {/* ETAPE 1: METADATA */}
+            <>
+                <div className="grid md:grid-cols-2 gap-8">
+                    {/* ETAPE 1: FICHIER LOCAL */}
+                <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+                    <h3 className="font-medium text-lg text-white flex items-center gap-2 mb-4">
+                        <UploadCloud className="w-5 h-5 text-zinc-400" />
+                        1. Fichier Vidéo (Rip Local)
+                    </h3>
+                    
+                    <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
+                        Le navigateur web ne peut pas directement "ripper" un lecteur DVD (sécurité système).
+                        Vous devez utiliser un logiciel de conversion comme MakeMKV ou Handbrake afin d'obtenir un fichier sur votre ordinateur, puis l'importer ici. Parfait pour ajouter 1 film.
+                    </p>
+
+                    <label className={`block border-2 border-dashed ${file ? 'border-zinc-500 bg-zinc-800/50' : 'border-zinc-700 bg-zinc-950'} rounded-lg p-8 relative cursor-pointer hover:border-zinc-500 transition`}>
+                        <input type="file" accept="video/mp4,video/webm,video/mkv,video/x-matroska,video/avi,video/quicktime,video/x-ms-wmv,video/x-flv,video/x-m4v,.mp4,.webm,.mkv,.avi,.mov,.wmv,.flv,.m4v" className="hidden" onChange={handleFileSelect} />
+                        <div className="text-center">
+                            {file ? (
+                                <div>
+                                    <CheckCircle className="w-8 h-8 text-white mx-auto mb-2" />
+                                    <p className="font-medium text-white text-sm truncate">{file.name}</p>
+                                    <p className="text-xs text-zinc-500 mt-1">{(file.size / (1024*1024)).toFixed(0)} Mo</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <UploadCloud className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+                                    <p className="font-medium text-zinc-400 text-sm">Cliquez pour sélectionner la vidéo</p>
+                                </div>
+                            )}
+                        </div>
+                    </label>
+                </div>
+
+                {/* ETAPE 2: METADATA */}
                 <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
                     <h3 className="font-medium text-lg text-white flex items-center gap-2 mb-4">
                         <Database className="w-5 h-5 text-zinc-400" />
-                        1. Lier les données du film (TMDB)
+                        2. Lier les données du film (TMDB)
                     </h3>
                     
                     <div className="flex gap-2 mb-6">
                         <input 
                            type="text" 
-                           placeholder="Ex: Matrix, Inception..." 
+                           placeholder="Le titre sera détecté automatiquement..." 
                            value={tmdbQuery} 
                            onChange={e => setTmdbQuery(e.target.value)}
                            onKeyDown={(e) => e.key === 'Enter' && searchTMDB()}
@@ -371,7 +409,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
 
                     {selectedMeta && (
                          <div className="p-4 bg-zinc-950 border border-green-900/50 rounded relative">
-                             <button onClick={() => setSelectedMeta(null)} className="absolute top-4 right-4 text-xs text-red-400 hover:underline">Changer</button>
+                             <button onClick={() => setSelectedMeta(null)} className="absolute top-4 right-4 text-xs text-zinc-400 bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded transition">Changer de film</button>
                              <div className="flex gap-4">
                                  {selectedMeta.poster_path && <img src={`https://image.tmdb.org/t/p/w92${selectedMeta.poster_path}`} className="w-16 rounded" />}
                                  <div>
@@ -383,62 +421,33 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                          </div>
                     )}
                 </div>
+            </div>
 
-                {/* ETAPE 2: FICHIER LOCAL */}
-                <div className={`bg-zinc-900 p-6 rounded-xl border transition-colors ${selectedMeta ? 'border-zinc-800' : 'border-zinc-800 opacity-50 pointer-events-none'}`}>
-                    <h3 className="font-medium text-lg text-white flex items-center gap-2 mb-4">
-                        <UploadCloud className="w-5 h-5 text-zinc-400" />
-                        2. Fichier Vidéo (Rip Local)
-                    </h3>
-                    
-                    <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
-                        Le navigateur web ne peut pas directement "ripper" un lecteur DVD (sécurité système).
-                        Vous devez utiliser un logiciel de conversion comme MakeMKV ou Handbrake afin d'obtenir un fichier MP4/MKV sur votre ordinateur, puis l'importer ici.
-                    </p>
-
-                    <label className={`block border-2 border-dashed ${file ? 'border-zinc-500 bg-zinc-800/50' : 'border-zinc-700 bg-zinc-950'} rounded-lg p-8 relative cursor-pointer hover:border-zinc-500 transition`}>
-                        <input type="file" accept="video/mp4,video/webm,video/mkv,video/x-matroska,video/avi,video/quicktime,video/x-ms-wmv,video/x-flv,video/x-m4v,.mp4,.webm,.mkv,.avi,.mov,.wmv,.flv,.m4v" className="hidden" onChange={handleFileSelect} />
-                        <div className="text-center">
-                            {file ? (
-                                <div>
-                                    <CheckCircle className="w-8 h-8 text-white mx-auto mb-2" />
-                                    <p className="font-medium text-white text-sm truncate">{file.name}</p>
-                                    <p className="text-xs text-zinc-500 mt-1">{(file.size / (1024*1024)).toFixed(0)} Mo</p>
-                                </div>
-                            ) : (
-                                <div>
-                                    <UploadCloud className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
-                                    <p className="font-medium text-zinc-400 text-sm">Cliquez pour importer la vidéo</p>
-                                </div>
-                            )}
-                        </div>
-                    </label>
-
-                    <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
-                        {uploadStatus === 'success' && <p className="text-green-500 text-sm font-medium mb-3 text-center">✓ Transfert du fichier terminé avec succès.</p>}
-                        {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Vérifiez la connexion ou redémarrez l'envoi.</p>}
-                        
-                        <div className="flex gap-2">
-                            {file && (
-                                <button
-                                    onClick={resetUpload}
-                                    className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded transition flex items-center justify-center"
-                                    title="Réinitialiser l'envoi"
-                                >
-                                    <X className="w-5 h-5 mx-1" />
-                                </button>
-                            )}
-                            <button 
-                               onClick={submitUpload}
-                               disabled={!file || !selectedMeta || isUploading}
-                               className="flex-1 bg-red-600 text-white font-semibold py-3 rounded hover:bg-red-500 transition disabled:opacity-50 flex justify-center"
-                            >
-                               {isUploading ? `Transfert en cours... ${uploadProgress > 0 ? `(${uploadProgress}%)` : ''}` : 'Envoyer vers CinéPrivé Serveur'}
-                            </button>
-                        </div>
-                    </div>
+            <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+                {uploadStatus === 'success' && <p className="text-green-500 text-sm font-medium mb-3 text-center">✓ Transfert du fichier terminé avec succès.</p>}
+                {uploadStatus === 'error' && <p className="text-red-500 text-sm font-medium mb-3 text-center">❌ Erreur de transfert : Vérifiez la connexion ou redémarrez l'envoi.</p>}
+                
+                <div className="flex gap-4 mt-6">
+                    {(file || selectedMeta) && (
+                        <button
+                            onClick={resetUpload}
+                            className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded transition flex items-center justify-center gap-2"
+                            title="Tout réinitialiser (Vidéo et TMDB)"
+                        >
+                            <X className="w-5 h-5 mx-1" />
+                            Réinitialiser
+                        </button>
+                    )}
+                    <button 
+                       onClick={submitUpload}
+                       disabled={!file || !selectedMeta || isUploading}
+                       className="flex-1 bg-red-600 text-white font-semibold py-3 rounded hover:bg-red-500 transition disabled:opacity-50 flex justify-center"
+                    >
+                       {isUploading ? `Transfert en cours... ${uploadProgress > 0 ? `(${uploadProgress}%)` : ''}` : 'Transférer vers le Serveur CinéPrivé'}
+                    </button>
                 </div>
             </div>
+            </>
             )
         )}
 

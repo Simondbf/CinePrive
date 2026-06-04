@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { notify } from '../lib/notify';
 import { Film, User } from '../types';
 import { ArrowLeft, Play, Pause, Maximize, Volume2, VolumeX, Download, Settings, Users } from 'lucide-react';
@@ -18,7 +18,13 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const [showCast, setShowCast] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
+
   useEffect(() => {
+    if (isMkv) {
+        notify("L'écran risque de rester noir.\n\nLes navigateurs Web ne supportent pas nativement le format .MKV. Téléchargez le fichier pour le lire avec VLC. Sur le projet final, Jellyfin corrigera cela à la volée.", "Format Vidéo Incompatible");
+    }
+
     if (videoRef.current) {
         // Fetch progress
         fetch(`/api/progress/${activeUser.id}/${film.id}`)
@@ -65,8 +71,9 @@ export default function Player({ film, activeUser, onClose }: Props) {
     }, 3000);
   };
 
-  const togglePlay = (e?: React.MouseEvent) => {
+  const togglePlay = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
       e?.stopPropagation();
+      e?.preventDefault();
       if (!videoRef.current) return;
       
       if (videoRef.current.paused) {
@@ -77,7 +84,18 @@ export default function Player({ film, activeUser, onClose }: Props) {
           setIsPlaying(false);
       }
       resetControlsTimeout();
-  };
+  }, [showCast]);
+
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.code === 'Space') {
+              togglePlay(e);
+          }
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay]);
 
   const toggleMute = (e: React.MouseEvent) => {
       e.stopPropagation();
