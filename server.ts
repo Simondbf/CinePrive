@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const app = express();
 const PORT = 3000;
@@ -16,6 +17,11 @@ app.use(express.json());
 app.use(cookieParser());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
+
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
+    console.error('FATAL ERROR: JWT_SECRET MUST BE SET IN PRODUCTION');
+    process.exit(1);
+}
 
 const requireAuth = (req: any, res: any, next: any) => {
     const token = req.cookies.token;
@@ -175,7 +181,7 @@ app.post('/api/polls/vote', requireAuth, (req, res) => {
     res.json({ success: true, pollData: db.polls[pollId] });
 });
 
-app.get('/api/polls/results', (req, res) => {
+app.get('/api/polls/results', requireAuth, (req, res) => {
     res.json(db.polls);
 });
 
@@ -217,7 +223,11 @@ const TMDB_GENRES: Record<number, string> = {
 // ======================= API ROUTES =======================
 
 // Settings
-app.get('/api/settings', (req, res) => res.json(db.settings || { allowRegistrations: true }));
+app.get('/api/settings', (req, res) => res.json({ 
+    allowRegistrations: db.settings?.allowRegistrations ?? true,
+    fundingCurrent: db.settings?.fundingCurrent ?? 0,
+    fundingGoal: db.settings?.fundingGoal ?? 12
+}));
 app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     if (req.body.allowRegistrations !== undefined) {
         db.settings.allowRegistrations = req.body.allowRegistrations;
@@ -236,7 +246,7 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, re
 });
 
 // Invites
-app.get('/api/invites', (req, res) => res.json(db.invites || []));
+app.get('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => res.json(db.invites || []));
 app.post('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     let newCode = req.body.customCode || Math.random().toString(36).substring(2, 8).toUpperCase();
     if (!db.invites) db.invites = [];
@@ -258,7 +268,7 @@ app.delete('/api/invites/:code', requireAuth, requireRole(['owner', 'admin']), (
 });
 
 // Auth & Utilisateurs
-app.get('/api/users', (req, res) => {
+app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     // Ne renvoyer que les données non sensibles (pas le mot de passe)
   res.json(db.users.map((u: any) => ({ ...u, password: '' })));
 });
@@ -360,7 +370,7 @@ app.post('/api/login', async (req, res) => {
                 return res.status(403).json({ error: "Votre compte est en attente d'approbation par le propriétaire." });
             }
             const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
-            res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+            res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
             return res.json({ ...user, password: '' });
         }
     }
@@ -555,13 +565,13 @@ app.post('/api/progress', requireAuth, (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/progress/:userId/:filmId', (req, res) => {
+app.get('/api/progress/:userId/:filmId', requireAuth, (req, res) => {
     const time = db.progress[`${req.params.userId}_${req.params.filmId}`] || 0;
     res.json({ time });
 });
 
 // Demandes (Requests)
-app.get('/api/requests', (req, res) => {
+app.get('/api/requests', requireAuth, (req, res) => {
     res.json(db.requests || []);
 });
 
@@ -606,7 +616,7 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
 });
 
 // Notifications
-app.get('/api/notifications', (req, res) => {
+app.get('/api/notifications', requireAuth, requireRole(['owner']), (req, res) => {
     res.json(db.notifications || []);
 });
 app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
@@ -787,7 +797,10 @@ app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (
 
     if (!uploadId || !chunkFile) return res.status(400).json({ error: 'Données manquantes' });
 
-    const targetPath = path.join(UPLOADS_DIR, `temp_${uploadId}`);
+    const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeUploadId) return res.status(400).json({ error: 'ID invalide' });
+
+    const targetPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}`);
 
     try {
         fs.appendFileSync(targetPath, fs.readFileSync(chunkFile.path));
@@ -811,9 +824,12 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     
     if (!uploadId || !filename) return res.status(400).json({ error: 'Données manquantes' });
 
+    const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeUploadId) return res.status(400).json({ error: 'ID invalide' });
+
     const safeName = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const finalFilename = `${Date.now()}_${safeName}`;
-    const tempPath = path.join(UPLOADS_DIR, `temp_${uploadId}`);
+    const tempPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}`);
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
     try {
@@ -909,7 +925,7 @@ app.get('/videos/:filename', requireAuth, (req, res) => {
 });
 
 // Phase 3: Route /api/stream/:filmId via Jellyfin API
-app.get('/api/stream/:filmId', requireAuth, async (req: any, res) => {
+app.get('/api/stream/:filmId', requireAuth, async (req: any, res, next) => {
     const user = req.user;
     const filmId = req.params.filmId;
     
@@ -920,8 +936,17 @@ app.get('/api/stream/:filmId', requireAuth, async (req: any, res) => {
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
-        const jellyfinStreamUrl = `${process.env.JELLYFIN_URL}/Videos/${(film as any).jellyfinId || film.id}/stream?api_key=${process.env.JELLYFIN_API_KEY}`;
-        return res.redirect(jellyfinStreamUrl);
+        const jellyfinId = (film as any).jellyfinId || film.id;
+        return createProxyMiddleware({
+            target: `${process.env.JELLYFIN_URL}/Videos/${jellyfinId}/stream`,
+            changeOrigin: true,
+            ignorePath: true,
+            on: {
+                proxyReq: (proxyReq) => {
+                    proxyReq.setHeader('X-Emby-Authorization', `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"`);
+                }
+            }
+        })(req, res, next);
     } else {
         // Fallback local
         const filename = film.filename || film.id;

@@ -1,9 +1,0 @@
-                               adminNotifs.map(n => (
-                                   <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
-                                       <div className="flex justify-between items-start mb-1">
-                                           <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">{n.type}</span>
-                                           <span className="text-[10px] text-zinc-500">{new Date(n.createdAt).toLocaleDateString()}</span>
-                                       </div>
-                                       <p className="text-sm font-medium">{n.message}</p>
-                                   </div>
-                               ))
