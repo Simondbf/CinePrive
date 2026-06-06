@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { exec } from 'child_process';
+import nodemailer from 'nodemailer';
 
 const app = express();
 const PORT = 3000;
@@ -38,6 +39,124 @@ const requireRole = (roles: string[]) => (req: any, res: any, next: any) => {
     }
     next();
 };
+
+const verificationCodes: Record<string, { code: string, expires: number, targetId: string, operation: string }> = {};
+
+async function sendSecurityCodeEmail(email: string, name: string, code: string, operationLabel: string) {
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT || '587');
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const fromName = process.env.SMTP_FROM_NAME || 'CinéPrivé Sécurité';
+    const fromAddress = process.env.SMTP_FROM_EMAIL || 'security@cineprive.rpisimon.uk';
+
+    if (!host || !user || !pass) {
+        console.log(`[Sécurité Mail] SMTP non configuré. Le code généré pour ${email} (${name}) est : ${code}`);
+        return false;
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            host,
+            port,
+            secure: port === 465,
+            auth: {
+                user,
+                pass
+            }
+        });
+
+        const mailOptions = {
+            from: `"${fromName}" <${fromAddress}>`,
+            to: email,
+            subject: `🔑 Code de sécurité CinéPrivé`,
+            html: `
+                <div style="font-family: sans-serif; background-color: #0f0f10; color: #ffffff; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; border: 1px solid #27272a;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <span style="color: #e4e4e7; font-size: 24px; font-weight: bold; margin: 0; letter-spacing: 2px;">CINÉPRIVÉ</span>
+                        <p style="color: #71717a; font-size: 14px; margin: 5px 0 0 0;">Validation de sécurité d'un administrateur</p>
+                    </div>
+                    
+                    <div style="background-color: #18181b; border-radius: 8px; padding: 24px; border: 1px solid #27272a; margin-bottom: 24px;">
+                        <p style="margin: 0 0 16px 0; color: #a1a1aa; font-size: 15px;">Bonjour <strong>${name}</strong>,</p>
+                        <p style="margin: 0 0 20px 0; color: #a1a1aa; font-size: 14px; line-height: 1.5;">
+                            Une action sensible exigeant vos droits de propriétaire/administrateur a été initiée : <br/>
+                            <strong style="color: #ef4444; font-size: 15px;">👉 ${operationLabel}</strong>
+                        </p>
+                        
+                        <div style="background-color: #0d0e12; border: 1px solid #3f3f46; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 20px;">
+                            <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: bold; color: #ea580c; letter-spacing: 6px;">${code}</span>
+                        </div>
+                        
+                        <p style="margin: 0; color: #71717a; font-size: 12px; line-height: 1.4; text-align: center;">
+                            Ce code est à usage unique et expirera dans 5 minutes.<br/>
+                            Si vous n'êtes pas à l'origine de cette action, ignorez cet e-mail.
+                        </p>
+                    </div>
+                    
+                    <div style="text-align: center; font-size: 11px; color: #52525b;">
+                        &copy; 2026 CinéPrivé • Serveur multimédia autonome.
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`[Sécurité Mail] E-mail de validation de sécurité envoyé avec succès à ${email}`);
+        return true;
+    } catch (err) {
+        console.error('[Sécurité Mail] Erreur lors de l\'envoi de l\'e-mail :', err);
+        return false;
+    }
+}
+
+function verifySecurityCode(userId: string, code: string, operation: string, targetId: string): { valid: boolean, error?: string } {
+    const record = verificationCodes[userId];
+    if (!record) {
+        return { valid: false, error: "Aucun code de sécurité n'a été demandé pour cette action." };
+    }
+    if (Date.now() > record.expires) {
+        delete verificationCodes[userId];
+        return { valid: false, error: "Le code de sécurité a expiré. Veuillez en générer un nouveau." };
+    }
+    if (record.operation !== operation || record.targetId !== targetId) {
+        return { valid: false, error: "Le code de sécurité n'est pas associé à cette action spécifique." };
+    }
+    if (record.code !== code) {
+        return { valid: false, error: "Code de sécurité incorrect." };
+    }
+    delete verificationCodes[userId];
+    return { valid: true };
+}
+
+app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
+    const { operation, targetId, label } = req.body;
+    if (!operation || !targetId) {
+        return res.status(400).json({ error: "Paramètres manquants." });
+    }
+    
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    verificationCodes[req.user.id] = {
+        code,
+        expires: Date.now() + 5 * 60 * 1000,
+        targetId,
+        operation
+    };
+
+    const hasSmtp = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+    
+    let sent = false;
+    if (hasSmtp && req.user.email) {
+        sent = await sendSecurityCodeEmail(req.user.email, req.user.name || req.user.username, code, label || operation);
+    }
+
+    res.json({
+        success: true,
+        smtpConfigured: hasSmtp && !!req.user.email,
+        emailSentTo: req.user.email || null,
+        codeShownInDemo: (!hasSmtp || !req.user.email) ? code : null
+    });
+});
 
 // Sécurité : Bloquer l'IP nue (Autoriser uniquement via Cloudflare avec le bon nom de domaine)
 app.use((req, res, next) => {
@@ -498,8 +617,18 @@ app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) 
     res.json({ success: true });
 });
 
-app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req, res) => {
-    db.users = db.users.filter((u: any) => u.id !== req.params.id);
+app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res) => {
+    const { id } = req.params;
+    const code = req.query.code || req.headers['x-security-code'];
+    if (!code) {
+        return res.status(400).json({ error: "Code de validation de sécurité requis." });
+    }
+    const verification = verifySecurityCode(req.user.id, code as string, 'delete_user', id);
+    if (!verification.valid) {
+        return res.status(403).json({ error: verification.error });
+    }
+
+    db.users = db.users.filter((u: any) => u.id !== id);
     saveDb();
     res.json({ success: true });
 });
@@ -582,8 +711,17 @@ app.get('/api/films', requireAuth, async (req, res) => {
   res.json(sanitizedFilms);
 });
 
-app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
     const { id } = req.params;
+    const code = req.query.code || req.headers['x-security-code'];
+    if (!code) {
+        return res.status(400).json({ error: "Code de validation de sécurité requis." });
+    }
+    const verification = verifySecurityCode(req.user.id, code as string, 'delete_film', id);
+    if (!verification.valid) {
+        return res.status(403).json({ error: verification.error });
+    }
+
     const filmIndex = db.films.findIndex((f: any) => f.id === id);
     if (filmIndex === -1) {
         return res.status(404).json({ error: "Film non trouvé" });

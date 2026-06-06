@@ -83,53 +83,133 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       } catch(e) { console.error(e); }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-      setDialogState({
-          isOpen: true,
-          title: 'Supprimer un utilisateur (Étape 1/2)',
-          message: 'Êtes-vous sûr de vouloir de vouloir supprimer cet utilisateur des accès de CinéPrivé ?',
-          closeOnConfirm: false,
-          onConfirm: () => {
-              setDialogState({
-                  isOpen: true,
-                  title: '⚠️ CONFIRMATION FINALE (Étape 2/2)',
-                  message: 'ATTENTION : Cette action supprimera définitivement le compte utilisateur, ses droits de connexion et tout son historique. Confirmez-vous à nouveau ?',
-                  onConfirm: async () => {
-                      try {
-                          await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-                          fetchData();
-                      } catch (e) { console.error(e); }
-                  }
-              });
+  const [securityModal, setSecurityModal] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      operation: 'delete_film' | 'delete_user';
+      targetId: string;
+      targetLabel: string;
+      code: string;
+      error: string;
+      demoNotice?: string;
+      onSuccess: () => Promise<void>;
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      operation: 'delete_film',
+      targetId: '',
+      targetLabel: '',
+      code: '',
+      error: '',
+      onSuccess: async () => {}
+  });
+
+  const triggerSecurityValidation = async (
+      operation: 'delete_film' | 'delete_user',
+      targetId: string,
+      targetLabel: string,
+      title: string,
+      message: string,
+      onSuccess: () => Promise<void>
+  ) => {
+      try {
+          const requestLabel = operation === 'delete_film' 
+              ? `Suppression définitive du film "${targetLabel}"` 
+              : `Suppression définitive de l'utilisateur "${targetLabel}"`;
+              
+          const res = await fetch('/api/security/request-code', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ operation, targetId, label: requestLabel })
+          });
+          
+          if (!res.ok) {
+              const err = await res.json();
+              notify(err.error || "Impossible de générer le code de sécurité", "Erreur");
+              return;
           }
-      });
+          
+          const data = await res.json();
+          let demoNotice = "";
+          if (data.codeShownInDemo) {
+              demoNotice = `📩 (Mode Démo) Puisque aucun serveur SMTP de production n'est configuré sur cette instance, utilisez le code temporaire suivant pour valider l'action : ${data.codeShownInDemo}`;
+          } else if (data.smtpConfigured) {
+              demoNotice = `📩 Un code de validation à usage unique a été envoyé à l'adresse e-mail de votre compte (${data.emailSentTo})`;
+          } else {
+              demoNotice = `📩 Un e-mail de validation de sécurité a été envoyé à votre profil.`;
+          }
+
+          setSecurityModal({
+              isOpen: true,
+              title,
+              message,
+              operation,
+              targetId,
+              targetLabel,
+              code: '',
+              error: '',
+              demoNotice,
+              onSuccess
+          });
+      } catch (err) {
+          console.error(err);
+          notify("Échec de la connexion avec le serveur de sécurité", "Erreur");
+      }
+  };
+
+  const handleConfirmSecurityAction = async () => {
+      if (securityModal.code.trim().length !== 6) {
+          setSecurityModal(prev => ({ ...prev, error: "Veuillez entrer le code de sécurité à 6 chiffres." }));
+          return;
+      }
+      
+      try {
+          const method = 'DELETE';
+          const url = securityModal.operation === 'delete_film'
+              ? `/api/films/${securityModal.targetId}?code=${securityModal.code}`
+              : `/api/users/${securityModal.targetId}?code=${securityModal.code}`;
+              
+          const res = await fetch(url, { method });
+          if (res.ok) {
+              setSecurityModal(prev => ({ ...prev, isOpen: false }));
+              await securityModal.onSuccess();
+              notify("L'opération a été validée et exécutée avec succès.", "Succès");
+          } else {
+              const err = await res.json();
+              setSecurityModal(prev => ({ ...prev, error: err.error || "Opération refusée (code incorrect ou expiré)." }));
+          }
+      } catch (e) {
+          console.error(e);
+          setSecurityModal(prev => ({ ...prev, error: "Erreur de communication avec le serveur." }));
+      }
+  };
+
+  const handleDeleteUser = async (userId: string, targetName: string) => {
+      triggerSecurityValidation(
+          'delete_user',
+          userId,
+          targetName,
+          'Supprimer un utilisateur',
+          `Saisissez le code de validation reçu par e-mail pour confirmer la suppression définitive de l'utilisateur "${targetName}" et de ses accès liés.`,
+          async () => {
+              fetchData();
+          }
+      );
   };
 
   const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
-      setDialogState({
-          isOpen: true,
-          title: 'Supprimer un film (Étape 1/2)',
-          message: `Êtes-vous sûr de vouloir de vouloir retirer "${filmTitle}" ?`,
-          closeOnConfirm: false,
-          onConfirm: () => {
-              setDialogState({
-                  isOpen: true,
-                  title: '⚠️ SUPPRESSION DU FICHIER (Étape 2/2)',
-                  message: `ATTENTION : Le fichier vidéo présent sur le serveur va être définitivement et physiquement détruit. Cette opération est immédiate et totalement irréversible. Confirmez-vous ?`,
-                  onConfirm: async () => {
-                      try {
-                          const res = await fetch(`/api/films/${filmId}`, { method: 'DELETE' });
-                          if (res.ok) {
-                              onRefresh();
-                          } else {
-                              const err = await res.json();
-                              notify(err.error || "Erreur lors de la suppression", "Erreur");
-                          }
-                      } catch (e) { console.error(e); }
-                  }
-              });
+      triggerSecurityValidation(
+          'delete_film',
+          filmId,
+          filmTitle,
+          'Supprimer un film',
+          `Saisissez le code de validation reçu par e-mail pour confirmer la suppression définitive du film "${filmTitle}" ainsi que de son fichier vidéo physique.`,
+          async () => {
+              onRefresh();
           }
-      });
+      );
   };
 
   const handleToggleRegistration = async () => {
@@ -761,7 +841,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                             )}
                                             {activeUser.role === 'owner' && u.id !== activeUser.id && (
                                                 <button
-                                                    onClick={() => handleDeleteUser(u.id)}
+                                                    onClick={() => handleDeleteUser(u.id, u.name || u.username)}
                                                     className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
                                                 >
                                                     {u.status === 'pending' ? 'Refuser' : 'Bannir'}
@@ -1001,6 +1081,81 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded shadow-sm transition"
                         >
                             {dialogState.isAlert ? 'OK' : 'Confirmer'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Validation de Sécurité par Code */}
+        {securityModal.isOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <div className="bg-white dark:bg-zinc-920 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-red-500/20 dark:border-red-500/10 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-3 mb-4 text-red-600">
+                        <span className="p-2 bg-red-500/10 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </span>
+                        <div>
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{securityModal.title}</h3>
+                            <p className="text-xs text-red-600 dark:text-red-400 font-semibold uppercase tracking-wider">Autorisation requise</p>
+                        </div>
+                    </div>
+
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                        {securityModal.message}
+                    </p>
+
+                    {securityModal.demoNotice && (
+                        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-600 dark:text-amber-400 space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px]">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                Notification de Sécurité
+                            </div>
+                            <p className="font-medium leading-relaxed">{securityModal.demoNotice}</p>
+                        </div>
+                    )}
+
+                    <div className="space-y-4 mb-6">
+                        <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest text-center">
+                            Code de sécurité à 6 chiffres
+                        </label>
+                        <div className="relative max-w-[240px] mx-auto">
+                            <input 
+                                type="text" 
+                                maxLength={6} 
+                                value={securityModal.code} 
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    setSecurityModal(prev => ({ ...prev, code: val, error: '' }));
+                                }} 
+                                className="w-full tracking-[0.4em] text-center font-mono text-3xl font-extrabold bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-zinc-900 dark:text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all select-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700 placeholder:opacity-30" 
+                                placeholder="000000" 
+                                autoFocus
+                            />
+                        </div>
+
+                        {securityModal.error && (
+                            <p className="text-xs text-red-600 dark:text-red-400 font-medium text-center bg-red-500/10 border border-red-500/20 py-2 px-3 rounded-lg animate-shake">
+                                ⚠️ {securityModal.error}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button 
+                            type="button"
+                            onClick={() => setSecurityModal(prev => ({ ...prev, isOpen: false }))}
+                            className="flex-1 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-xl transition-all"
+                        >
+                            Annuler
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={handleConfirmSecurityAction}
+                            disabled={securityModal.code.length !== 6}
+                            className="flex-1 py-3 text-sm font-medium text-white bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:hover:bg-red-600 rounded-xl shadow-md transition-all uppercase tracking-wide"
+                        >
+                            Valider et Détruire
                         </button>
                     </div>
                 </div>

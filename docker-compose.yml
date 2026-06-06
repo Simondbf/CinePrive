@@ -15,3 +15,9 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - JELLYFIN_URL=${JELLYFIN_URL}
       - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-CinéPrivé Sécurité}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-security@cineprive.rpisimon.uk}
