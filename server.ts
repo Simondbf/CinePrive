@@ -17,12 +17,7 @@ const PORT = 3000;
 app.use(express.json());
 app.use(cookieParser());
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
-
-if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
-    console.error('FATAL ERROR: JWT_SECRET MUST BE SET IN PRODUCTION');
-    process.exit(1);
-}
+let JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
 
 const requireAuth = (req: any, res: any, next: any) => {
     const token = req.cookies.token;
@@ -88,6 +83,23 @@ if (!db.users) db.users = [];
 if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
+
+// Sécurisation automatique de JWT_SECRET en production si non spécifié (évite crash de prod 502)
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
+    if (db.settings.jwtSecret) {
+        JWT_SECRET = db.settings.jwtSecret;
+        console.log('[Sécurité] JWT_SECRET chargé depuis le fichier de configuration persistent.');
+    } else {
+        JWT_SECRET = uuidv4() + '-' + uuidv4();
+        db.settings.jwtSecret = JWT_SECRET;
+        try {
+            fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
+            console.log('[Sécurité] JWT_SECRET généré et persisté avec succès dans le fichier de configuration.');
+        } catch (e) {
+            console.error('[Sécurité] Impossible de persister le JWT_SECRET généré :', e);
+        }
+    }
+}
 if (!db.invites) db.invites = [];
 if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};

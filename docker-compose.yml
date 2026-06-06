@@ -11,4 +11,7 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - TMDB_API_KEY=VOTRE_CLE_TMDB_ICI
+      - TMDB_API_KEY=${TMDB_API_KEY:-VOTRE_CLE_TMDB_ICI}
+      - JWT_SECRET=${JWT_SECRET}
+      - JELLYFIN_URL=${JELLYFIN_URL}
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
