@@ -115,6 +115,79 @@ async function sendSecurityCodeEmail(email: string, name: string, code: string, 
     }
 }
 
+async function sendNewPatronSecurityCodeEmail(email: string, name: string, code: string, method: 'direct' | 'regenerate' = 'regenerate') {
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT || '587');
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const fromName = process.env.SMTP_FROM_NAME || 'CinéPrivé Sécurité';
+    const fromAddress = process.env.SMTP_FROM_EMAIL || 'security@cineprive.rpisimon.uk';
+
+    if (!host || !user || !pass) {
+        console.log(`[Sécurité Mail] SMTP non configuré. Le nouveau code pour le Patron (${email}) est : ${code}`);
+        return false;
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            host,
+            port,
+            secure: port === 465,
+            auth: { user, pass }
+        });
+
+        const subject = method === 'regenerate' 
+            ? `🔑 Nouveau Code de Sécurité Régénéré - CinéPrivé`
+            : `🔑 Récupération/Modification de votre Code de Sécurité - CinéPrivé`;
+
+        const actionText = method === 'regenerate'
+            ? `Un nouveau code de sécurité a été généré aléatoirement pour sécuriser les actions de votre espace Patron.`
+            : `Votre code de sécurité Patron a été mis à jour dans vos paramètres.`;
+
+        const mailOptions = {
+            from: `"${fromName}" <${fromAddress}>`,
+            to: email,
+            subject,
+            html: `
+                <div style="font-family: sans-serif; background-color: #0f0f10; color: #ffffff; padding: 40px; border-radius: 12px; max-width: 500px; margin: 0 auto; border: 1px solid #27272a;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <span style="color: #e4e4e7; font-size: 24px; font-weight: bold; margin: 0; letter-spacing: 2px;">CINÉPRIVÉ</span>
+                        <p style="color: #71717a; font-size: 14px; margin: 5px 0 0 0;">Sécurité de l'Espace Patron</p>
+                    </div>
+                    
+                    <div style="background-color: #18181b; border-radius: 8px; padding: 24px; border: 1px solid #27272a; margin-bottom: 24px;">
+                        <p style="margin: 0 0 16px 0; color: #a1a1aa; font-size: 15px;">Bonjour <strong>${name}</strong>,</p>
+                        <p style="margin: 0 0 20px 0; color: #a1a1aa; font-size: 14px; line-height: 1.5;">
+                            ${actionText}<br/>
+                            Ce code est requis pour valider les suppressions de films et bannissements définitifs d'utilisateurs.
+                        </p>
+                        
+                        <div style="background-color: #0d0e12; border: 1px solid #3f3f46; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 20px;">
+                            <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: bold; color: #ef4444; letter-spacing: 6px;">${code}</span>
+                        </div>
+                        
+                        <p style="margin: 0; color: #71717a; font-size: 12px; line-height: 1.4; text-align: center;">
+                            Veuillez conserver ce code précieusement.<br/>
+                            Vous pouvez le modifier à tout moment depuis vos Paramètres.
+                        </p>
+                    </div>
+                    
+                    <div style="text-align: center; font-size: 11px; color: #52525b;">
+                        &copy; 2026 CinéPrivé • Serveur multimédia autonome.
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`[Sécurité Mail] Code de sécurité envoyé avec succès au Patron à : ${email}`);
+        return true;
+    } catch (err) {
+        console.error('[Sécurité Mail] Erreur d\'envoi du code de sécurité au Patron :', err);
+        return false;
+    }
+}
+
 function verifySecurityCode(userId: string, code: string, operation: string, targetId: string): { valid: boolean, error?: string } {
     // Si un Code Maître (Master Code) global est défini dans l'environnement et correspond, l'action est validée directement !
     const masterCode = process.env.SECURITY_MASTER_CODE;
@@ -122,22 +195,13 @@ function verifySecurityCode(userId: string, code: string, operation: string, tar
         return { valid: true };
     }
 
-    const record = verificationCodes[userId];
-    if (!record) {
-        return { valid: false, error: "Aucun code de sécurité n'a été demandé pour cette action." };
+    // Validation par le code persistant en base de données
+    const patronCode = db.settings?.securityCode || '000000';
+    if (code === patronCode) {
+        return { valid: true };
     }
-    if (Date.now() > record.expires) {
-        delete verificationCodes[userId];
-        return { valid: false, error: "Le code de sécurité a expiré. Veuillez en générer un nouveau." };
-    }
-    if (record.operation !== operation || record.targetId !== targetId) {
-        return { valid: false, error: "Le code de sécurité n'est pas associé à cette action spécifique." };
-    }
-    if (record.code !== code) {
-        return { valid: false, error: "Code de sécurité incorrect." };
-    }
-    delete verificationCodes[userId];
-    return { valid: true };
+
+    return { valid: false, error: "Code de sécurité incorrect." };
 }
 
 app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
@@ -213,6 +277,7 @@ if (!db.users) db.users = [];
 if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
+if (!db.settings.securityCode) db.settings.securityCode = "123456";
 
 // Sécurisation automatique de JWT_SECRET en production si non spécifié (évite crash de prod 502)
 if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
@@ -420,12 +485,22 @@ const TMDB_GENRES: Record<number, string> = {
 // ======================= API ROUTES =======================
 
 // Settings
-app.get('/api/settings', (req, res) => res.json({ 
-    allowRegistrations: db.settings?.allowRegistrations ?? true,
-    fundingCurrent: db.settings?.fundingCurrent ?? 0,
-    fundingGoal: db.settings?.fundingGoal ?? 12
-}));
-app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+app.get('/api/settings', requireAuth, (req: any, res) => {
+    const settings: any = { 
+        allowRegistrations: db.settings?.allowRegistrations ?? true,
+        fundingCurrent: db.settings?.fundingCurrent ?? 0,
+        fundingGoal: db.settings?.fundingGoal ?? 12
+    };
+    if (req.user.role === 'owner') {
+        settings.webhookUrl = db.settings?.webhookUrl || '';
+        settings.securityCode = db.settings?.securityCode || '000000';
+    } else if (req.user.role === 'admin') {
+        settings.webhookUrl = db.settings?.webhookUrl || '';
+    }
+    res.json(settings);
+});
+
+app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
     if (req.body.allowRegistrations !== undefined) {
         db.settings.allowRegistrations = req.body.allowRegistrations;
     }
@@ -435,11 +510,76 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req, re
     if (req.body.fundingGoal !== undefined) {
         db.settings.fundingGoal = parseFloat(req.body.fundingGoal);
     }
-    if (req.body.webhookUrl !== undefined) {
-        db.settings.webhookUrl = req.body.webhookUrl;
+    if (req.user.role === 'owner' || req.user.role === 'admin') {
+        if (req.body.webhookUrl !== undefined) {
+            db.settings.webhookUrl = req.body.webhookUrl;
+        }
+    }
+    if (req.user.role === 'owner') {
+        if (req.body.securityCode !== undefined) {
+            db.settings.securityCode = req.body.securityCode;
+        }
     }
     saveDb();
-    res.json(db.settings);
+    
+    // Pour la réponse, renvoyer de manière sécurisée
+    const responseSettings: any = {
+        allowRegistrations: db.settings.allowRegistrations,
+        fundingCurrent: db.settings.fundingCurrent,
+        fundingGoal: db.settings.fundingGoal
+    };
+    if (req.user.role === 'owner') {
+        responseSettings.webhookUrl = db.settings.webhookUrl || '';
+        responseSettings.securityCode = db.settings.securityCode || '';
+    } else if (req.user.role === 'admin') {
+        responseSettings.webhookUrl = db.settings.webhookUrl || '';
+    }
+    res.json(responseSettings);
+});
+
+app.post('/api/settings/security/regenerate', requireAuth, requireRole(['owner']), async (req: any, res) => {
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    db.settings.securityCode = newCode;
+    saveDb();
+
+    let notificationSent = false;
+    let sentToDiscord = false;
+    let sentToEmail = false;
+
+    // 1. Envoyer à Discord si configuré
+    if (db.settings.webhookUrl) {
+        try {
+            const discordMessage = `🔔 **[CinéPrivé Sécurité]** Un nouveau code de sécurité Patron a été régénéré : \`${newCode}\`.\nCe code est désormais requis pour toutes les suppressions définitives de films ou bannissements d'utilisateurs.`;
+            await fetch(db.settings.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: discordMessage })
+            });
+            sentToDiscord = true;
+            notificationSent = true;
+        } catch (e) {
+            console.error("Erreur envoi webhook sécurité Discord", e);
+        }
+    }
+
+    // 2. Envoyer par e-mail si SMTP et adresse configurés
+    const hasSmtp = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+    if (hasSmtp && req.user.email) {
+        const sent = await sendNewPatronSecurityCodeEmail(req.user.email, req.user.name || req.user.username, newCode, 'regenerate');
+        if (sent) {
+            sentToEmail = true;
+            notificationSent = true;
+        }
+    }
+
+    res.json({
+        success: true,
+        securityCode: newCode,
+        sentToDiscord,
+        sentToEmail,
+        notificationSent,
+        emailSentTo: req.user.email || null
+    });
 });
 
 // Invites

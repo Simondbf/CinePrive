@@ -114,49 +114,18 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       message: string,
       onSuccess: () => Promise<void>
   ) => {
-      try {
-          const requestLabel = operation === 'delete_film' 
-              ? `Suppression définitive du film "${targetLabel}"` 
-              : `Suppression définitive de l'utilisateur "${targetLabel}"`;
-              
-          const res = await fetch('/api/security/request-code', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ operation, targetId, label: requestLabel })
-          });
-          
-          if (!res.ok) {
-              const err = await res.json();
-              notify(err.error || "Impossible de générer le code de sécurité", "Erreur");
-              return;
-          }
-          
-          const data = await res.json();
-          let demoNotice = "";
-          if (data.codeShownInDemo) {
-              demoNotice = `📩 (Mode Démo) Puisque aucun serveur SMTP de production n'est configuré sur cette instance, utilisez le code temporaire suivant pour valider l'action : ${data.codeShownInDemo}`;
-          } else if (data.smtpConfigured) {
-              demoNotice = `📩 Un code de validation à usage unique a été envoyé à l'adresse e-mail de votre compte (${data.emailSentTo})`;
-          } else {
-              demoNotice = `📩 Un e-mail de validation de sécurité a été envoyé à votre profil.`;
-          }
-
-          setSecurityModal({
-              isOpen: true,
-              title,
-              message,
-              operation,
-              targetId,
-              targetLabel,
-              code: '',
-              error: '',
-              demoNotice,
-              onSuccess
-          });
-      } catch (err) {
-          console.error(err);
-          notify("Échec de la connexion avec le serveur de sécurité", "Erreur");
-      }
+      setSecurityModal({
+          isOpen: true,
+          title,
+          message,
+          operation,
+          targetId,
+          targetLabel,
+          code: '',
+          error: '',
+          demoNotice: "🔑 Saisissez le code de validation du Patron (généré et visible dans vos Paramètres) pour confirmer cette action.",
+          onSuccess
+      });
   };
 
   const handleConfirmSecurityAction = async () => {

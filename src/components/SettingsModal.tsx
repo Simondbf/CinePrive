@@ -26,12 +26,23 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
     const [isSavingServer, setIsSavingServer] = useState(false);
     const [serverMsg, setServerMsg] = useState('');
 
+    // Patron security code settings
+    const [patronCode, setPatronCode] = useState('');
+    const [showSecurityCode, setShowSecurityCode] = useState(false);
+    const [isSavingSecurityCode, setIsSavingSecurityCode] = useState(false);
+    const [isRegeneratingSecurityCode, setIsRegeneratingSecurityCode] = useState(false);
+    const [securityCodeMsg, setSecurityCodeMsg] = useState('');
+    const [securityCodeIsError, setSecurityCodeIsError] = useState(false);
+
     useEffect(() => {
         if (userRole === 'owner' || userRole === 'admin') {
             fetch('/api/settings')
                 .then(r => r.json())
                 .then(data => {
                     setWebhookUrl(data.webhookUrl || '');
+                    if (data.securityCode) {
+                        setPatronCode(data.securityCode);
+                    }
                 });
         }
     }, [userRole]);
@@ -78,6 +89,66 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
             setServerMsg('Erreur réseau.');
         } finally {
             setIsSavingServer(false);
+        }
+    };
+
+    const handleSaveSecurityCode = async () => {
+        setSecurityCodeMsg('');
+        setSecurityCodeIsError(false);
+        setIsSavingSecurityCode(true);
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ securityCode: patronCode })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setSecurityCodeMsg('Code de sécurité mis à jour.');
+            } else {
+                setSecurityCodeIsError(true);
+                setSecurityCodeMsg(data.error || 'Erreur d’enregistrement.');
+            }
+        } catch (error) {
+            setSecurityCodeIsError(true);
+            setSecurityCodeMsg('Erreur réseau.');
+        } finally {
+            setIsSavingSecurityCode(false);
+        }
+    };
+
+    const handleRegenerateSecurityCode = async () => {
+        if (!window.confirm("Êtes-vous sûr de vouloir régénérer un nouveau code ? L'ancien code sera immédiatement révoqué.")) {
+            return;
+        }
+        setSecurityCodeMsg('');
+        setSecurityCodeIsError(false);
+        setIsRegeneratingSecurityCode(true);
+        try {
+            const res = await fetch('/api/settings/security/regenerate', {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setPatronCode(data.securityCode);
+                let notice = "Nouveau code généré ! ";
+                if (data.sentToDiscord) {
+                    notice += "Envoyé sur Discord.";
+                } else if (data.sentToEmail) {
+                    notice += `Envoyé par e-mail à ${data.emailSentTo}.`;
+                } else {
+                    notice += "Visible ici (configurer Discord/SMTP pour l'envoi automatique).";
+                }
+                setSecurityCodeMsg(notice);
+            } else {
+                setSecurityCodeIsError(true);
+                setSecurityCodeMsg(data.error || 'Erreur lors de la régénération.');
+            }
+        } catch (error) {
+            setSecurityCodeIsError(true);
+            setSecurityCodeMsg('Erreur réseau.');
+        } finally {
+            setIsRegeneratingSecurityCode(false);
         }
     };
 
@@ -208,6 +279,65 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                                     {isSavingServer ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sauvegarder"}
                                 </button>
                             </form>
+                        </div>
+                    )}
+
+                    {userRole === 'owner' && (
+                        <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                            <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <KeyRound className="w-4 h-4 text-red-600" /> Sécurité du Patron (Code de Validation)
+                            </h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                                        Code de sécurité actuel (6 chiffres)
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type={showSecurityCode ? "text" : "password"}
+                                            maxLength={6}
+                                            value={patronCode}
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/\D/g, '').substring(0, 6);
+                                                setPatronCode(val);
+                                            }}
+                                            className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm tracking-[0.5em] font-mono text-center font-bold animate-pulse"
+                                        />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowSecurityCode(!showSecurityCode)}
+                                            className="px-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded text-xs hover:opacity-80 text-zinc-700 dark:text-zinc-300 font-medium"
+                                        >
+                                            {showSecurityCode ? "Masquer" : "Afficher"}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500 mt-1">Ce code est requis pour valider les actions de destruction définitive.</p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={handleSaveSecurityCode}
+                                        disabled={isSavingSecurityCode || patronCode.length !== 6}
+                                        className="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-black py-2 rounded font-medium text-sm transition hover:opacity-90 flex justify-center items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isSavingSecurityCode ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sauvegarder"}
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={handleRegenerateSecurityCode}
+                                        disabled={isRegeneratingSecurityCode}
+                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded font-medium text-sm transition flex justify-center items-center gap-2 disabled:opacity-50 text-center"
+                                        title="Générer un code aléatoire envoyé par mail ou Discord"
+                                    >
+                                        {isRegeneratingSecurityCode ? <Loader2 className="w-4 h-4 animate-spin" /> : "Régénérer & Envoyer"}
+                                    </button>
+                                </div>
+                                {securityCodeMsg && (
+                                    <p className={`text-xs font-semibold ${securityCodeIsError ? 'text-red-500' : 'text-green-500'}`}>
+                                        {securityCodeMsg}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
