@@ -17,7 +17,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [invitesList, setInvitesList] = useState<{code: string, used: boolean, maxUses?: number, currentUses?: number}[]>([]);
   const [pollResults, setPollResults] = useState<any>({});
   const [settings, setSettings] = useState<{ allowRegistrations: boolean, fundingCurrent?: number, fundingGoal?: number }>({ allowRegistrations: true });
-  const [dialogState, setDialogState] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, isAlert?: boolean}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [dialogState, setDialogState] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void, isAlert?: boolean, closeOnConfirm?: boolean}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // Nouveaux états locaux pour les super-codes
   const [customCodeInput, setCustomCodeInput] = useState('');
@@ -86,13 +86,21 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const handleDeleteUser = async (userId: string) => {
       setDialogState({
           isOpen: true,
-          title: 'Supprimer un utilisateur',
-          message: 'Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.',
-          onConfirm: async () => {
-              try {
-                  await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-                  fetchData();
-              } catch (e) { console.error(e); }
+          title: 'Supprimer un utilisateur (Étape 1/2)',
+          message: 'Êtes-vous sûr de vouloir de vouloir supprimer cet utilisateur des accès de CinéPrivé ?',
+          closeOnConfirm: false,
+          onConfirm: () => {
+              setDialogState({
+                  isOpen: true,
+                  title: '⚠️ CONFIRMATION FINALE (Étape 2/2)',
+                  message: 'ATTENTION : Cette action supprimera définitivement le compte utilisateur, ses droits de connexion et tout son historique. Confirmez-vous à nouveau ?',
+                  onConfirm: async () => {
+                      try {
+                          await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+                          fetchData();
+                      } catch (e) { console.error(e); }
+                  }
+              });
           }
       });
   };
@@ -100,18 +108,26 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
       setDialogState({
           isOpen: true,
-          title: 'Supprimer un film',
-          message: `Êtes-vous sûr de vouloir supprimer définitivement le film "${filmTitle}" du serveur ? Cette action supprimera également le fichier vidéo associé.`,
-          onConfirm: async () => {
-              try {
-                  const res = await fetch(`/api/films/${filmId}`, { method: 'DELETE' });
-                  if (res.ok) {
-                      onRefresh();
-                  } else {
-                      const err = await res.json();
-                      notify(err.error || "Erreur lors de la suppression", "Erreur");
+          title: 'Supprimer un film (Étape 1/2)',
+          message: `Êtes-vous sûr de vouloir de vouloir retirer "${filmTitle}" ?`,
+          closeOnConfirm: false,
+          onConfirm: () => {
+              setDialogState({
+                  isOpen: true,
+                  title: '⚠️ SUPPRESSION DU FICHIER (Étape 2/2)',
+                  message: `ATTENTION : Le fichier vidéo présent sur le serveur va être définitivement et physiquement détruit. Cette opération est immédiate et totalement irréversible. Confirmez-vous ?`,
+                  onConfirm: async () => {
+                      try {
+                          const res = await fetch(`/api/films/${filmId}`, { method: 'DELETE' });
+                          if (res.ok) {
+                              onRefresh();
+                          } else {
+                              const err = await res.json();
+                              notify(err.error || "Erreur lors de la suppression", "Erreur");
+                          }
+                      } catch (e) { console.error(e); }
                   }
-              } catch (e) { console.error(e); }
+              });
           }
       });
   };
@@ -517,7 +533,9 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     <td className="px-6 py-4 font-medium text-zinc-900 dark:text-white">{f.title}</td>
                                     <td className="px-6 py-4">{uploader?.name || f.addedBy}</td>
                                     <td className="px-6 py-4">{new Date(f.addedAt).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 max-w-[200px] truncate" title={f.originalName}>{f.originalName}</td>
+                                    <td className="px-6 py-4 max-w-[200px] truncate" title={f.originalName}>
+                                        {f.originalName ? f.originalName.replace(/\.[^/.]+$/, "") : ""}
+                                    </td>
                                     {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                                         <td className="px-6 py-4 text-right">
                                             <button 
@@ -976,7 +994,9 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                 if(!dialogState.isAlert) {
                                     dialogState.onConfirm();
                                 }
-                                setDialogState(prev => ({...prev, isOpen: false}));
+                                if (dialogState.closeOnConfirm !== false) {
+                                    setDialogState(prev => ({...prev, isOpen: false}));
+                                }
                             }}
                             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded shadow-sm transition"
                         >
