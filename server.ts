@@ -9,6 +9,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { exec } from 'child_process';
 
 const app = express();
 const PORT = 3000;
@@ -128,6 +129,60 @@ if (!db.pollsConfig) db.pollsConfig = [
 ];
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
+
+const remuxToMp4 = (filmId: string, inputFilename: string) => {
+    const inputPath = path.join(UPLOADS_DIR, inputFilename);
+    const ext = path.extname(inputFilename);
+    const baseName = path.basename(inputFilename, ext);
+    const outputFilename = `${baseName}.mp4`;
+    const outputPath = path.join(UPLOADS_DIR, outputFilename);
+
+    console.log(`[Remux] Tentative de remuxing de "${inputFilename}" vers "${outputFilename}"...`);
+
+    exec('ffmpeg -version', (err) => {
+        if (err) {
+            console.error('[Remux] ffmpeg n\'est pas installé sur ce serveur. Désactivation du remux auto.');
+            const film = db.films.find((f: any) => f.id === filmId);
+            if (film) {
+                film.status = 'ready'; // fallback de secours
+                saveDb();
+            }
+            return;
+        }
+
+        // Remux rapide: vidéo recopiée sans perte et audio convertie en AAC pour support universel sur mobile/navigateur
+        const cmd = `ffmpeg -y -i "${inputPath}" -c:v copy -c:a aac -movflags +faststart "${outputPath}"`;
+        
+        exec(cmd, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`[Remux] Échec du remuxing pour ${inputFilename}:`, error);
+                const film = db.films.find((f: any) => f.id === filmId);
+                if (film) {
+                    film.status = 'ready'; // On le remet en ready par sécurité pour ne pas bloquer l'accès
+                    saveDb();
+                }
+                return;
+            }
+            
+            console.log(`[Remux] Succès ! Le fichier ${inputFilename} a été converti en ${outputFilename}`);
+            
+            const film = db.films.find((f: any) => f.id === filmId);
+            if (film) {
+                film.filename = outputFilename;
+                film.status = 'ready';
+                saveDb();
+                
+                // Suppression du fichier source pour préserver le disque dur
+                try {
+                    fs.unlinkSync(inputPath);
+                    console.log(`[Remux] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
+                } catch (unlinkErr) {
+                    console.error(`[Remux] Impossible de supprimer le fichier original ${inputFilename}:`, unlinkErr);
+                }
+            }
+        });
+    });
+};
 
 // --- API POLLS ---
 app.get('/api/polls/config', (req, res) => {
@@ -497,8 +552,22 @@ app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
 });
 
 // Films
-app.get('/api/films', async (req, res) => {
-  res.json(db.films);
+app.get('/api/films', requireAuth, async (req, res) => {
+  // Masquer la clé JELLYFIN_API_KEY des posterUrls pour les films existants
+  const sanitizedFilms = (db.films || []).map((f: any) => {
+    if (f.posterUrl && f.posterUrl.includes('?api_key=')) {
+      const parts = f.posterUrl.split('/Items/');
+      if (parts.length > 1) {
+        const itemId = parts[1].split('/')[0];
+        return {
+          ...f,
+          posterUrl: `/api/jellyfin/image/${itemId}`
+        };
+      }
+    }
+    return f;
+  });
+  res.json(sanitizedFilms);
 });
 
 app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, res) => {
@@ -538,7 +607,7 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
                     genre: item.Genres && item.Genres.length > 0 ? item.Genres[0] : (isSeries ? 'Série' : 'Film'),
                     director: isSeries ? 'Série' : 'Jellyfin',
                     duration: isSeries ? (item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 600000000) + ' min par ep.' : 'Série TV') : (item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 600000000) + ' min' : 'Inconnu'),
-                    posterUrl: `${process.env.JELLYFIN_URL}/Items/${item.Id}/Images/Primary?api_key=${process.env.JELLYFIN_API_KEY}`,
+                    posterUrl: `/api/jellyfin/image/${item.Id}`,
                     addedBy: 'Admin',
                     addedAt: new Date().toISOString(),
                     filename: '',
@@ -867,6 +936,8 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             }
         }
 
+        const isMp4 = finalFilename.toLowerCase().endsWith('.mp4');
+
         const film = {
             id: uuidv4(),
             tmdbId: metadata.id,
@@ -882,7 +953,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             addedAt: new Date().toISOString(),
             filename: finalFilename,
             originalName: originalName || filename,
-            status: 'ready'
+            status: isMp4 ? 'ready' : 'transcoding'
         };
 
         db.films.push(film);
@@ -910,6 +981,11 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         }
         
         saveDb();
+
+        if (!isMp4) {
+            // Lancement du remux en arrière-plan (non-bloquant)
+            remuxToMp4(film.id, finalFilename);
+        }
 
         res.json({ success: true, film });
     } catch (e) {
@@ -951,6 +1027,24 @@ app.get('/api/stream/:filmId', requireAuth, async (req: any, res, next) => {
         // Fallback local
         const filename = film.filename || film.id;
         return res.redirect(`/videos/${filename}`);
+    }
+});
+
+// Proxy d'images Jellyfin pour masquer la clé d'API
+app.get('/api/jellyfin/image/:itemId', requireAuth, (req: any, res, next) => {
+    if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
+        return createProxyMiddleware({
+            target: `${process.env.JELLYFIN_URL}/Items/${req.params.itemId}/Images/Primary`,
+            changeOrigin: true,
+            ignorePath: true,
+            on: {
+                proxyReq: (proxyReq) => {
+                    proxyReq.setHeader('X-Emby-Authorization', `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"`);
+                }
+            }
+        })(req, res, next);
+    } else {
+        res.status(404).json({ error: 'Jellyfin non configuré' });
     }
 });
 

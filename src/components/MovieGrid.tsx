@@ -39,7 +39,13 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList }: P
             <div key={film.id} className="group relative flex flex-col gap-2">
                 {/* Poster Box */}
                 <div 
-                    onClick={() => onPlay(film)}
+                    onClick={() => {
+                        if (film.status === 'transcoding') {
+                            notify("Ce film est actuellement en cours de préparation (remux rapide) sur le serveur pour être lisible sur tous vos écrans. Ce processus prend généralement moins d'une minute !", "Traitement en cours");
+                        } else {
+                            onPlay(film);
+                        }
+                    }}
                     className="aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative cursor-pointer border border-zinc-800 hover:border-zinc-500 transition-colors shadow-sm"
                 >
                     {film.posterUrl ? (
@@ -51,12 +57,21 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList }: P
                         </div>
                     )}
                     
+                    {film.status === 'transcoding' && (
+                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 p-3 text-center">
+                            <Loader2 className="w-8 h-8 text-gold-400 animate-spin" />
+                            <span className="text-gold-400 font-medium text-xs tracking-wider uppercase animate-pulse">Conversion...</span>
+                        </div>
+                    )}
+                    
                     {/* Hover actions */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
-                        <button className="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full hover:scale-105 transition-transform shadow-lg">
-                            <Play className="w-6 h-6 fill-black ml-1" />
-                        </button>
-                    </div>
+                    {film.status !== 'transcoding' && (
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
+                            <button className="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full hover:scale-105 transition-transform shadow-lg">
+                                <Play className="w-6 h-6 fill-black ml-1" />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Meta details (Classic prototype structurally organized data) */}

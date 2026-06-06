@@ -16,7 +16,21 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showCast, setShowCast] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const formatTime = (seconds: number): string => {
+      if (isNaN(seconds) || seconds === Infinity) return '0:00';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+
+      if (hrs > 0) {
+          return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
 
@@ -117,20 +131,46 @@ export default function Player({ film, activeUser, onClose }: Props) {
       resetControlsTimeout();
   };
 
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      if (!videoRef.current || !duration) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const width = rect.width;
+      const newTime = (clickX / width) * duration;
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+  };
+
   return (
     <div 
         className="fixed inset-0 bg-black z-50 flex items-center justify-center cursor-default select-none"
         onMouseMove={resetControlsTimeout}
         onClick={togglePlay}
     >
-        {/* Real video player pointing to the Express static /videos route */}
+        {/* Real video player pointing to the Express static /videos route or secure Jellyfin proxy stream */}
         <video 
             ref={videoRef}
-            src={`/videos/${film.filename}`}
+            src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`}
             className="w-full h-full object-contain"
             onEnded={() => setIsPlaying(false)}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onTimeUpdate={() => {
+                if (videoRef.current) {
+                    setCurrentTime(videoRef.current.currentTime);
+                }
+            }}
+            onDurationChange={() => {
+                if (videoRef.current) {
+                    setDuration(videoRef.current.duration);
+                }
+            }}
+            onLoadedMetadata={() => {
+                if (videoRef.current) {
+                    setDuration(videoRef.current.duration);
+                }
+            }}
         >
             Votre navigateur ne supporte pas la balise vidéo.
         </video>
@@ -222,10 +262,15 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             </motion.div>
                         )}
 
-                        <div className="w-full h-1 bg-zinc-600 rounded cursor-pointer mb-4 hover:h-2 transition-all">
-                            {/* Dummy progress bar to show intent */}
-                            <div className="h-full bg-gold-500 w-[15%] rounded relative">
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-gold-500 rounded-full shadow" />
+                        <div 
+                            className="w-full h-1.5 bg-zinc-600/60 rounded-full cursor-pointer mb-4 hover:h-2 transition-all relative"
+                            onClick={handleProgressClick}
+                        >
+                            <div 
+                                className="h-full bg-gold-400 rounded-full relative"
+                                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                            >
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-gold-400" />
                             </div>
                         </div>
 
@@ -237,6 +282,9 @@ export default function Player({ film, activeUser, onClose }: Props) {
                                 <button onClick={toggleMute} className="hover:text-gold-500 transition-colors drop-shadow">
                                     {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                                 </button>
+                                <span className="text-sm font-mono text-zinc-300">
+                                    {formatTime(currentTime)} / {formatTime(duration)}
+                                </span>
                             </div>
                             
                             <button onClick={toggleFullscreen} className="hover:text-gold-500 transition-colors drop-shadow">
