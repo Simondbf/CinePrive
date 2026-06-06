@@ -186,30 +186,112 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       }
   };
 
-  const handleDeleteUser = async (userId: string, targetName: string) => {
-      triggerSecurityValidation(
-          'delete_user',
-          userId,
-          targetName,
-          'Supprimer un utilisateur',
-          `Saisissez le code de validation reçu par e-mail pour confirmer la suppression définitive de l'utilisateur "${targetName}" et de ses accès liés.`,
-          async () => {
-              fetchData();
+  const handleRestoreFilm = async (filmId: string) => {
+      try {
+          const res = await fetch(`/api/films/${filmId}/restore`, { method: 'POST' });
+          if (res.ok) {
+              notify("Le film a été rétabli avec succès.", "Succès");
+              onRefresh();
+          } else {
+              const err = await res.json();
+              notify(err.error || "Erreur de restauration des droits du film.", "Erreur");
           }
-      );
+      } catch (e) {
+          console.error(e);
+          notify("Échec de connexion.", "Erreur");
+      }
+  };
+
+  const handleRestoreUser = async (userId: string) => {
+      try {
+          const res = await fetch(`/api/users/${userId}/restore`, { method: 'POST' });
+          if (res.ok) {
+              notify("Le compte de l'utilisateur a été réactivé avec succès.", "Succès");
+              fetchData();
+          } else {
+              const err = await res.json();
+              notify(err.error || "Erreur de réactivation de l'utilisateur.", "Erreur");
+          }
+      } catch (e) {
+          console.error(e);
+          notify("Échec de connexion.", "Erreur");
+      }
+  };
+
+  const handleDeleteUser = async (userId: string, targetName: string) => {
+      if (activeUser.role === 'admin') {
+          // Si simple admin -> suspension temporaire sans code
+          setDialogState({
+              isOpen: true,
+              title: "Suspendre l'utilisateur",
+              message: `Êtes-vous sûr de vouloir suspendre temporairement "${targetName}" ? Son compte sera bloqué et masqué, et le Patron devra valider son bannissement définitif.`,
+              onConfirm: async () => {
+                  try {
+                      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+                      if (res.ok) {
+                          notify(`La suspension de ${targetName} a été enregistrée.`, "Succès");
+                          fetchData();
+                      } else {
+                          const err = await res.json();
+                          notify(err.error || "Impossible de suspendre l'utilisateur", "Erreur");
+                      }
+                  } catch (e) {
+                      console.error(e);
+                      notify("Erreur de connexion", "Erreur");
+                  }
+              }
+          });
+      } else {
+          // Si Patron (owner) -> code de sécurité requis
+          triggerSecurityValidation(
+              'delete_user',
+              userId,
+              targetName,
+              'Bannir un utilisateur',
+              `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la suppression définitive de l'utilisateur "${targetName}" et de tous ses accès.`,
+              async () => {
+                  fetchData();
+              }
+          );
+      }
   };
 
   const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
-      triggerSecurityValidation(
-          'delete_film',
-          filmId,
-          filmTitle,
-          'Supprimer un film',
-          `Saisissez le code de validation reçu par e-mail pour confirmer la suppression définitive du film "${filmTitle}" ainsi que de son fichier vidéo physique.`,
-          async () => {
-              onRefresh();
-          }
-      );
+      if (activeUser.role === 'admin') {
+          // Si simple admin -> suppression temporaire sans code
+          setDialogState({
+              isOpen: true,
+              title: "Suspendre le film",
+              message: `Êtes-vous sûr de vouloir suspendre le film "${filmTitle}" ? Il sera masqué pour les membres, et le Patron devra de valider sa destruction définitive.`,
+              onConfirm: async () => {
+                  try {
+                      const res = await fetch(`/api/films/${filmId}`, { method: 'DELETE' });
+                      if (res.ok) {
+                          notify(`Le film "${filmTitle}" a été suspendu temporairement.`, "Succès");
+                          onRefresh();
+                      } else {
+                          const err = await res.json();
+                          notify(err.error || "Impossible de suspendre le film", "Erreur");
+                      }
+                  } catch (e) {
+                      console.error(e);
+                      notify("Erreur de connexion", "Erreur");
+                  }
+              }
+          });
+      } else {
+          // Si Patron (owner) -> code de sécurité requis
+          triggerSecurityValidation(
+              'delete_film',
+              filmId,
+              filmTitle,
+              'Supprimer définitivement un film',
+              `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la destruction définitive du film "${filmTitle}" et de son fichier vidéo sur le serveur.`,
+              async () => {
+                  onRefresh();
+              }
+          );
+      }
   };
 
   const handleToggleRegistration = async () => {
@@ -618,12 +700,37 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     </td>
                                     {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                                         <td className="px-6 py-4 text-right">
-                                            <button 
-                                                onClick={() => handleDeleteFilm(f.id, f.title)}
-                                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded"
-                                            >
-                                                Supprimer
-                                            </button>
+                                            {f.pendingDeletion ? (
+                                                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
+                                                    <span className="text-[10px] bg-amber-500/10 text-amber-500 font-semibold px-2 py-1 rounded border border-amber-500/10 whitespace-nowrap">
+                                                        ⚠️ Suspendu par {f.requestedDeletionBy || 'Admin'}
+                                                    </span>
+                                                    <div className="flex gap-1.5 mt-1 sm:mt-0">
+                                                        {activeUser.role === 'owner' && (
+                                                            <button 
+                                                                onClick={() => handleDeleteFilm(f.id, f.title)}
+                                                                className="text-white hover:bg-red-500 transition-all font-semibold text-[11px] bg-red-600 hover:shadow-sm px-2.5 py-1.5 rounded tracking-wide uppercase"
+                                                            >
+                                                                Détruire
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => handleRestoreFilm(f.id)}
+                                                            className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-805 transition-all font-medium text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded"
+                                                            title="Rétablir le film"
+                                                        >
+                                                            Rétablir
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleDeleteFilm(f.id, f.title)}
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded"
+                                                >
+                                                    Supprimer
+                                                </button>
+                                            )}
                                         </td>
                                     )}
                                 </tr>
@@ -798,7 +905,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     <td className="px-6 py-4">{u.username}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-2">
-                                            <span className="uppercase text-xs font-semibold">{u.role === 'owner' ? 'Fondateur' : u.role}</span>
+                                            <span className="uppercase text-xs font-semibold">{u.role === 'owner' ? 'Patron' : (u.role === 'admin' ? 'Admin' : 'Membre')}</span>
                                             {activeUser.role === 'owner' && u.id !== activeUser.id && (
                                                 <div className="flex items-center gap-1">
                                                     {u.role === 'admin' ? (
@@ -830,22 +937,56 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {u.status === 'pending' ? (
-                                                <button 
-                                                    onClick={() => handleApproveUser(u.id)}
-                                                    className="px-3 py-1 bg-green-500/10 text-green-600 font-medium rounded hover:bg-green-500/20"
-                                                >
-                                                    Approuver
-                                                </button>
+                                                <>
+                                                    <button 
+                                                        onClick={() => handleApproveUser(u.id)}
+                                                        className="px-3 py-1 bg-green-500/10 text-green-600 font-medium rounded hover:bg-green-500/20"
+                                                    >
+                                                        Approuver
+                                                    </button>
+                                                    {(activeUser.role === 'owner' || activeUser.role === 'admin') && u.id !== activeUser.id && (
+                                                        <button
+                                                            onClick={() => handleDeleteUser(u.id, u.name || u.username)}
+                                                            className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
+                                                        >
+                                                            Refuser
+                                                        </button>
+                                                    )}
+                                                </>
+                                            ) : u.status === 'pending_ban' ? (
+                                                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
+                                                    <span className="text-[10px] bg-red-500/10 text-red-500 font-semibold px-2 py-1 rounded border border-red-500/15 whitespace-nowrap">
+                                                        ⚠️ Suspendu par {u.requestedBanBy || 'Admin'}
+                                                    </span>
+                                                    <div className="flex gap-1.5 mt-1 sm:mt-0">
+                                                        {activeUser.role === 'owner' && (
+                                                            <button 
+                                                                onClick={() => handleDeleteUser(u.id, u.name || u.username)}
+                                                                className="text-white hover:bg-red-500 transition-all font-semibold text-[11px] bg-red-600 hover:shadow-sm px-2.5 py-1.5 rounded tracking-wide uppercase"
+                                                            >
+                                                                Bannir déf.
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => handleRestoreUser(u.id)}
+                                                            className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-805 transition-all font-medium text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded"
+                                                        >
+                                                            Réactiver
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             ) : (
-                                                <span className="text-zinc-400 cursor-default">Actif</span>
-                                            )}
-                                            {activeUser.role === 'owner' && u.id !== activeUser.id && (
-                                                <button
-                                                    onClick={() => handleDeleteUser(u.id, u.name || u.username)}
-                                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
-                                                >
-                                                    {u.status === 'pending' ? 'Refuser' : 'Bannir'}
-                                                </button>
+                                                <>
+                                                    <span className="text-zinc-400 cursor-default">Actif</span>
+                                                    {(activeUser.role === 'owner' || activeUser.role === 'admin') && u.id !== activeUser.id && (
+                                                        <button
+                                                            onClick={() => handleDeleteUser(u.id, u.name || u.username)}
+                                                            className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
+                                                        >
+                                                            Bannir
+                                                        </button>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </td>

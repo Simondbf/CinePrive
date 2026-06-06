@@ -6,7 +6,9 @@ export interface User {
     name: string;
     color: string;
     role: 'owner' | 'admin' | 'user';
-    status?: 'pending' | 'active';
+    status?: 'pending' | 'active' | 'pending_ban';
+    requestedBanBy?: string;
+    requestedBanAt?: number;
     myList: string[]; // Liste des IDs de films à voir
 }
 
@@ -42,4 +44,7 @@ export interface Film {
     filename: string;
     originalName: string;
     status: 'ready' | 'transcoding' | 'error';
+    pendingDeletion?: boolean;
+    requestedDeletionBy?: string;
+    requestedDeletionAt?: number;
 }

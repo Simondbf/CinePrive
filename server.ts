@@ -27,6 +27,11 @@ const requireAuth = (req: any, res: any, next: any) => {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         req.user = db.users.find((u: any) => u.id === decoded.userId);
         if (!req.user) throw new Error();
+        
+        // Sécurité : Bloquer l'utilisateur s'il est banni temporairement ou suspendu par l'admin
+        if (req.user.status === 'pending_ban') {
+            return res.status(403).json({ error: 'Votre compte est temporairement suspendu en attente de la validation finale du Patron.' });
+        }
         next();
     } catch {
         res.status(401).json({ error: 'Token invalide' });
@@ -111,6 +116,12 @@ async function sendSecurityCodeEmail(email: string, name: string, code: string, 
 }
 
 function verifySecurityCode(userId: string, code: string, operation: string, targetId: string): { valid: boolean, error?: string } {
+    // Si un Code Maître (Master Code) global est défini dans l'environnement et correspond, l'action est validée directement !
+    const masterCode = process.env.SECURITY_MASTER_CODE;
+    if (masterCode && code === masterCode) {
+        return { valid: true };
+    }
+
     const record = verificationCodes[userId];
     if (!record) {
         return { valid: false, error: "Aucun code de sécurité n'a été demandé pour cette action." };
@@ -553,7 +564,10 @@ app.post('/api/login', async (req, res) => {
 
         if (passwordMatch) {
             if (user.status === 'pending') {
-                return res.status(403).json({ error: "Votre compte est en attente d'approbation par le propriétaire." });
+                return res.status(403).json({ error: "Votre compte est en attente d'approbation par le Patron." });
+            }
+            if (user.status === 'pending_ban') {
+                return res.status(403).json({ error: "Votre compte est temporairement suspendu en attente de la validation finale du Patron." });
             }
             const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
             res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
@@ -617,8 +631,38 @@ app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) 
     res.json({ success: true });
 });
 
-app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res) => {
+app.post('/api/users/:id/restore', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
     const { id } = req.params;
+    const targetUser = db.users.find((u: any) => u.id === id);
+    if (!targetUser) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+    }
+
+    targetUser.status = 'active';
+    delete targetUser.requestedBanBy;
+    delete targetUser.requestedBanAt;
+    
+    saveDb();
+    res.json({ success: true, message: `Le compte de "${targetUser.username}" a été réactivé.` });
+});
+
+app.delete('/api/users/:id', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const { id } = req.params;
+    const targetUser = db.users.find((u: any) => u.id === id);
+    if (!targetUser) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+    }
+
+    // Un simple admin fait une suspension temporaire en attente du Patron
+    if (req.user.role === 'admin') {
+        targetUser.status = 'pending_ban';
+        targetUser.requestedBanBy = req.user.name || req.user.username;
+        targetUser.requestedBanAt = Date.now();
+        saveDb();
+        return res.json({ success: true, pendingApproval: true, message: `L'utilisateur "${targetUser.username}" a été suspendu par l'administrateur.` });
+    }
+
+    // Le Patron (owner) valide avec le code pour supprimer définitivement
     const code = req.query.code || req.headers['x-security-code'];
     if (!code) {
         return res.status(400).json({ error: "Code de validation de sécurité requis." });
@@ -630,7 +674,7 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res
 
     db.users = db.users.filter((u: any) => u.id !== id);
     saveDb();
-    res.json({ success: true });
+    res.json({ success: true, deleted: true, message: `L'utilisateur "${targetUser.username}" a été banni définitivement.` });
 });
 
 // Admin : Approuver un utilisateur
@@ -693,9 +737,16 @@ app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
 });
 
 // Films
-app.get('/api/films', requireAuth, async (req, res) => {
+app.get('/api/films', requireAuth, async (req: any, res) => {
+  let filmsList = db.films || [];
+  
+  // Masquer les films en attente de suppression définitive pour les membres réguliers
+  if (req.user.role !== 'owner' && req.user.role !== 'admin') {
+      filmsList = filmsList.filter((f: any) => !f.pendingDeletion);
+  }
+
   // Masquer la clé JELLYFIN_API_KEY des posterUrls pour les films existants
-  const sanitizedFilms = (db.films || []).map((f: any) => {
+  const sanitizedFilms = filmsList.map((f: any) => {
     if (f.posterUrl && f.posterUrl.includes('?api_key=')) {
       const parts = f.posterUrl.split('/Items/');
       if (parts.length > 1) {
@@ -711,8 +762,39 @@ app.get('/api/films', requireAuth, async (req, res) => {
   res.json(sanitizedFilms);
 });
 
+app.post('/api/films/:id/restore', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const { id } = req.params;
+    const film = db.films.find((f: any) => f.id === id);
+    if (!film) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+
+    delete film.pendingDeletion;
+    delete film.requestedDeletionBy;
+    delete film.requestedDeletionAt;
+    
+    saveDb();
+    res.json({ success: true, message: `Le film "${film.title}" a été restauré.` });
+});
+
 app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
     const { id } = req.params;
+    const filmIndex = db.films.findIndex((f: any) => f.id === id);
+    if (filmIndex === -1) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+    const film = db.films[filmIndex];
+
+    // Si l'utilisateur est un simple admin, il ne fait qu'une suppression temporaire (mise en attente)
+    if (req.user.role === 'admin') {
+        film.pendingDeletion = true;
+        film.requestedDeletionBy = req.user.name || req.user.username;
+        film.requestedDeletionAt = Date.now();
+        saveDb();
+        return res.json({ success: true, pendingApproval: true, message: `Le film "${film.title}" a été placé en attente de suppression définitive.` });
+    }
+
+    // Si c'est le Patron (owner), il faut valider avec le code de sécurité pour supprimer définitivement
     const code = req.query.code || req.headers['x-security-code'];
     if (!code) {
         return res.status(400).json({ error: "Code de validation de sécurité requis." });
@@ -721,13 +803,6 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req:
     if (!verification.valid) {
         return res.status(403).json({ error: verification.error });
     }
-
-    const filmIndex = db.films.findIndex((f: any) => f.id === id);
-    if (filmIndex === -1) {
-        return res.status(404).json({ error: "Film non trouvé" });
-    }
-    
-    const film = db.films[filmIndex];
     
     // Si c'est un film local de type upload, on supprime le fichier physique
     if (film.filename && !film.jellyfinId) {
@@ -749,7 +824,7 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req:
     }
     
     saveDb();
-    res.json({ success: true, message: `Le film "${film.title}" a été supprimé.` });
+    res.json({ success: true, deleted: true, message: `Le film "${film.title}" a été supprimé définitivement.` });
 });
 
 app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, res) => {

@@ -287,7 +287,7 @@ export default function App() {
                         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden flex flex-col">
                             <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
                                 <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Fondateur' : activeUser.role}</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Patron' : (activeUser.role === 'admin' ? 'Admin' : 'Membre')}</p>
                             </div>
                             
                             {/* Mobile specific navigation menu items */}
