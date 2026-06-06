@@ -582,6 +582,38 @@ app.get('/api/films', requireAuth, async (req, res) => {
   res.json(sanitizedFilms);
 });
 
+app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+    const { id } = req.params;
+    const filmIndex = db.films.findIndex((f: any) => f.id === id);
+    if (filmIndex === -1) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+    
+    const film = db.films[filmIndex];
+    
+    // Si c'est un film local de type upload, on supprime le fichier physique
+    if (film.filename && !film.jellyfinId) {
+        const filePath = path.join(UPLOADS_DIR, film.filename);
+        if (fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+                console.log(`[Delete] Fichier vidéo supprimé du serveur : ${film.filename}`);
+            } catch (err) {
+                console.error(`[Delete] Erreur de suppression du fichier ${film.filename}:`, err);
+            }
+        }
+    }
+    
+    db.films.splice(filmIndex, 1);
+    
+    if (db.progress) {
+        delete db.progress[id];
+    }
+    
+    saveDb();
+    res.json({ success: true, message: `Le film "${film.title}" a été supprimé.` });
+});
+
 app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, res) => {
     if (!process.env.JELLYFIN_URL || !process.env.JELLYFIN_API_KEY) {
         return res.status(400).json({ error: "Jellyfin n'est pas configuré" });

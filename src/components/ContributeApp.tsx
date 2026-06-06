@@ -97,6 +97,25 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       });
   };
 
+  const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
+      setDialogState({
+          isOpen: true,
+          title: 'Supprimer un film',
+          message: `Êtes-vous sûr de vouloir supprimer définitivement le film "${filmTitle}" du serveur ? Cette action supprimera également le fichier vidéo associé.`,
+          onConfirm: async () => {
+              try {
+                  const res = await fetch(`/api/films/${filmId}`, { method: 'DELETE' });
+                  if (res.ok) {
+                      onRefresh();
+                  } else {
+                      const err = await res.json();
+                      notify(err.error || "Erreur lors de la suppression", "Erreur");
+                  }
+              } catch (e) { console.error(e); }
+          }
+      });
+  };
+
   const handleToggleRegistration = async () => {
       try {
           const res = await fetch('/api/settings', {
@@ -485,11 +504,12 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             <th className="px-6 py-4 font-medium">Uploader</th>
                             <th className="px-6 py-4 font-medium">Date d'import</th>
                             <th className="px-6 py-4 font-medium">Fichier d'origine</th>
+                            {(activeUser.role === 'owner' || activeUser.role === 'admin') && <th className="px-6 py-4 font-medium text-right">Actions</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                         {films.length === 0 ? (
-                            <tr><td colSpan={4} className="text-center py-8">Base de données vide.</td></tr>
+                            <tr><td colSpan={5} className="text-center py-8">Base de données vide.</td></tr>
                         ) : films.map(f => {
                             const uploader = usersList.find(u => u.id === f.addedBy);
                             return (
@@ -498,6 +518,16 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                                     <td className="px-6 py-4">{uploader?.name || f.addedBy}</td>
                                     <td className="px-6 py-4">{new Date(f.addedAt).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 max-w-[200px] truncate" title={f.originalName}>{f.originalName}</td>
+                                    {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                                        <td className="px-6 py-4 text-right">
+                                            <button 
+                                                onClick={() => handleDeleteFilm(f.id, f.title)}
+                                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded"
+                                            >
+                                                Supprimer
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             )
                         })}
