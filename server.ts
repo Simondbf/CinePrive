@@ -195,7 +195,20 @@ function verifySecurityCode(userId: string, code: string, operation: string, tar
         return { valid: true };
     }
 
-    // Validation par le code persistant en base de données
+    // Vérification d'un code dynamique envoyé sur Discord/E-mail (verificationCodes)
+    const record = verificationCodes[userId];
+    if (record) {
+        if (record.code === code) {
+            if (Date.now() > record.expires) {
+                delete verificationCodes[userId];
+                return { valid: false, error: "Le code reçu sur Discord/E-mail a expiré après 5 minutes." };
+            }
+            delete verificationCodes[userId];
+            return { valid: true };
+        }
+    }
+
+    // Validation par le code persistant en base de données (statique)
     const patronCode = db.settings?.securityCode || '000000';
     if (code === patronCode) {
         return { valid: true };
@@ -220,16 +233,37 @@ app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin
 
     const hasSmtp = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
     
-    let sent = false;
+    let sentToEmail = false;
     if (hasSmtp && req.user.email) {
-        sent = await sendSecurityCodeEmail(req.user.email, req.user.name || req.user.username, code, label || operation);
+        sentToEmail = await sendSecurityCodeEmail(req.user.email, req.user.name || req.user.username, code, label || operation);
+    }
+
+    let sentToDiscord = false;
+    if (db.settings?.webhookUrl) {
+        try {
+            const opLabel = operation === 'delete_film' ? 'Suppression définitive du film' : 'Bannissement définitive de l\'utilisateur';
+            const discordMessage = `🔐 **[CinéPrivé Sécurité]** Validation requise par **${req.user.name || req.user.username}** pour l'action :\n` +
+                `👉 **${label || opLabel}**\n` +
+                `🔑 **Code temporaire** : \`${code}\`\n` +
+                `⏱️ *Valable pendant 5 minutes. Saisissez ce code dans l'application pour valider.*`;
+            
+            await fetch(db.settings.webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: discordMessage })
+            });
+            sentToDiscord = true;
+        } catch (e) {
+            console.error("Erreur d'envoi du code sécurité sur Discord Webhook", e);
+        }
     }
 
     res.json({
         success: true,
         smtpConfigured: hasSmtp && !!req.user.email,
+        discordConfigured: !!db.settings?.webhookUrl,
         emailSentTo: req.user.email || null,
-        codeShownInDemo: (!hasSmtp || !req.user.email) ? code : null
+        codeShownInDemo: (!hasSmtp && !db.settings?.webhookUrl) ? code : null
     });
 });
 

@@ -114,6 +114,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       message: string,
       onSuccess: () => Promise<void>
   ) => {
+      // 1. Ouvrir le modal immédiatement avec un message de chargement/génération
       setSecurityModal({
           isOpen: true,
           title,
@@ -123,9 +124,56 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
           targetLabel,
           code: '',
           error: '',
-          demoNotice: "🔑 Saisissez le code de validation du Patron (généré et visible dans vos Paramètres) pour confirmer cette action.",
+          demoNotice: "🔑 Envoi d'un code de sécurité temporaire à 6 chiffres...",
           onSuccess
       });
+
+      try {
+          const requestLabel = operation === 'delete_film' 
+              ? `Suppression définitive du film "${targetLabel}"` 
+              : `Bannissement définitif de l'utilisateur "${targetLabel}"`;
+              
+          const res = await fetch('/api/security/request-code', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ operation, targetId, label: requestLabel })
+          });
+          
+          if (!res.ok) {
+              const err = await res.json();
+              setSecurityModal(prev => ({
+                  ...prev,
+                  demoNotice: `⚠️ Impossible de générer un code temporaire : ${err.error || 'Erreur serveur'}. Vous pouvez toujours utiliser votre code Patron permanent si configuré.`
+              }));
+              return;
+          }
+          
+          const data = await res.json();
+          let demoNotice = "";
+          
+          if (data.discordConfigured && data.smtpConfigured) {
+              demoNotice = `💬📧 Un code de sécurité temporaire vous a été envoyé instantanément sur Discord et par e-mail.`;
+          } else if (data.discordConfigured) {
+              demoNotice = `💬 Un code de sécurité temporaire vous a été envoyé instantanément sur votre Discord (via Webhook).`;
+          } else if (data.smtpConfigured) {
+              demoNotice = `📧 Un code de sécurité temporaire vous a été envoyé par e-mail (${data.emailSentTo}).`;
+          } else if (data.codeShownInDemo) {
+              demoNotice = `🔑 (Mode Démo) Aucun canal configuré. Utilisez votre code permanent ou ce code de sécurité temporaire : ${data.codeShownInDemo}`;
+          } else {
+              demoNotice = `🔑 Saisissez votre code de sécurité Patron (permanent ou reçu) pour confirmer cette action.`;
+          }
+
+          setSecurityModal(prev => ({
+              ...prev,
+              demoNotice
+          }));
+      } catch (err) {
+          console.error(err);
+          setSecurityModal(prev => ({
+              ...prev,
+              demoNotice: "⚠️ Erreur de communication de sécurité. Saisissez votre code Patron permanent pour valider."
+          }));
+      }
   };
 
   const handleConfirmSecurityAction = async () => {
