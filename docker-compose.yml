@@ -6,7 +6,7 @@ services:
     container_name: cineprive-app
     restart: always
     ports:
-      - "80:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./data:/app/data
     environment:
