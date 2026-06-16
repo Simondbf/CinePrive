@@ -1457,7 +1457,43 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
 // Distribution Vidéos Static & Proxy Jellyfin
 app.get('/videos/:filename', requireAuth, (req, res) => {
     const safeName = path.basename(req.params.filename);
-    res.sendFile(path.join(UPLOADS_DIR, safeName));
+    const videoPath = path.join(UPLOADS_DIR, safeName);
+
+    if (!fs.existsSync(videoPath)) {
+        return res.status(404).send('Playable video not found.');
+    }
+
+    const stat = fs.statSync(videoPath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    let contentType = 'video/mp4';
+    if (safeName.toLowerCase().endsWith('.mkv')) contentType = 'video/x-matroska';
+    if (safeName.toLowerCase().endsWith('.webm')) contentType = 'video/webm';
+
+    if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(videoPath, { start, end });
+        const head = {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': contentType,
+        };
+        res.writeHead(206, head);
+        file.pipe(res);
+    } else {
+        const head = {
+            'Content-Length': fileSize,
+            'Content-Type': contentType,
+            'Accept-Ranges': 'bytes',
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(videoPath).pipe(res);
+    }
 });
 
 // Phase 3: Route /api/stream/:filmId via Jellyfin API
