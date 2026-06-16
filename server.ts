@@ -332,7 +332,9 @@ if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'cineprive_super_sec
 if (!db.invites) db.invites = [];
 if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};
-if (!db.pollsConfig) db.pollsConfig = [
+if (!db.pollsConfig) db.pollsConfig = [];
+
+const defaultPolls = [
     {
         id: 'p1',
         title: 'Identité Visuelle & Logo',
@@ -366,8 +368,27 @@ if (!db.pollsConfig) db.pollsConfig = [
             { id: 'o1', label: 'Oui, je veux bien !' },
             { id: 'o2', label: 'Non, je préfère la version stable.' }
         ]
+    },
+    {
+        id: 'p4',
+        title: 'Nom de Domaine',
+        desc: "Que pensez-vous du nom de domaine actuel ?",
+        allowMultiple: false,
+        allowCustom: true,
+        options: [
+            { id: 'o1', label: 'cineprive.rpisimon.uk me convient très bien' },
+            { id: 'o2', label: 'Je préfèrerais un format plus court (ex: film.rpisimon.uk)' },
+            { id: 'o3', label: 'Il faudrait un vrai domaine professionnel (.com, .fr)' }
+        ]
     }
 ];
+
+// Fusionner les sondages par défaut s'ils manquent (ex: nouveau sondage ajouté dans le code)
+defaultPolls.forEach(defaultPoll => {
+    if (!db.pollsConfig.find((p: any) => p.id === defaultPoll.id)) {
+        db.pollsConfig.push(defaultPoll);
+    }
+});
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
 
