@@ -77,32 +77,48 @@ export default function Player({ film, activeUser, onClose }: Props) {
     };
   }, [activeUser.id, film.id]);
 
-  const resetControlsTimeout = () => {
+  const isPlayingRef = useRef(false);
+
+  useEffect(() => {
+      isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const resetControlsTimeout = useCallback(() => {
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
-        if (isPlaying && !showCast) setShowControls(false);
+        if (isPlayingRef.current && !showCast) setShowControls(false);
     }, 3000);
-  };
+  }, [showCast]);
 
   const togglePlay = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
       e?.stopPropagation();
       e?.preventDefault();
+      
+      // Prevent focus-triggered double calls if spacebar was pressed while a button was focused
+      if (document.activeElement instanceof HTMLElement && e?.type === 'keydown') {
+          document.activeElement.blur();
+      }
+
       if (!videoRef.current) return;
       
       if (videoRef.current.paused) {
-          videoRef.current.play();
+          videoRef.current.play().catch(console.error);
           setIsPlaying(true);
       } else {
           videoRef.current.pause();
           setIsPlaying(false);
       }
       resetControlsTimeout();
-  }, [showCast]);
+  }, [resetControlsTimeout]);
 
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
+          // Verify typing in inputs isn't caught
+          if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+          
           if (e.code === 'Space') {
+              e.preventDefault();
               togglePlay(e);
           }
       };

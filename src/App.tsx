@@ -184,8 +184,66 @@ export default function App() {
     return <Loader />;
   }
 
+  const globalModals = (
+      <AnimatePresence>
+          {showSettings && (
+             <SettingsModal 
+                 onClose={() => setShowSettings(false)} 
+                 themeMode={themeMode}
+                 setThemeMode={setThemeMode}
+                 amoledUnlocked={amoledUnlocked}
+                 amoledActive={amoledActive}
+                 setAmoledActive={setAmoledActive}
+                 onTriggerEasterEgg={() => setShowEasterEgg(true)}
+                 userId={activeUser.id}
+                 userRole={activeUser.role}
+              />
+          )}
+          {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
+          {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
+          
+          {notification && (
+              <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999]">
+                  <motion.div 
+                     initial={{ opacity: 0, scale: 0.95, y: -20, x: 0 }}
+                     animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                     exit={{ opacity: 0, scale: 0.95, y: -20, x: 0 }}
+                     className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-80 text-center flex flex-col gap-3 pointer-events-auto"
+                  >
+                      <div className="flex flex-col items-center">
+                          <h3 className="font-bold text-sm text-red-500 mb-1">{notification.title}</h3>
+                          <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
+                      </div>
+                      
+                      <div className="flex gap-2 justify-center mt-2">
+                          {notification.action && (
+                              <button 
+                                  onClick={() => {
+                                      notification.action!.onClick();
+                                      setNotification(null);
+                                  }} 
+                                  className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition cursor-pointer"
+                              >
+                                  {notification.action.label}
+                              </button>
+                          )}
+                          <button onClick={() => setNotification(null)} className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded transition cursor-pointer">
+                              Fermer
+                          </button>
+                      </div>
+                  </motion.div>
+              </div>
+          )}
+      </AnimatePresence>
+  );
+
   if (playingFilm) {
-    return <Player film={playingFilm} activeUser={activeUser} onClose={() => setPlayingFilm(null)} />;
+    return (
+        <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
+           <Player film={playingFilm} activeUser={activeUser} onClose={() => setPlayingFilm(null)} />
+           {globalModals}
+        </div>
+    );
   }
 
   // Auth Screen
@@ -195,7 +253,7 @@ export default function App() {
 
   // Navbar shared between Viewer and Admin
   const navbarContent = (
-      <nav className={`sticky top-0 w-full z-40 ${amoledActive ? 'bg-zinc-50/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 md:px-12 py-4 transition-colors`}>
+      <nav className={`sticky top-0 w-full z-40 ${amoledActive ? 'bg-white/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 md:px-12 py-4 transition-colors`}>
         <div className="flex items-center gap-4">
             {viewMode !== 'viewer' && (
                 <button 
@@ -351,7 +409,7 @@ export default function App() {
   );
 
   return (
-    <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-zinc-50 dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
+    <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
       {navbarContent}
       
       <main>
@@ -427,55 +485,9 @@ export default function App() {
                   </motion.div>
               </div>
           )}
-          {showSettings && (
-              <SettingsModal 
-                 onClose={() => setShowSettings(false)}
-                 themeMode={themeMode}
-                 setThemeMode={setThemeMode}
-                 amoledUnlocked={amoledUnlocked}
-                 amoledActive={amoledActive}
-                 setAmoledActive={setAmoledActive}
-                 onTriggerEasterEgg={() => setShowEasterEgg(true)}
-                 userId={activeUser.id}
-                 userRole={activeUser.role}
-              />
-          )}
-          {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
-          {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
-          
-          {notification && (
-              <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999]">
-                  <motion.div 
-                     initial={{ opacity: 0, scale: 0.95, y: -20, x: 0 }}
-                     animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                     exit={{ opacity: 0, scale: 0.95, y: -20, x: 0 }}
-                     className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-80 text-center flex flex-col gap-3"
-                  >
-                      <div className="flex flex-col items-center">
-                          <h3 className="font-bold text-sm text-red-500 mb-1">{notification.title}</h3>
-                          <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
-                      </div>
-                      
-                      <div className="flex gap-2 justify-center mt-2">
-                          {notification.action && (
-                              <button 
-                                  onClick={() => {
-                                      notification.action!.onClick();
-                                      setNotification(null);
-                                  }} 
-                                  className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition"
-                              >
-                                  {notification.action.label}
-                              </button>
-                          )}
-                          <button onClick={() => setNotification(null)} className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded transition">
-                              Fermer
-                          </button>
-                      </div>
-                  </motion.div>
-              </div>
-          )}
       </AnimatePresence>
+
+      {globalModals}
       
       {showEasterEgg && <EasterEgg onClose={() => setShowEasterEgg(false)} />}
     </div>
