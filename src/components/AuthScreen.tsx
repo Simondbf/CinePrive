@@ -43,7 +43,7 @@ export default function AuthScreen({ onLogin }: Props) {
                 }
             });
 
-        fetch('/api/settings')
+        fetch('/api/public/settings')
             .then(res => res.json())
             .then(data => setSettings(data))
             .catch(console.error);
@@ -145,7 +145,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                               className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
                                           />
                                       </div>
-                                      {settings && !settings.allowRegistrations && (
+                                      {settings && settings.allowRegistrations === false && (
                                           <div>
                                               <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-2">
                                                   <KeyRound className="w-4 h-4"/> Code d'invitation

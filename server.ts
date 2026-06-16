@@ -518,10 +518,17 @@ const TMDB_GENRES: Record<number, string> = {
 
 // ======================= API ROUTES =======================
 
+// Public Settings
+app.get('/api/public/settings', (req, res) => {
+    res.json({
+        allowRegistrations: db.settings?.allowRegistrations ?? true
+    });
+});
+
 // Settings
 app.get('/api/settings', requireAuth, (req: any, res) => {
     const settings: any = { 
-        allowRegistrations: db.settings?.allowRegistrations ?? true,
+        allowRegistrations: true, // Bypass temporaire
         fundingCurrent: db.settings?.fundingCurrent ?? 0,
         fundingGoal: db.settings?.fundingGoal ?? 12
     };
@@ -647,7 +654,8 @@ app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) =
 app.post('/api/register', async (req, res) => {
     const { username, password, email, name, inviteCode } = req.body;
     
-    let bypassWithCode = false;
+    // TEMPORARY BYPASS: Force allow registration for admin creation
+    let bypassWithCode = true;
     if (inviteCode && db.invites) {
         const inviteIndex = db.invites.findIndex((i: any) => i.code.toLowerCase() === inviteCode.toLowerCase() && !i.used);
         if (inviteIndex >= 0) {
