@@ -174,7 +174,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`}
             className="w-full h-full object-contain"
             onError={() => {
-                notify("Le format de ce fichier (ex: .mkv) n'est pas pris en charge par le navigateur. Veuillez le réimporter en .mp4.", "Erreur de Lecture");
+                notify("Le format de ce fichier n'est pas pris en charge par votre navigateur. Si vous venez de l'importer en .mkv, la conversion (.mp4) a sûrement échoué (souvent car FFmpeg est manquant sur ce serveur). Essayez d'uploader un .mp4 directement en attendant, ou patientez s'il est en cours de traitement.", "Erreur de Lecture");
             }}
             onEnded={() => setIsPlaying(false)}
             onPlay={() => setIsPlaying(true)}
@@ -229,7 +229,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             
                             {/* Top Right Action tools */}
                             <div className="flex items-center gap-4 text-white">
-                                <button className="hover:text-gold-500 transition-colors p-2" title="Sous-titres & Audio (Bientôt disponible sur serveur complet)" onClick={() => notify("Le multiplexage (Sous-titres & multi-audio) nécessite un transcodage côté serveur (via FFmpeg comme sur Jellyfin complet). Dans ce prototype, seul le flux par défaut est streamé.", "Information Technique")}>
+                                <button className="hover:text-gold-500 transition-colors p-2" title="Sous-titres & Audio (Bientôt disponible sur serveur complet)" onClick={() => notify("Les options de sous-titres et langues seront gérées intelligemment par le transcodage de votre VPS cible (nécessite Jellyfin complet ou FFmpeg).", "Paramètres de Lecture")}>
                                     <Settings className="w-5 h-5" />
                                 </button>
                                 {film.cast && film.cast.length > 0 && (

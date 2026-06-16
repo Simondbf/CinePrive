@@ -5,7 +5,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (ignoring dev dependencies for smaller image, but we need vite to build)
+# Install ffmpeg and other dependencies
+RUN apk add --no-cache ffmpeg
+
+# Install node dependencies
 RUN npm ci
 
 # Copy the rest of the application code

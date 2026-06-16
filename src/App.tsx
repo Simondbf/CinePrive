@@ -78,14 +78,15 @@ export default function App() {
       
       const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const shouldBeDark = themeMode === 'dark' || (themeMode === 'system' && isSystemDark);
-      
-      if (shouldBeDark) {
+      const forceAmoled = amoledActive && amoledUnlocked;
+
+      if (shouldBeDark || forceAmoled) {
           root.classList.add('dark');
       } else {
           root.classList.remove('dark');
       }
 
-      if (amoledActive && shouldBeDark && amoledUnlocked) {
+      if (forceAmoled) {
           root.classList.add('amoled');
       } else {
           root.classList.remove('amoled');
@@ -211,7 +212,7 @@ export default function App() {
                      className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-80 text-center flex flex-col gap-3 pointer-events-auto"
                   >
                       <div className="flex flex-col items-center">
-                          <h3 className="font-bold text-sm text-red-500 mb-1">{notification.title}</h3>
+                          <h3 className={`font-bold text-sm mb-1 ${notification.title.toLowerCase().includes('erreur') ? 'text-red-500' : 'text-blue-400'}`}>{notification.title}</h3>
                           <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
                       </div>
                       
@@ -304,7 +305,7 @@ export default function App() {
             {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                 <button 
                     onClick={() => setViewMode('admin')}
-                    className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-zinc-900 dark:text-white bg-zinc-800 dark:bg-zinc-700 border border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                     title="Administration"
                 >
                     <Shield className="w-4 h-4"/> <span>Administration</span>
@@ -313,7 +314,7 @@ export default function App() {
 
             <button 
                 onClick={() => setViewMode('upload')}
-                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-800 dark:bg-zinc-700 border border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Ajouter un film"
             >
                 <UploadCloud className="w-4 h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
