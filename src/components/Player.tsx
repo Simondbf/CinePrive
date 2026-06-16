@@ -103,8 +103,12 @@ export default function Player({ film, activeUser, onClose }: Props) {
       if (!videoRef.current) return;
       
       if (videoRef.current.paused) {
-          videoRef.current.play().catch(console.error);
-          setIsPlaying(true);
+          videoRef.current.play().then(() => {
+              setIsPlaying(true);
+          }).catch((err) => {
+              console.error(err);
+              setIsPlaying(false);
+          });
       } else {
           videoRef.current.pause();
           setIsPlaying(false);
@@ -169,6 +173,9 @@ export default function Player({ film, activeUser, onClose }: Props) {
             ref={videoRef}
             src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`}
             className="w-full h-full object-contain"
+            onError={() => {
+                notify("Le format de ce fichier (ex: .mkv) n'est pas pris en charge par le navigateur. Veuillez le réimporter en .mp4.", "Erreur de Lecture");
+            }}
             onEnded={() => setIsPlaying(false)}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
