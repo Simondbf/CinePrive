@@ -24,6 +24,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [maxUsesInput, setMaxUsesInput] = useState('');
 
   const [pollsConfig, setPollsConfig] = useState<any[]>([]);
+  const [editingPollId, setEditingPollId] = useState<string | null>(null);
 
   const fetchData = React.useCallback(() => {
      fetch('/api/users').then(r => r.json()).then(setUsersList).catch(console.error);
@@ -1074,12 +1075,57 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                             const data = pollResults[pollId] || { options: {}, custom: [], userVotes: {} };
                             const title = config.title;
                             const totalVotes = Object.values(data.options).reduce((a: any, b: any) => a + b, 0) as number;
-                            return (
+                            return editingPollId === pollId ? (
+                                <form key={pollId} className="space-y-4 pb-6 border-b border-zinc-100 dark:border-zinc-800 last:border-0 last:pb-0" onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const formData = new FormData(e.currentTarget);
+                                    const updatedPoll = {
+                                        id: pollId,
+                                        title: formData.get('title'),
+                                        desc: formData.get('desc'),
+                                        allowMultiple: formData.get('allowMultiple') === 'on',
+                                        allowCustom: formData.get('allowCustom') === 'on',
+                                        options: formData.get('options')?.toString().split('\n').filter(s => s.trim()).map((s, i) => {
+                                            const existingConfig = config.options[i];
+                                            return { id: existingConfig ? existingConfig.id : 'o' + (i + 1), label: s.trim() };
+                                        }) || []
+                                    };
+                                    const updatedConfig = pollsConfig.map((p: any) => p.id === pollId ? updatedPoll : p);
+                                    await fetch('/api/polls/config', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(updatedConfig)
+                                    });
+                                    setEditingPollId(null);
+                                    fetchData();
+                                }}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="font-medium">Modifier le sondage</h4>
+                                        <button type="button" onClick={() => setEditingPollId(null)} className="text-zinc-500 hover:text-zinc-900">Annuler</button>
+                                    </div>
+                                    <input name="title" defaultValue={config.title} required className="w-full border rounded px-3 py-2" placeholder="Titre" />
+                                    <textarea name="desc" defaultValue={config.desc} className="w-full border rounded px-3 py-2" placeholder="Description" rows={2} />
+                                    <textarea name="options" defaultValue={config.options.map((o:any)=>o.label).join('\n')} className="w-full border rounded px-3 py-2" placeholder="Options (1 par ligne)" rows={4} />
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="allowMultiple" defaultChecked={config.allowMultiple} /> Choix multiples</label>
+                                        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="allowCustom" defaultChecked={config.allowCustom} /> Saisie libre</label>
+                                    </div>
+                                    <button className="bg-zinc-900 text-white px-4 py-2 rounded">Sauvegarder</button>
+                                </form>
+                            ) : (
                                 <div key={pollId} className="space-y-4 pb-6 border-b border-zinc-100 dark:border-zinc-800 last:border-0 last:pb-0">
                                     <div className="flex justify-between items-center">
                                         <h4 className="font-medium text-zinc-900 dark:text-white capitalize">{title} ({totalVotes} votes)</h4>
                                         {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                                             <div className="flex items-center gap-2">
+                                                {totalVotes === 0 && (
+                                                    <button 
+                                                        onClick={() => setEditingPollId(pollId)}
+                                                        className="text-xs text-blue-600 hover:underline px-2 py-1 bg-blue-50 dark:bg-blue-900/10 rounded"
+                                                    >
+                                                        Éditer
+                                                    </button>
+                                                )}
                                                 <button 
                                                     onClick={async () => {
                                                         setDialogState({
