@@ -392,56 +392,61 @@ defaultPolls.forEach(defaultPoll => {
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
 
-const remuxToMp4 = (filmId: string, inputFilename: string) => {
-    const inputPath = path.join(UPLOADS_DIR, inputFilename);
-    const ext = path.extname(inputFilename);
-    const baseName = path.basename(inputFilename, ext);
-    const outputFilename = `${baseName}.mp4`;
-    const outputPath = path.join(UPLOADS_DIR, outputFilename);
+const remuxToMp4 = (filmId: string, inputFilename: string): Promise<void> => {
+    return new Promise((resolve) => {
+        const inputPath = path.join(UPLOADS_DIR, inputFilename);
+        const ext = path.extname(inputFilename);
+        const baseName = path.basename(inputFilename, ext);
+        const outputFilename = `${baseName}.mp4`;
+        const outputPath = path.join(UPLOADS_DIR, outputFilename);
 
-    console.log(`[Remux] Tentative de remuxing de "${inputFilename}" vers "${outputFilename}"...`);
+        console.log(`[Remux] Tentative de remuxing de "${inputFilename}" vers "${outputFilename}"...`);
 
-    exec('ffmpeg -version', (err) => {
-        if (err) {
-            console.error('[Remux] ffmpeg n\'est pas installé sur ce serveur. Désactivation du remux auto.');
-            const film = db.films.find((f: any) => f.id === filmId);
-            if (film) {
-                film.status = 'ready'; // fallback de secours
-                saveDb();
-            }
-            return;
-        }
-
-        // Remux rapide: vidéo recopiée sans perte et audio convertie en AAC pour support universel sur mobile/navigateur
-        const cmd = `ffmpeg -y -i "${inputPath}" -c:v copy -c:a aac -movflags +faststart "${outputPath}"`;
-        
-        exec(cmd, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`[Remux] Échec du remuxing pour ${inputFilename}:`, error);
+        exec('ffmpeg -version', (err) => {
+            if (err) {
+                console.error('[Remux] ffmpeg n\'est pas installé sur ce serveur. Désactivation du remux auto.');
                 const film = db.films.find((f: any) => f.id === filmId);
                 if (film) {
-                    film.status = 'ready'; // On le remet en ready par sécurité pour ne pas bloquer l'accès
+                    film.status = 'ready'; // fallback de secours
                     saveDb();
                 }
+                resolve();
                 return;
             }
+
+            // Remux rapide: vidéo recopiée sans perte et audio convertie en AAC pour support universel sur mobile/navigateur
+            const cmd = `ffmpeg -y -i "${inputPath}" -c:v copy -c:a aac -movflags +faststart "${outputPath}"`;
             
-            console.log(`[Remux] Succès ! Le fichier ${inputFilename} a été converti en ${outputFilename}`);
-            
-            const film = db.films.find((f: any) => f.id === filmId);
-            if (film) {
-                film.filename = outputFilename;
-                film.status = 'ready';
-                saveDb();
-                
-                // Suppression du fichier source pour préserver le disque dur
-                try {
-                    fs.unlinkSync(inputPath);
-                    console.log(`[Remux] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
-                } catch (unlinkErr) {
-                    console.error(`[Remux] Impossible de supprimer le fichier original ${inputFilename}:`, unlinkErr);
+            exec(cmd, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`[Remux] Échec du remuxing pour ${inputFilename}:`, error);
+                    const film = db.films.find((f: any) => f.id === filmId);
+                    if (film) {
+                        film.status = 'ready'; // On le remet en ready par sécurité pour ne pas bloquer l'accès
+                        saveDb();
+                    }
+                    resolve();
+                    return;
                 }
-            }
+                
+                console.log(`[Remux] Succès ! Le fichier ${inputFilename} a été converti en ${outputFilename}`);
+                
+                const film = db.films.find((f: any) => f.id === filmId);
+                if (film) {
+                    film.filename = outputFilename;
+                    film.status = 'ready';
+                    saveDb();
+                    
+                    // Suppression du fichier source pour préserver le disque dur
+                    try {
+                        fs.unlinkSync(inputPath);
+                        console.log(`[Remux] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
+                    } catch (unlinkErr) {
+                        console.error(`[Remux] Impossible de supprimer le original ${inputFilename}:`, unlinkErr);
+                    }
+                }
+                resolve();
+            });
         });
     });
 };
@@ -1443,11 +1448,12 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         saveDb();
 
         if (!isMp4) {
-            // Lancement du remux en arrière-plan (non-bloquant)
-            remuxToMp4(film.id, finalFilename);
+            // Lancement du remux bloquant pour l'upload
+            await remuxToMp4(film.id, finalFilename);
         }
 
-        res.json({ success: true, film });
+        const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
+        res.json({ success: true, film: reloadedFilm });
     } catch (e) {
         console.error("Upload finalize error", e);
         res.status(500).json({ error: 'Internal upload finalize error' });

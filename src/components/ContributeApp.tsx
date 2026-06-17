@@ -389,11 +389,6 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
       const newTasks: UploadTask[] = [];
 
       for (const f of selectedFiles) {
-          if (f.name.toLowerCase().endsWith('.mkv')) {
-              notify(`Le fichier ${f.name} est un .mkv, veuillez utiliser un .mp4 pour une compatibilité web maximale (astuce: HandBrake, Shutter Encoder).`, "Format non supporté");
-              continue;
-          }
-
           const nameWithoutExt = f.name.replace(/\.[^/.]+$/, "");
           const cleanName = nameWithoutExt.replace(/[\._-]/g, ' ')
                                           .replace(/[\[\(].*?[\]\)]/g, '')
@@ -585,10 +580,10 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
                     {/* Zone de Drop / Selection Multiple */}
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                         <label className={`block border-2 border-dashed border-zinc-700 bg-zinc-950 rounded-lg p-8 relative cursor-pointer hover:border-zinc-500 transition text-center`}>
-                            <input type="file" multiple accept="video/mp4,video/webm,video/avi,video/quicktime,video/x-ms-wmv,video/x-flv,video/x-m4v,.mp4,.webm,.avi,.mov,.wmv,.flv,.m4v" className="hidden" onChange={handleFileSelect} />
+                            <input type="file" multiple accept="video/*,.mkv" className="hidden" onChange={handleFileSelect} />
                             <UploadCloud className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
                             <p className="font-medium text-white mb-1">Cliquez pour ajouter un ou plusieurs films</p>
-                            <p className="text-xs text-zinc-500">Parfait pour un ajout en lot. Les fichiers MKV ne sont pas supportés par défaut sur le web, veuillez utiliser des MP4.</p>
+                            <p className="text-xs text-zinc-500">Formats supportés : MP4, MKV, AVI, etc. Les vidéos seront automatiquement optimisées en MP4 sur le serveur en arrière-plan.</p>
                         </label>
                     </div>
 

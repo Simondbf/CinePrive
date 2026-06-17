@@ -12,6 +12,18 @@ body {
   overflow-x: hidden;
 }
 
+/* AMOLED overrides: make dark elements purely black */
+html.amoled .bg-zinc-900,
+html.amoled .bg-zinc-950,
+html.amoled.dark body {
+    background-color: #000000 !important;
+}
+
+html.amoled .dark\:bg-zinc-900:where(.dark, .dark *),
+html.amoled .dark\:bg-zinc-950:where(.dark, .dark *) {
+    background-color: #000000 !important;
+}
+
 .hide-scrollbar::-webkit-scrollbar {
     display: none;
 }
