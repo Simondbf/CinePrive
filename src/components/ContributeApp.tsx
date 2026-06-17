@@ -8,9 +8,10 @@ interface Props {
   films: Film[];
   onRefresh: () => void;
   mode: 'upload' | 'admin';
+  onUploadStateChange?: (isUploading: boolean) => void;
 }
 
-export default function ContributeApp({ activeUser, films, onRefresh, mode }: Props) {
+export default function ContributeApp({ activeUser, films, onRefresh, mode, onUploadStateChange }: Props) {
   const [tab, setTab] = useState<'upload' | 'library' | 'users' | 'requests' | 'polls' | 'funding'>(mode === 'upload' ? 'upload' : 'users');
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
@@ -357,6 +358,10 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
 
   useEffect(() => {
+      if (onUploadStateChange) {
+          onUploadStateChange(isUploadingGlobal);
+      }
+      
       const handleBeforeUnload = (e: BeforeUnloadEvent) => {
           if (isUploadingGlobal) {
               e.preventDefault();
@@ -367,7 +372,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
 
       window.addEventListener('beforeunload', handleBeforeUnload);
       return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isUploadingGlobal]);
+  }, [isUploadingGlobal, onUploadStateChange]);
 
   const searchTMDBForTask = async (taskId: string, query: string) => {
       if (!query || query.length < 2) return;

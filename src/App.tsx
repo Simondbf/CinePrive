@@ -21,7 +21,20 @@ export default function App() {
   const [adminNotifs, setAdminNotifs] = useState<any[]>([]);
 
   // Routing Local Mode: 'viewer', 'upload', 'polls', 'admin'
-  const [viewMode, setViewMode] = useState<'viewer' | 'upload' | 'polls' | 'admin'>('viewer');
+  const [rawViewMode, setRawViewMode] = useState<'viewer' | 'upload' | 'polls' | 'admin'>('viewer');
+  const [isUploading, setIsUploading] = useState(false);
+  
+  const setViewMode = (mode: 'viewer' | 'upload' | 'polls' | 'admin') => {
+      if (isUploading && rawViewMode !== 'viewer') {
+          if (!window.confirm("Un téléchargement est en cours. Si vous quittez la page, il sera annulé ! Êtes-vous sûr ?")) {
+              return;
+          }
+      }
+      setRawViewMode(mode);
+  };
+
+  const viewMode = rawViewMode;
+
   const [playingFilm, setPlayingFilm] = useState<Film | null>(null);
   const [showFunding, setShowFunding] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
@@ -424,9 +437,9 @@ export default function App() {
                onUpdateUser={setActiveUser}
            />
         ) : viewMode === 'admin' ? (
-           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" />
+           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />
         ) : (
-           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" />
+           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" onUploadStateChange={setIsUploading} />
         )}
       </main>
 
