@@ -18,6 +18,9 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const [showCast, setShowCast] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackError, setPlaybackError] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const formatTime = (seconds: number): string => {
@@ -162,19 +165,51 @@ export default function Player({ film, activeUser, onClose }: Props) {
       setCurrentTime(newTime);
   };
 
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.playbackRate = playbackRate;
+        }
+    }, [playbackRate]);
+
   return (
     <div 
-        className="fixed inset-0 bg-black z-50 flex items-center justify-center cursor-default select-none"
+        className="fixed inset-0 bg-black z-50 flex items-center justify-center cursor-default select-none group"
         onMouseMove={resetControlsTimeout}
         onClick={togglePlay}
     >
+        {playbackError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-zinc-950/80 z-20 space-y-4">
+                <Settings className="w-16 h-16 text-zinc-500 mb-4 animate-pulse" />
+                <h2 className="text-xl font-bold">Erreur de lecture</h2>
+                <p className="text-zinc-400 text-center max-w-lg px-4">
+                    Ce format n'est pas supporté par votre navigateur actuel ou la conversion a échoué.
+                </p>
+                <div className="flex gap-4">
+                    <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
+                        Retour
+                    </button>
+                    {!film.jellyfinId && (
+                        <button onClick={(e) => { 
+                            e.stopPropagation();
+                            fetch(`/api/films/${film.id}/remux`, { method: 'POST' })
+                              .then(() => notify("Une demande de conversion en MP4 a été envoyée au serveur. Revenez plus tard.", "Conversion en cours"))
+                              .catch(() => notify("Erreur de connexion", "Erreur"));
+                        }} className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition text-white">
+                            Convertir en MP4 (Serveur)
+                        </button>
+                    )}
+                </div>
+            </div>
+        )}
+
         {/* Real video player pointing to the Express static /videos route or secure Jellyfin proxy stream */}
         <video 
             ref={videoRef}
             src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`}
             className="w-full h-full object-contain"
             onError={() => {
-                notify("Le format de ce fichier n'est pas pris en charge par votre navigateur. Si vous venez de l'importer en .mkv, la conversion (.mp4) a sûrement échoué (souvent car FFmpeg est manquant sur ce serveur). Essayez d'uploader un .mp4 directement en attendant, ou patientez s'il est en cours de traitement.", "Erreur de Lecture");
+                setPlaybackError(true);
+                notify("Le format de ce fichier n'est pas pris en charge par votre navigateur, ou le fichier est en cours de traitement vidéo.", "Erreur de Lecture");
             }}
             onEnded={() => setIsPlaying(false)}
             onPlay={() => setIsPlaying(true)}
@@ -228,10 +263,24 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             </div>
                             
                             {/* Top Right Action tools */}
-                            <div className="flex items-center gap-4 text-white">
-                                <button className="hover:text-gold-500 transition-colors p-2" title="Sous-titres & Audio (Bientôt disponible sur serveur complet)" onClick={() => notify("Les options de sous-titres et langues seront gérées intelligemment par le transcodage de votre VPS cible (nécessite Jellyfin complet ou FFmpeg).", "Paramètres de Lecture")}>
+                            <div className="flex items-center gap-4 text-white relative">
+                                <button className={`transition-colors p-2 rounded ${showSettings ? 'bg-zinc-800 text-gold-500' : 'hover:text-gold-500'}`} title="Paramètres" onClick={() => setShowSettings(!showSettings)}>
                                     <Settings className="w-5 h-5" />
                                 </button>
+                                {showSettings && (
+                                    <div className="absolute bottom-full right-16 mb-2 bg-zinc-900 border border-zinc-800 rounded-lg p-2 shadow-2xl z-50 w-48 text-sm">
+                                        <div className="text-zinc-400 font-medium px-2 py-1 mb-1 shadow-sm border-b border-zinc-800">Vitesse de lecture</div>
+                                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
+                                            <button 
+                                                key={rate} 
+                                                onClick={() => { setPlaybackRate(rate); setShowSettings(false); }}
+                                                className={`w-full text-left px-3 py-2 rounded transition-colors ${playbackRate === rate ? 'bg-gold-500/20 text-gold-400' : 'hover:bg-zinc-800 text-white'}`}
+                                            >
+                                                {rate}x {rate === 1 && '(Normal)'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 {film.cast && film.cast.length > 0 && (
                                     <button 
                                         onClick={() => setShowCast(!showCast)} 

@@ -80,7 +80,7 @@ export default function App() {
       const shouldBeDark = themeMode === 'dark' || (themeMode === 'system' && isSystemDark);
       const forceAmoled = amoledActive && amoledUnlocked;
 
-      if (shouldBeDark || forceAmoled) {
+      if (shouldBeDark) {
           root.classList.add('dark');
       } else {
           root.classList.remove('dark');

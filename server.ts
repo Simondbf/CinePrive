@@ -1454,6 +1454,20 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     }
 });
 
+app.post('/api/films/:id/remux', requireAuth, (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: 'Film non trouvé' });
+    
+    // Only remux if it's an MKV and not already MP4
+    if (film.filename && film.filename.toLowerCase().endsWith('.mkv')) {
+        res.json({ success: true, message: 'Remuxing déclenché' });
+        // The remux function doesn't need to block
+        setTimeout(() => remuxToMp4(film.id, film.filename), 100);
+    } else {
+        res.json({ success: false, message: 'Ce format n\'a pas besoin de conversion ou est déjà en MP4' });
+    }
+});
+
 // Distribution Vidéos Static & Proxy Jellyfin
 app.get('/videos/:filename', requireAuth, (req, res) => {
     const safeName = path.basename(req.params.filename);
