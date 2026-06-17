@@ -356,6 +356,19 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
 
+  useEffect(() => {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+          if (isUploadingGlobal) {
+              e.preventDefault();
+              e.returnValue = "Un téléchargement est en cours. Si vous quittez la page, il sera annulé !";
+              return e.returnValue;
+          }
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isUploadingGlobal]);
+
   const searchTMDBForTask = async (taskId: string, query: string) => {
       if (!query || query.length < 2) return;
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, isSearching: true } : t));

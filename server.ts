@@ -1448,8 +1448,8 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         saveDb();
 
         if (!isMp4) {
-            // Lancement du remux bloquant pour l'upload
-            await remuxToMp4(film.id, finalFilename);
+            // Lancement du remux en arrière-plan (non-bloquant)
+            remuxToMp4(film.id, finalFilename).catch(e => console.error(e));
         }
 
         const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
