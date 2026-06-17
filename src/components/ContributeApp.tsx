@@ -390,10 +390,16 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode }: Pr
 
       for (const f of selectedFiles) {
           const nameWithoutExt = f.name.replace(/\.[^/.]+$/, "");
-          const cleanName = nameWithoutExt.replace(/[\._-]/g, ' ')
+          let cleanName = nameWithoutExt.replace(/[\._-]/g, ' ')
                                           .replace(/[\[\(].*?[\]\)]/g, '')
-                                          .replace(/\b(1080p|720p|480p|mp4|avi|mov|wmv|av1|x264|x265|bluray|webrip|hdrip|dvdrip|cam|fr|vostfr|truefrench)\b/gi, '')
+                                          .replace(/\b(1080p|720p|480p|mp4|avi|mov|wmv|av1|x264|x265|bluray|webrip|hdrip|dvdrip|cam|fr|vostfr|truefrench|b1|t00|t01|t02|t03)\b/gi, '')
+                                          .replace(/^[0-9rn]+\s*/, '') // Supprime les nombres au début (comme "1 ", "2 ")
                                           .trim();
+          
+          // "HP" to "Harry Potter" as a nice standardisation for known acronyms if needed, though manual search is preferred
+          if (cleanName.toUpperCase().includes('HP AND THE')) {
+              cleanName = cleanName.replace(/HP/i, 'Harry Potter');
+          }
           newTasks.push({
               id: Date.now().toString() + Math.random().toString().slice(2),
               file: f,
