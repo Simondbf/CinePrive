@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { notify } from '../lib/notify';
 import { Film, User } from '../types';
-import { ArrowLeft, Play, Pause, Maximize, Volume2, VolumeX, Download, Settings, Users } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Maximize, Volume2, VolumeX, Download, Settings, Users, Subtitles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
@@ -264,7 +264,10 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             
                             {/* Top Right Action tools */}
                             <div className="flex items-center gap-4 text-white relative">
-                                <button className={`transition-colors p-2 rounded ${showSettings ? 'bg-zinc-800 text-gold-500' : 'hover:text-gold-500'}`} title="Paramètres" onClick={() => setShowSettings(!showSettings)}>
+                                <button className="hover:text-gold-500 transition-colors p-2" title="Sous-titres & Audio" onClick={(e) => { e.stopPropagation(); notify("Les options de sous-titres et langues seront gérées intelligemment par le transcodage de votre VPS cible (nécessite Jellyfin complet ou FFmpeg exhaustif).", "Sous-titres & Audio"); }}>
+                                    <Subtitles className="w-5 h-5" />
+                                </button>
+                                <button className={`transition-colors p-2 rounded ${showSettings ? 'bg-zinc-800 text-gold-500' : 'hover:text-gold-500'}`} title="Paramètres" onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }}>
                                     <Settings className="w-5 h-5" />
                                 </button>
                                 {showSettings && (
@@ -273,7 +276,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                                         {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
                                             <button 
                                                 key={rate} 
-                                                onClick={() => { setPlaybackRate(rate); setShowSettings(false); }}
+                                                onClick={(e) => { e.stopPropagation(); setPlaybackRate(rate); setShowSettings(false); }}
                                                 className={`w-full text-left px-3 py-2 rounded transition-colors ${playbackRate === rate ? 'bg-gold-500/20 text-gold-400' : 'hover:bg-zinc-800 text-white'}`}
                                             >
                                                 {rate}x {rate === 1 && '(Normal)'}

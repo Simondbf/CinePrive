@@ -194,6 +194,16 @@ export default function App() {
      if (activeUser) fetchFilms();
   }, [activeUser]);
 
+  useEffect(() => {
+     const hasTranscoding = films.some(f => f.status === 'transcoding');
+     if (hasTranscoding) {
+         const interval = setInterval(() => {
+             fetchFilms();
+         }, 5000);
+         return () => clearInterval(interval);
+     }
+  }, [films, activeUser]);
+
   if (isLoading) {
     return <Loader />;
   }

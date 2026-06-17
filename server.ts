@@ -414,8 +414,8 @@ const remuxToMp4 = (filmId: string, inputFilename: string): Promise<void> => {
                 return;
             }
 
-            // Remux rapide: vidéo recopiée sans perte et audio convertie en AAC pour support universel sur mobile/navigateur
-            const cmd = `ffmpeg -y -i "${inputPath}" -c:v copy -c:a aac -movflags +faststart "${outputPath}"`;
+            // Remux rapide : sélection du premier flux vidéo et audio. Désactivation des sous-titres (non supportés en MP4 par défaut) pour éviter de faire planter ffmpeg.
+            const cmd = `ffmpeg -y -i "${inputPath}" -map 0:v:0 -map 0:a:0? -c copy -movflags +faststart "${outputPath}"`;
             
             exec(cmd, (error, stdout, stderr) => {
                 if (error) {
