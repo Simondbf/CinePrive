@@ -1,21 +1,37 @@
+version: '3.8'
 services:
-  cineprive-app:
+  web:
     build: .
-    container_name: cineprive-app
-    restart: always
+    restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
-    volumes:
-      - ./data:/app/data
     environment:
       - NODE_ENV=production
-      - TMDB_API_KEY=${TMDB_API_KEY:-VOTRE_CLE_TMDB_ICI}
-      - JWT_SECRET=${JWT_SECRET}
-      - JELLYFIN_URL=${JELLYFIN_URL}
-      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
-      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-CinéPrivé Sécurité}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-security@cineprive.rpisimon.uk}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+  worker:
+    build: .
+    command: npm run start:worker
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

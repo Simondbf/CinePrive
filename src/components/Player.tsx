@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function Player({ film, activeUser, onClose }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -145,7 +146,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const toggleFullscreen = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(e => console.error(e));
+          containerRef.current?.requestFullscreen().catch(e => console.error(e));
       } else {
           if (document.exitFullscreen) {
               document.exitFullscreen();
@@ -173,6 +174,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
   return (
     <div 
+        ref={containerRef}
         className="fixed inset-0 bg-black z-50 flex items-center justify-center cursor-default select-none group"
         onMouseMove={resetControlsTimeout}
         onClick={togglePlay}
