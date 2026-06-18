@@ -9,6 +9,7 @@ services:
       - NODE_ENV=production
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./data:/app/data
     depends_on:
@@ -22,6 +23,7 @@ services:
       - NODE_ENV=production
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./data:/app/data
     depends_on:

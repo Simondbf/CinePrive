@@ -359,14 +359,14 @@ if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
 if (!db.settings.securityCode) db.settings.securityCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-// Sécurisation automatique de JWT_SECRET en production si non spécifié (évite crash de prod 502)
-if (process.env.NODE_ENV !== 'development' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
-    if (db.settings.jwtSecret) {
-        JWT_SECRET = db.settings.jwtSecret;
-        console.log('[Sécurité] JWT_SECRET chargé depuis le fichier de configuration persistent.');
-    } else {
-        throw new Error("ERREUR CRITIQUE: Démarrage refusé. Aucun JWT_SECRET n'est défini en environnement de production.");
-    }
+// Sécurisation automatique de JWT_SECRET
+if (process.env.JWT_SECRET) {
+    JWT_SECRET = process.env.JWT_SECRET;
+} else if (db.settings && db.settings.jwtSecret) {
+    JWT_SECRET = db.settings.jwtSecret;
+    console.log('[Sécurité] JWT_SECRET chargé depuis le fichier de configuration persistent (db.settings.jwtSecret).');
+} else if (process.env.NODE_ENV !== 'development') {
+    throw new Error("ERREUR CRITIQUE: Démarrage refusé. Aucun JWT_SECRET n'est défini en variable d'environnement (recommandé) ni dans db.json.");
 }
 if (!db.invites) db.invites = [];
 if (!db.notifications) db.notifications = [];
