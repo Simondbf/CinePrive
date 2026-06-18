@@ -23,6 +23,7 @@ export default function App() {
   // Routing Local Mode: 'viewer', 'upload', 'polls', 'admin'
   const [rawViewMode, setRawViewMode] = useState<'viewer' | 'upload' | 'polls' | 'admin'>('viewer');
   const [isUploading, setIsUploading] = useState(false);
+  const [transcodingStatuses, setTranscodingStatuses] = useState<Record<string, any>>({});
   
   const setViewMode = (mode: 'viewer' | 'upload' | 'polls' | 'admin') => {
       if (isUploading && rawViewMode !== 'viewer') {
@@ -154,8 +155,8 @@ export default function App() {
 
   }, []);
 
-  const fetchFilms = async () => {
-    setIsLoading(true);
+  const fetchFilms = async (background = false) => {
+    if (!background) setIsLoading(true);
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
@@ -186,7 +187,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     } finally {
-      setIsLoading(false);
+      if (!background) setIsLoading(false);
     }
   };
 
@@ -197,10 +198,18 @@ export default function App() {
   useEffect(() => {
      const hasTranscoding = films.some(f => f.status === 'transcoding');
      if (hasTranscoding) {
-         const interval = setInterval(() => {
-             fetchFilms();
+         const interval = setInterval(async () => {
+             fetchFilms(true);
+             try {
+                 const res = await fetch('/api/films/transcoding-status');
+                 if (res.ok) setTranscodingStatuses(await res.json());
+             } catch (e) {}
          }, 5000);
          return () => clearInterval(interval);
+     } else {
+         if (Object.keys(transcodingStatuses).length > 0) {
+             setTranscodingStatuses({});
+         }
      }
   }, [films, activeUser]);
 

@@ -9,9 +9,10 @@ interface Props {
     films: Film[];
     onPlay: (film: Film) => void;
     onUpdateUser: (u: User) => void;
+    transcodingStatuses?: Record<string, any>;
 }
 
-export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser }: Props) {
+export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, transcodingStatuses }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
 
     const toggleMyList = async (filmId: string) => {
@@ -104,7 +105,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser }: P
                 <div>
                     <h3 className="text-xl font-medium text-white mb-6">Résultats pour "{searchQuery}" ({filteredFilms.length})</h3>
                     {filteredFilms.length > 0 ? (
-                         <MovieGrid films={filteredFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} />
+                         <MovieGrid films={filteredFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} />
                     ) : (
                          <div className="p-12 flex flex-col items-center gap-4 justify-center text-center text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800 border-dashed">
                              <p>Le film "{searchQuery}" n'est pas (encore) dans la bibliothèque.</p>
@@ -138,7 +139,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser }: P
                             <div key={idx} className="space-y-4">
                                 <h3 className="text-xl font-medium text-white">{list.title}</h3>
                                 {list.films.length > 0 ? (
-                                    <MovieGrid films={list.films} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} />
+                                    <MovieGrid films={list.films} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} />
                                 ) : (
                                     <div className="p-8 text-center text-zinc-500 bg-zinc-900/20 rounded-xl border border-zinc-800 border-dashed text-sm">
                                         Cette catégorie est vide pour le moment.

@@ -8,9 +8,10 @@ interface Props {
   activeUser: User;
   onPlay: (film: Film) => void;
   onToggleList: (filmId: string) => void;
+  transcodingStatuses?: Record<string, any>;
 }
 
-export default function MovieGrid({ films, activeUser, onPlay, onToggleList }: Props) {
+export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses }: Props) {
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
 
   const handleToggle = async (e: React.MouseEvent, filmId: string) => {
@@ -61,6 +62,19 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList }: P
                         <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 p-3 text-center">
                             <Loader2 className="w-8 h-8 text-gold-400 animate-spin" />
                             <span className="text-gold-400 font-medium text-xs tracking-wider uppercase animate-pulse">Conversion...</span>
+                            {transcodingStatuses && transcodingStatuses[film.id] && (
+                                <div className="text-xs text-zinc-400 mt-2 flex flex-col items-center">
+                                    <div className="w-full bg-zinc-800 rounded-full h-1.5 mb-1 max-w-[80px]">
+                                        <div className="bg-gold-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${transcodingStatuses[film.id].progress}%` }}></div>
+                                    </div>
+                                    <span>{transcodingStatuses[film.id].progress}%</span>
+                                    {transcodingStatuses[film.id].etaSeconds !== null && (
+                                        <span className="opacity-70 mt-1">
+                                            ~{Math.ceil(transcodingStatuses[film.id].etaSeconds / 60)} min restantes
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                     

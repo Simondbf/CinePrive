@@ -9,7 +9,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import nodemailer from 'nodemailer';
 
 const app = express();
@@ -392,7 +392,17 @@ defaultPolls.forEach(defaultPoll => {
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
 
-const remuxToMp4 = (filmId: string, inputFilename: string): Promise<void> => {
+export const transcodingTasks: Record<string, { progress: number, etaSeconds: number | null }> = {};
+
+const parseTimeToSeconds = (timeStr: string) => {
+    const parts = timeStr.split(':');
+    if (parts.length === 3) {
+        return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+    }
+    return 0;
+};
+
+const transcodeToMp4 = (filmId: string, inputFilename: string): Promise<void> => {
     return new Promise((resolve) => {
         const inputPath = path.join(UPLOADS_DIR, inputFilename);
         const ext = path.extname(inputFilename);
@@ -400,11 +410,11 @@ const remuxToMp4 = (filmId: string, inputFilename: string): Promise<void> => {
         const outputFilename = `${baseName}.mp4`;
         const outputPath = path.join(UPLOADS_DIR, outputFilename);
 
-        console.log(`[Remux] Tentative de remuxing de "${inputFilename}" vers "${outputFilename}"...`);
+        console.log(`[Transcodage] Tentative de conversion de "${inputFilename}" vers "${outputFilename}"...`);
 
         exec('ffmpeg -version', (err) => {
             if (err) {
-                console.error('[Remux] ffmpeg n\'est pas installé sur ce serveur. Désactivation du remux auto.');
+                console.error('[Transcodage] ffmpeg n\'est pas installé sur ce serveur. Désactivation.');
                 const film = db.films.find((f: any) => f.id === filmId);
                 if (film) {
                     film.status = 'ready'; // fallback de secours
@@ -414,38 +424,69 @@ const remuxToMp4 = (filmId: string, inputFilename: string): Promise<void> => {
                 return;
             }
 
-            // Remux rapide : sélection du premier flux vidéo et audio. Désactivation des sous-titres (non supportés en MP4 par défaut) pour éviter de faire planter ffmpeg.
-            const cmd = `ffmpeg -y -i "${inputPath}" -map 0:v:0 -map 0:a:0? -c copy -movflags +faststart "${outputPath}"`;
-            
-            exec(cmd, (error, stdout, stderr) => {
-                if (error) {
-                    console.error(`[Remux] Échec du remuxing pour ${inputFilename}:`, error);
-                    const film = db.films.find((f: any) => f.id === filmId);
-                    if (film) {
-                        film.status = 'ready'; // On le remet en ready par sécurité pour ne pas bloquer l'accès
-                        saveDb();
-                    }
-                    resolve();
-                    return;
-                }
-                
-                console.log(`[Remux] Succès ! Le fichier ${inputFilename} a été converti en ${outputFilename}`);
-                
-                const film = db.films.find((f: any) => f.id === filmId);
-                if (film) {
-                    film.filename = outputFilename;
-                    film.status = 'ready';
-                    saveDb();
-                    
-                    // Suppression du fichier source pour préserver le disque dur
-                    try {
-                        fs.unlinkSync(inputPath);
-                        console.log(`[Remux] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
-                    } catch (unlinkErr) {
-                        console.error(`[Remux] Impossible de supprimer le original ${inputFilename}:`, unlinkErr);
-                    }
-                }
-                resolve();
+            exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`, (probeErr, stdout) => {
+                 const totalDuration = stdout ? parseFloat(stdout) : 0;
+                 
+                 const args = [
+                     '-y', '-i', inputPath,
+                     '-c:v', 'libx264', '-preset', 'fast',
+                     '-c:a', 'aac',
+                     '-movflags', '+faststart',
+                     outputPath
+                 ];
+
+                 const ffmpegProcess = spawn('ffmpeg', args);
+                 transcodingTasks[filmId] = { progress: 0, etaSeconds: null };
+
+                 ffmpegProcess.stderr.on('data', (data) => {
+                      const output = data.toString();
+                      const timeMatch = output.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/);
+                      
+                      if (timeMatch && totalDuration > 0) {
+                          const currentTime = parseTimeToSeconds(timeMatch[1]);
+                          const progress = Math.min(100, Math.round((currentTime / totalDuration) * 100));
+                          
+                          const speedMatch = output.match(/speed=\s*([\d.]+)x/);
+                          let eta = null;
+                          if (speedMatch) {
+                              const speed = parseFloat(speedMatch[1]);
+                              if (speed > 0) {
+                                  eta = Math.round((totalDuration - currentTime) / speed);
+                              }
+                          }
+                          transcodingTasks[filmId] = { progress, etaSeconds: eta };
+                      }
+                 });
+
+                 ffmpegProcess.on('close', (code) => {
+                     delete transcodingTasks[filmId];
+                     if (code !== 0) {
+                        console.error(`[Transcodage] Échec avec le code ${code} pour ${inputFilename}`);
+                        const film = db.films.find((f: any) => f.id === filmId);
+                        if (film) {
+                            film.status = 'ready';
+                            saveDb();
+                        }
+                        resolve();
+                        return;
+                     }
+                     
+                     console.log(`[Transcodage] Succès ! Le fichier ${inputFilename} a été converti en ${outputFilename}`);
+                     const film = db.films.find((f: any) => f.id === filmId);
+                     if (film) {
+                         film.filename = outputFilename;
+                         film.status = 'ready';
+                         saveDb();
+                         
+                         try {
+                             fs.unlinkSync(inputPath);
+                             console.log(`[Transcodage] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
+                         } catch (unlinkErr) {
+                             console.error(`[Transcodage] Impossible de supprimer l'original ${inputFilename}:`, unlinkErr);
+                         }
+                     }
+                     resolve();
+                 });
             });
         });
     });
@@ -1448,8 +1489,8 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         saveDb();
 
         if (!isMp4) {
-            // Lancement du remux en arrière-plan (non-bloquant)
-            remuxToMp4(film.id, finalFilename).catch(e => console.error(e));
+            // Lancement du transcodage en arrière-plan (non-bloquant)
+            transcodeToMp4(film.id, finalFilename).catch(e => console.error(e));
         }
 
         const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
@@ -1464,14 +1505,18 @@ app.post('/api/films/:id/remux', requireAuth, (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
     
-    // Only remux if it's an MKV and not already MP4
+    // Only transcode if it's an MKV and not already MP4
     if (film.filename && film.filename.toLowerCase().endsWith('.mkv')) {
-        res.json({ success: true, message: 'Remuxing déclenché' });
-        // The remux function doesn't need to block
-        setTimeout(() => remuxToMp4(film.id, film.filename), 100);
+        res.json({ success: true, message: 'Transcodage déclenché' });
+        // The transcode function doesn't need to block
+        setTimeout(() => transcodeToMp4(film.id, film.filename), 100);
     } else {
         res.json({ success: false, message: 'Ce format n\'a pas besoin de conversion ou est déjà en MP4' });
     }
+});
+
+app.get('/api/films/transcoding-status', requireAuth, (req, res) => {
+    res.json(transcodingTasks);
 });
 
 // Distribution Vidéos Static & Proxy Jellyfin

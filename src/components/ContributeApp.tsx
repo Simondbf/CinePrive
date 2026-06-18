@@ -6,7 +6,7 @@ import { UploadCloud, Search, CheckCircle, Database, Server, X } from 'lucide-re
 interface Props {
   activeUser: User;
   films: Film[];
-  onRefresh: () => void;
+  onRefresh: (bg?: boolean) => void;
   mode: 'upload' | 'admin';
   onUploadStateChange?: (isUploading: boolean) => void;
 }
@@ -508,7 +508,7 @@ export default function ContributeApp({ activeUser, films, onRefresh, mode, onUp
 
               if (finRes.ok) {
                   setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'success' } : t));
-                  onRefresh(); // reload global library
+                  onRefresh(true); // reload global library silently without unmounting
               } else {
                   setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'error' } : t));
               }
