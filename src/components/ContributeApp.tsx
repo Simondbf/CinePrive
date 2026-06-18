@@ -602,7 +602,7 @@ export default function ContributeApp({
       try {
         const uploadId =
           Date.now().toString() + Math.random().toString().slice(2);
-        const chunkSize = 10 * 1024 * 1024; // 10MB pour éviter les timeouts Nginx
+        const chunkSize = 2 * 1024 * 1024; // 2MB to strictly comply with payload size limits
         const totalChunks = Math.ceil(task.file.size / chunkSize);
 
         let failed = false;
@@ -614,7 +614,7 @@ export default function ContributeApp({
           const chunk = task.file.slice(start, end);
 
           const formData = new FormData();
-          formData.append("chunk", chunk);
+          formData.append("chunk", chunk, task.file.name);
           formData.append("uploadId", uploadId);
 
           const res = await fetch("/api/films/upload-chunk", {
@@ -623,6 +623,7 @@ export default function ContributeApp({
           });
 
           if (!res.ok) {
+            console.error(`[Upload] Erreur HTTP ${res.status} sur le chunk ${i+1}/${totalChunks}`);
             failed = true;
             break;
           }
@@ -664,11 +665,13 @@ export default function ContributeApp({
           );
           onRefresh(true); // reload global library silently without unmounting
         } else {
+          console.error(`[Upload] Erreur à la finalisation: HTTP ${finRes.status}`);
           setTasks((prev) =>
             prev.map((t) => (t.id === task.id ? { ...t, status: "error" } : t)),
           );
         }
       } catch (err) {
+        console.error(`[Upload] Exception catchée lors de l'envoi du fichier ${task.file.name}:`, err);
         setTasks((prev) =>
           prev.map((t) => (t.id === task.id ? { ...t, status: "error" } : t)),
         );

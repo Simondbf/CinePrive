@@ -410,11 +410,11 @@ const connection = new IORedis({
     maxRetriesPerRequest: null,
 });
 
-export const transcodeQueue = new Queue('transcode', { connection });
-const transcodeEvents = new QueueEvents('transcode', { connection });
+export const transcodeQueue = new Queue('transcode', { connection: connection as any });
+const transcodeEvents = new QueueEvents('transcode', { connection: connection as any });
 
 transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
-    const { filmId, newFilename } = returnvalue;
+    const { filmId, newFilename } = returnvalue as any;
     const film = db.films.find((f: any) => f.id === filmId);
     if (film) {
         film.filename = newFilename;

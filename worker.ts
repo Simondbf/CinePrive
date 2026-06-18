@@ -116,7 +116,7 @@ const worker = new Worker('transcode', async (job) => {
     }
 
     return { filmId, newFilename: outputFilename };
-}, { connection });
+}, { connection: connection as any });
 
 worker.on('failed', (job, err) => {
     console.error(`[Worker] Le job ${job?.id} a échoué:`, err);
