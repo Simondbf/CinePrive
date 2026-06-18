@@ -247,11 +247,27 @@ function verifySecurityCode(userId: string, code: string, operation: string, tar
     return { valid: false, error: "Code de sécurité incorrect." };
 }
 
+const requestCodeAttempts: Record<string, { count: number, lockedUntil: number }> = {};
+
 app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
     const { operation, targetId, label } = req.body;
     if (!operation || !targetId) {
         return res.status(400).json({ error: "Paramètres manquants." });
     }
+
+    const userId = req.user.id;
+    let attempts = requestCodeAttempts[userId] || { count: 0, lockedUntil: 0 };
+    if (attempts.lockedUntil > Date.now()) {
+        const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+        return res.status(429).json({ error: `Trop de requêtes. Veuillez patienter ${remaining}s.` });
+    }
+
+    attempts.count++;
+    if (attempts.count >= 3) {
+        attempts.lockedUntil = Date.now() + 2 * 60 * 1000; // 2 min lockout after 3 requests
+        attempts.count = 0;
+    }
+    requestCodeAttempts[userId] = attempts;
     
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     verificationCodes[req.user.id] = {
