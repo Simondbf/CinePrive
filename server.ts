@@ -15,8 +15,8 @@ import nodemailer from 'nodemailer';
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '1000mb' }));
-app.use(express.urlencoded({ limit: '1000mb', extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(cookieParser());
 
 app.use('/api', (req, res, next) => {
@@ -194,31 +194,55 @@ async function sendNewPatronSecurityCodeEmail(email: string, name: string, code:
     }
 }
 
+import crypto from 'crypto';
+
+const securityAttempts: Record<string, { count: number, lockedUntil: number }> = {};
+
+function timingSafeCompare(a: string, b: string) {
+    const aBuf = Buffer.from(a);
+    const bBuf = Buffer.from(b);
+    if (aBuf.length !== bBuf.length) return false;
+    return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
 function verifySecurityCode(userId: string, code: string, operation: string, targetId: string): { valid: boolean, error?: string } {
-    // Si un Code Maître (Master Code) global est défini dans l'environnement et correspond, l'action est validée directement !
+    let attempts = securityAttempts[userId] || { count: 0, lockedUntil: 0 };
+    if (attempts.lockedUntil > Date.now()) {
+        const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+        return { valid: false, error: `Trop de tentatives. Veuillez patienter ${remaining}s.` };
+    }
+
     const masterCode = process.env.SECURITY_MASTER_CODE;
-    if (masterCode && code === masterCode) {
+    if (masterCode && timingSafeCompare(code, masterCode)) {
+        delete securityAttempts[userId];
         return { valid: true };
     }
 
-    // Vérification d'un code dynamique envoyé sur Discord/E-mail (verificationCodes)
     const record = verificationCodes[userId];
     if (record) {
-        if (record.code === code) {
+        if (timingSafeCompare(code, record.code)) {
             if (Date.now() > record.expires) {
                 delete verificationCodes[userId];
-                return { valid: false, error: "Le code reçu sur Discord/E-mail a expiré après 5 minutes." };
+                return { valid: false, error: "Le code a expiré après 5 minutes." };
             }
             delete verificationCodes[userId];
+            delete securityAttempts[userId];
             return { valid: true };
         }
     }
 
-    // Validation par le code persistant en base de données (statique)
-    const patronCode = db.settings?.securityCode || '000000';
-    if (code === patronCode) {
+    const patronCode = db.settings?.securityCode;
+    if (patronCode && timingSafeCompare(code, patronCode)) {
+        delete securityAttempts[userId];
         return { valid: true };
     }
+
+    attempts.count++;
+    if (attempts.count >= 5) {
+        attempts.lockedUntil = Date.now() + 5 * 60 * 1000; // 5 min lockout
+        attempts.count = 0;
+    }
+    securityAttempts[userId] = attempts;
 
     return { valid: false, error: "Code de sécurité incorrect." };
 }
@@ -317,22 +341,15 @@ if (!db.users) db.users = [];
 if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
-if (!db.settings.securityCode) db.settings.securityCode = "123456";
+if (!db.settings.securityCode) db.settings.securityCode = Math.floor(100000 + Math.random() * 900000).toString();
 
 // Sécurisation automatique de JWT_SECRET en production si non spécifié (évite crash de prod 502)
-if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
+if (process.env.NODE_ENV !== 'development' && JWT_SECRET === 'cineprive_super_secret_dev_key') {
     if (db.settings.jwtSecret) {
         JWT_SECRET = db.settings.jwtSecret;
         console.log('[Sécurité] JWT_SECRET chargé depuis le fichier de configuration persistent.');
     } else {
-        JWT_SECRET = uuidv4() + '-' + uuidv4();
-        db.settings.jwtSecret = JWT_SECRET;
-        try {
-            fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
-            console.log('[Sécurité] JWT_SECRET généré et persisté avec succès dans le fichier de configuration.');
-        } catch (e) {
-            console.error('[Sécurité] Impossible de persister le JWT_SECRET généré :', e);
-        }
+        throw new Error("ERREUR CRITIQUE: Démarrage refusé. Aucun JWT_SECRET n'est défini en environnement de production.");
     }
 }
 if (!db.invites) db.invites = [];
@@ -398,6 +415,15 @@ defaultPolls.forEach(defaultPoll => {
 
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
 
+let saveDbTimeout: NodeJS.Timeout | null = null;
+const debouncedSaveDb = () => {
+    if (saveDbTimeout) clearTimeout(saveDbTimeout);
+    saveDbTimeout = setTimeout(() => {
+        saveDb();
+        saveDbTimeout = null;
+    }, 5000); // 5 sec debounce
+};
+
 import { Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 
@@ -431,7 +457,7 @@ transcodeEvents.on('failed', async ({ jobId, failedReason }) => {
         if (job && job.data.filmId) {
             const film = db.films.find((f: any) => f.id === job.data.filmId);
             if (film) {
-                film.status = 'ready'; // On le remet ready pour permettre la lecture "brute"
+                film.status = 'error';
                 saveDb();
             }
         }
@@ -672,8 +698,7 @@ app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) =
 app.post('/api/register', async (req, res) => {
     const { username, password, email, name, inviteCode } = req.body;
     
-    // TEMPORARY BYPASS: Force allow registration for admin creation
-    let bypassWithCode = true;
+    let bypassWithCode = false;
     if (inviteCode && db.invites) {
         const inviteIndex = db.invites.findIndex((i: any) => i.code.toLowerCase() === inviteCode.toLowerCase() && !i.used);
         if (inviteIndex >= 0) {
@@ -741,12 +766,23 @@ app.post('/api/register', async (req, res) => {
     res.json({ ...newUser, password: '' });
 });
 
+const loginAttempts: Record<string, { count: number, lockedUntil: number }> = {};
+
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
+    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    const lockKey = `${(username || '').toLowerCase()}_${ip}`;
+    
+    let attempts = loginAttempts[lockKey] || { count: 0, lockedUntil: 0 };
+    if (attempts.lockedUntil > Date.now()) {
+        const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+        return res.status(429).json({ error: `Trop de tentatives. Veuillez patienter ${remaining}s.` });
+    }
+
     const user = db.users.find((u: any) => 
         (
-            (u.username || '').toLowerCase() === username.toLowerCase() || 
-            (u.email || '').toLowerCase() === username.toLowerCase()
+            (u.username || '').toLowerCase() === (username || '').toLowerCase() || 
+            (u.email || '').toLowerCase() === (username || '').toLowerCase()
         )
     );
     
@@ -763,6 +799,7 @@ app.post('/api/login', async (req, res) => {
         }
 
         if (passwordMatch) {
+            delete loginAttempts[lockKey];
             if (user.status === 'pending') {
                 return res.status(403).json({ error: "Votre compte est en attente d'approbation par le Patron." });
             }
@@ -775,6 +812,13 @@ app.post('/api/login', async (req, res) => {
         }
     }
     
+    attempts.count++;
+    if (attempts.count >= 5) {
+        attempts.lockedUntil = Date.now() + 5 * 60 * 1000;
+        attempts.count = 0;
+    }
+    loginAttempts[lockKey] = attempts;
+
     res.status(401).json({ error: 'Identifiants incorrects' });
 });
 
@@ -851,6 +895,14 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner', 'admin']), (req:
     const targetUser = db.users.find((u: any) => u.id === id);
     if (!targetUser) {
         return res.status(404).json({ error: "Utilisateur non trouvé" });
+    }
+    
+    if (targetUser.role === 'owner') {
+        return res.status(403).json({ error: "Impossible de modifier le compte Patron." });
+    }
+    
+    if (targetUser.id === req.user.id) {
+        return res.status(403).json({ error: "Vous ne pouvez pas effectuer cette action sur vous-même." });
     }
 
     // Un simple admin fait une suspension temporaire en attente du Patron
@@ -1084,15 +1136,15 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
 });
 
 // Progression de lecture
-app.post('/api/progress', requireAuth, (req, res) => {
-    const { userId, filmId, time } = req.body;
-    db.progress[`${userId}_${filmId}`] = time;
-    saveDb();
+app.post('/api/progress', requireAuth, (req: any, res) => {
+    const { filmId, time } = req.body;
+    db.progress[`${req.user.id}_${filmId}`] = time;
+    debouncedSaveDb();
     res.json({ success: true });
 });
 
-app.get('/api/progress/:userId/:filmId', requireAuth, (req, res) => {
-    const time = db.progress[`${req.params.userId}_${req.params.filmId}`] || 0;
+app.get('/api/progress/:filmId', requireAuth, (req: any, res) => {
+    const time = db.progress[`${req.user.id}_${req.params.filmId}`] || 0;
     res.json({ time });
 });
 
@@ -1145,8 +1197,8 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
 app.get('/api/notifications', requireAuth, requireRole(['owner']), (req, res) => {
     res.json(db.notifications || []);
 });
-app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
-    const { userId } = req.body;
+app.post('/api/notifications/:id/read', requireAuth, (req: any, res) => {
+    const userId = req.user.id;
     if (!db.notifications) db.notifications = [];
     const notif = db.notifications.find((n: any) => n.id === req.params.id);
     if (notif && !notif.readBy.includes(userId)) {
@@ -1155,8 +1207,8 @@ app.post('/api/notifications/:id/read', requireAuth, (req, res) => {
     }
     res.json({ success: true });
 });
-app.post('/api/notifications/read-all', requireAuth, (req, res) => {
-    const { userId } = req.body;
+app.post('/api/notifications/read-all', requireAuth, (req: any, res) => {
+    const userId = req.user.id;
     if (!db.notifications) db.notifications = [];
     db.notifications.forEach((n: any) => {
         if (!n.readBy.includes(userId)) {
@@ -1207,7 +1259,7 @@ app.post('/api/bugs', requireAuth, async (req: any, res) => {
 });
 
 // Recherche TMDB
-app.get('/api/tmdb/search', async (req, res) => {
+app.get('/api/tmdb/search', requireAuth, async (req, res) => {
     const query = req.query.query as string;
     const apiKey = process.env.TMDB_API_KEY;
     
@@ -1226,93 +1278,6 @@ app.get('/api/tmdb/search', async (req, res) => {
     } catch (err: any) {
         console.error("Erreur TMDB:", err);
         res.status(500).json({ error: 'Échec de la recherche TMDB', details: err.message });
-    }
-});
-
-// Upload Video Local
-app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: any, res) => {
-    const file = req.file;
-    const body = req.body;
-
-    if (!file) return res.status(400).json({ error: 'Aucun fichier vidéo fourni' });
-
-    try {
-        const metadata = JSON.parse(body.metadata || '{}');
-        const genreIds = metadata.genre_ids || [];
-        const mainGenre = genreIds.length > 0 ? (TMDB_GENRES[genreIds[0]] || 'Autre') : 'Autre';
-
-        let castData: any[] = [];
-        let directorData = 'Vérifié par TMDB';
-
-        if (metadata.id && process.env.TMDB_API_KEY) {
-            try {
-                const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${metadata.id}?api_key=${process.env.TMDB_API_KEY}&language=fr-FR&append_to_response=credits`);
-                const fullMeta = await creditsRes.json();
-                
-                if (fullMeta.credits && fullMeta.credits.cast) {
-                    castData = fullMeta.credits.cast.slice(0, 10).map((c: any) => ({
-                        name: c.name,
-                        character: c.character,
-                        profilePath: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null
-                    }));
-                }
-                if (fullMeta.credits && fullMeta.credits.crew) {
-                    const dir = fullMeta.credits.crew.find((c: any) => c.job === 'Director');
-                    if (dir) directorData = dir.name;
-                }
-            } catch (err) {
-                console.error("TMDB Credits fetch error", err);
-            }
-        }
-
-        const film = {
-            id: uuidv4(),
-            tmdbId: metadata.id,
-            title: metadata.title || 'Inconnu',
-            synopsis: metadata.overview || '',
-            year: metadata.release_date ? parseInt(metadata.release_date.split('-')[0]) : new Date().getFullYear(),
-            genre: mainGenre,
-            director: directorData,
-            cast: castData,
-            duration: '~120m',
-            posterUrl: metadata.poster_path ? `https://image.tmdb.org/t/p/w500${metadata.poster_path}` : undefined,
-            addedBy: body.user || 'Unknown',
-            addedAt: new Date().toISOString(),
-            filename: file.filename,
-            originalName: file.originalname,
-            status: 'ready'
-        };
-
-        db.films.push(film);
-        
-        // Notifications
-        if (!db.notifications) db.notifications = [];
-        const notifMessage = `🎬 Nouveau film ajouté : ${film.title}`;
-        db.notifications.push({
-            id: uuidv4(),
-            type: 'upload',
-            message: notifMessage,
-            createdAt: new Date().toISOString(),
-            readBy: []
-        });
-
-        // Webhook Discord
-        if (db.settings && db.settings.webhookUrl) {
-            try {
-                fetch(db.settings.webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: notifMessage })
-                }).catch(e => console.error("Discord webhook failed", e));
-            } catch (e) {}
-        }
-        
-        saveDb();
-
-        res.json({ success: true, film });
-    } catch (e) {
-        console.error("Upload error", e);
-        res.status(500).json({ error: 'Internal upload error' });
     }
 });
 

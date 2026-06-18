@@ -1,7 +1,7 @@
 import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import path from 'path';
-import { spawn, exec } from 'child_process';
+import { spawn, exec, execFile } from 'child_process';
 import fs from 'fs';
 
 const connection = new IORedis({
@@ -43,13 +43,13 @@ const worker = new Worker('transcode', async (job) => {
     });
 
     const totalDuration = await new Promise<number>((resolve) => {
-        exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`, (err, stdout) => {
+        execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
             resolve(stdout ? parseFloat(stdout) : 0);
         });
     });
 
     const videoCodecStr = await new Promise<string>((resolve) => {
-        exec(`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`, (err, stdout) => {
+        execFile('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
              resolve((stdout || '').trim());
         });
     });
@@ -93,6 +93,10 @@ const worker = new Worker('transcode', async (job) => {
                 }
                 await job.updateProgress({ progress, etaSeconds: eta });
             }
+        });
+
+        ffmpegProcess.on('error', (err) => {
+            reject(err);
         });
 
         ffmpegProcess.on('close', (code) => {
