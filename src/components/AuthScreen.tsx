@@ -116,7 +116,7 @@ export default function AuthScreen({ onLogin }: Props) {
 
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-xl shadow-xl">
                   <h2 className="text-2xl font-semibold mb-6 flex flex-col gap-1 text-center">
-                    {isForgotPassword ? 'Mot de passe oublié' : (isLogin ? 'Connexion' : 'Créer un compte privé')}
+                    {isForgotPassword ? 'Mot de passe oublié' : (isLogin ? 'Connexion' : 'Créer un compte')}
                   </h2>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
@@ -231,11 +231,6 @@ export default function AuthScreen({ onLogin }: Props) {
                           </>
                       )}
                   </div>
-                  {!isLogin && !isForgotPassword && (
-                      <p className="mt-4 text-xs text-zinc-500 text-center">
-                          Note : L'activation de compte est soumise à l'approbation de l'administrateur.
-                      </p>
-                  )}
               </div>
           </div>
       </div>
