@@ -48,10 +48,25 @@ const worker = new Worker('transcode', async (job) => {
         });
     });
 
+    const videoCodecStr = await new Promise<string>((resolve) => {
+        exec(`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`, (err, stdout) => {
+             resolve((stdout || '').trim());
+        });
+    });
+
+    const isH264 = videoCodecStr.toLowerCase() === 'h264';
+    console.log(`[Worker] Analyse : codec vidéo = ${videoCodecStr}. Remuxing rapide : ${isH264 ? 'OUI' : 'NON'}`);
+
     await new Promise((resolve, reject) => {
-        const args = [
+        const args = isH264 ? [
             '-y', '-i', inputPath,
-            '-threads', '1',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-movflags', '+faststart',
+            outputPath
+        ] : [
+            '-y', '-i', inputPath,
+            '-threads', '2',
             '-c:v', 'libx264', '-preset', 'fast',
             '-c:a', 'aac',
             '-movflags', '+faststart',
