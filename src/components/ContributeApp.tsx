@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { notify } from "../lib/notify";
 import { Film, User } from "../types";
 import {
@@ -457,6 +457,7 @@ export default function ContributeApp({
   }
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
+  const isUploadingRef = useRef(false);
 
   useEffect(() => {
     if (onUploadStateChange) {
@@ -574,15 +575,19 @@ export default function ContributeApp({
       }
     }
     setTasks([]);
+    isUploadingRef.current = false;
     setIsUploadingGlobal(false);
   };
 
   const submitUploadQueue = async () => {
+    if (isUploadingRef.current) return;
+
     const pendingTasks = tasks.filter(
       (t) => t.status === "waiting" && t.selectedMeta,
     );
     if (pendingTasks.length === 0) return;
 
+    isUploadingRef.current = true;
     setIsUploadingGlobal(true);
 
     for (const task of pendingTasks) {
@@ -670,6 +675,7 @@ export default function ContributeApp({
       }
     }
 
+    isUploadingRef.current = false;
     setIsUploadingGlobal(false);
   };
 

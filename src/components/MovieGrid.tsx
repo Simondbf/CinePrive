@@ -42,7 +42,12 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 <div 
                     onClick={() => {
                         if (film.status === 'transcoding') {
-                            notify("Ce film est actuellement en cours de préparation (remux rapide) sur le serveur pour être lisible sur tous vos écrans. Ce processus prend généralement moins d'une minute !", "Traitement en cours");
+                            const status = transcodingStatuses?.[film.id];
+                            let extraText = "Ce processus intensif s'exécute en tâche de fond et peut prendre de plusieurs dizaines de minutes à plus d'une heure.";
+                            if (status && status.etaSeconds !== null && status.etaSeconds !== undefined) {
+                                extraText = `Temps estimé restant : environ ${Math.ceil(status.etaSeconds / 60)} minute(s).`;
+                            }
+                            notify(`Le film est en cours d'optimisation pour le web. ${extraText}`, "Traitement en cours");
                         } else {
                             onPlay(film);
                         }
