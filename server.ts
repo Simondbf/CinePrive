@@ -18,6 +18,11 @@ const PORT = 3000;
 app.use(express.json());
 app.use(cookieParser());
 
+app.use('/api', (req, res, next) => {
+    console.log(`[HTTP] ${req.method} ${req.url}`);
+    next();
+});
+
 let JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
 
 const requireAuth = (req: any, res: any, next: any) => {
@@ -402,9 +407,11 @@ const processTranscodeQueue = async () => {
     const task = transcodeQueue.shift();
     if (task) {
         try {
+            console.log(`[Transcodage] DÉMARRAGE de FFmpeg pour le film ID: ${task.filmId}...`);
             await transcodeToMp4(task.filmId, task.inputFilename);
+            console.log(`[Transcodage] SUCCÈS pour le film ID: ${task.filmId}`);
         } catch (e) {
-            console.error("[Transcodage] Erreur dans la file", e);
+            console.error("[Transcodage] ERREUR FATALE dans la file pour le film ID:", task.filmId, e);
         }
     }
     isTranscoding = false;
@@ -452,7 +459,7 @@ const transcodeToMp4 = (filmId: string, inputFilename: string): Promise<void> =>
                  
                  const args = [
                      '-y', '-i', inputPath,
-                     '-threads', '2',
+                     '-threads', '1',
                      '-c:v', 'libx264', '-preset', 'fast',
                      '-c:a', 'aac',
                      '-movflags', '+faststart',
@@ -1394,19 +1401,28 @@ app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (
     const { uploadId } = req.body;
     const chunkFile = req.file;
 
-    if (!uploadId || !chunkFile) return res.status(400).json({ error: 'Données manquantes' });
+    console.log(`[Upload] Réception d'un chunk pour l'upload ${uploadId}...`);
+
+    if (!uploadId || !chunkFile) {
+        console.error(`[Upload] Données manquantes pour le chunk de ${uploadId}`);
+        return res.status(400).json({ error: 'Données manquantes' });
+    }
 
     const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
-    if (!safeUploadId) return res.status(400).json({ error: 'ID invalide' });
+    if (!safeUploadId) {
+        console.error(`[Upload] ID invalide : ${uploadId}`);
+        return res.status(400).json({ error: 'ID invalide' });
+    }
 
     const targetPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}`);
 
     try {
         fs.appendFileSync(targetPath, fs.readFileSync(chunkFile.path));
         fs.unlinkSync(chunkFile.path);
+        console.log(`[Upload] Chunk sauvegardé et ajouté à ${targetPath}`);
         res.json({ success: true });
     } catch (e) {
-        console.error("Erreur de chunk:", e);
+        console.error("[Upload] Erreur de chunk:", e);
         res.status(500).json({ error: 'Erreur écriture chunk' });
     }
 });
@@ -1415,13 +1431,18 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     const body = req.body;
     const { uploadId, filename, originalName } = body;
 
+    console.log(`[Upload] Requête finalize reçue pour uploadId: ${uploadId}`);
+
     // Use multer upload instead to accept multipart if we send it that way? We sent it via express.json? Wait!
     // No, multipart/form-data requires multer. Let's use upload.none() for the finalize endpoint if formData is used. 
     // Or we just send it as application/json from the client! (JSON is easier).
     // The previous request used formData. Let's check how I am planning to send finalize.
     // Client can do: fetch(..., { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({...}) })
     
-    if (!uploadId || !filename) return res.status(400).json({ error: 'Données manquantes' });
+    if (!uploadId || !filename) {
+        console.error(`[Upload] Échec finalize: données manquantes pour ${uploadId}`);
+        return res.status(400).json({ error: 'Données manquantes' });
+    }
 
     const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
     if (!safeUploadId) return res.status(400).json({ error: 'ID invalide' });
@@ -1431,10 +1452,14 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     const tempPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}`);
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
+    console.log(`[Upload] Construction du fichier final: ${finalPath}`);
+
     try {
         if (fs.existsSync(tempPath)) {
             fs.renameSync(tempPath, finalPath);
+            console.log(`[Upload] Fichier final généré avec succès: ${finalFilename}`);
         } else {
+             console.error(`[Upload] Fichier temporaire introuvable: ${tempPath}`);
             return res.status(400).json({ error: 'Fichier temporaire introuvable' });
         }
 
