@@ -842,10 +842,13 @@ export default function ContributeApp({
                               </div>
                               {task.etaSeconds !== null &&
                                 task.etaSeconds !== undefined && (
-                                  <span className="text-[10px] text-zinc-500 text-right">
-                                    ETA : {Math.floor(task.etaSeconds / 60)}m{" "}
-                                    {task.etaSeconds % 60}s
-                                  </span>
+                                  <div className="flex justify-between items-center bg-zinc-900/50 rounded px-2 py-1.5 mt-1 border border-zinc-800">
+                                    <span className="text-zinc-500 font-normal">Temps estimé restant</span>
+                                    <span className="text-zinc-300">
+                                      {Math.floor(task.etaSeconds / 60)}m{" "}
+                                      {task.etaSeconds % 60}s
+                                    </span>
+                                  </div>
                                 )}
                             </div>
                           )}

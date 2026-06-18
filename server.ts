@@ -393,6 +393,29 @@ defaultPolls.forEach(defaultPoll => {
 const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
 
 export const transcodingTasks: Record<string, { progress: number, etaSeconds: number | null }> = {};
+const transcodeQueue: {filmId: string, inputFilename: string}[] = [];
+let isTranscoding = false;
+
+const processTranscodeQueue = async () => {
+    if (isTranscoding || transcodeQueue.length === 0) return;
+    isTranscoding = true;
+    const task = transcodeQueue.shift();
+    if (task) {
+        try {
+            await transcodeToMp4(task.filmId, task.inputFilename);
+        } catch (e) {
+            console.error("[Transcodage] Erreur dans la file", e);
+        }
+    }
+    isTranscoding = false;
+    processTranscodeQueue();
+};
+
+export const enqueueTranscode = (filmId: string, inputFilename: string) => {
+    transcodeQueue.push({filmId, inputFilename});
+    console.log(`[Transcodage] Film ajouté à la file d'attente. (${transcodeQueue.length} en attente)`);
+    processTranscodeQueue();
+};
 
 const parseTimeToSeconds = (timeStr: string) => {
     const parts = timeStr.split(':');
@@ -429,6 +452,7 @@ const transcodeToMp4 = (filmId: string, inputFilename: string): Promise<void> =>
                  
                  const args = [
                      '-y', '-i', inputPath,
+                     '-threads', '2',
                      '-c:v', 'libx264', '-preset', 'fast',
                      '-c:a', 'aac',
                      '-movflags', '+faststart',
@@ -1336,7 +1360,7 @@ app.post('/api/films/upload', requireAuth, upload.single('video'), async (req: a
         
         // Notifications
         if (!db.notifications) db.notifications = [];
-        const notifMessage = `🎬 Nouveau film ajouté par ${req.user.username} : ${film.title}`;
+        const notifMessage = `🎬 Nouveau film ajouté : ${film.title}`;
         db.notifications.push({
             id: uuidv4(),
             type: 'upload',
@@ -1466,7 +1490,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         
         // Notifications
         if (!db.notifications) db.notifications = [];
-        const notifMessage = `🎬 Nouveau film ajouté par ${req.user.username} : ${film.title}`;
+        const notifMessage = `🎬 Nouveau film ajouté : ${film.title}`;
         db.notifications.push({
             id: uuidv4(),
             type: 'upload',
@@ -1489,8 +1513,8 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         saveDb();
 
         if (!isMp4) {
-            // Lancement du transcodage en arrière-plan (non-bloquant)
-            transcodeToMp4(film.id, finalFilename).catch(e => console.error(e));
+            // Ajout à la file d'attente
+            enqueueTranscode(film.id, finalFilename);
         }
 
         const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
@@ -1507,9 +1531,9 @@ app.post('/api/films/:id/remux', requireAuth, (req: any, res) => {
     
     // Only transcode if it's an MKV and not already MP4
     if (film.filename && film.filename.toLowerCase().endsWith('.mkv')) {
-        res.json({ success: true, message: 'Transcodage déclenché' });
-        // The transcode function doesn't need to block
-        setTimeout(() => transcodeToMp4(film.id, film.filename), 100);
+        res.json({ success: true, message: 'Fichier ajouté à la file de transcodage' });
+        // Enqueue the task
+        enqueueTranscode(film.id, film.filename);
     } else {
         res.json({ success: false, message: 'Ce format n\'a pas besoin de conversion ou est déjà en MP4' });
     }
