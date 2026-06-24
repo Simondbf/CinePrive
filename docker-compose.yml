@@ -12,7 +12,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
-      - ./data:/app/data
+      - /mnt/cineprive_stockage:/app/data
     depends_on:
       - redis
 
@@ -27,7 +27,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
-      - ./data:/app/data
+      - /mnt/cineprive_stockage:/app/data
     depends_on:
       - redis
 
