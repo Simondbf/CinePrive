@@ -8,6 +8,7 @@ import {
   Database,
   Server,
   X,
+  RefreshCw,
 } from "lucide-react";
 
 interface Props {
@@ -579,108 +580,113 @@ export default function ContributeApp({
     setIsUploadingGlobal(false);
   };
 
-  const submitUploadQueue = async () => {
+  const processUploadQueue = async () => {
     if (isUploadingRef.current) return;
 
-    const pendingTasks = tasks.filter(
-      (t) => t.status === "waiting" && t.selectedMeta,
+    const nextTask = tasks.find(
+      (t) => t.status === "waiting" && t.selectedMeta
     );
-    if (pendingTasks.length === 0) return;
+    if (!nextTask) return; // Plus rien à uploader
 
     isUploadingRef.current = true;
     setIsUploadingGlobal(true);
 
-    for (const task of pendingTasks) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === task.id
-            ? { ...t, status: "uploading", progress: 0, etaSeconds: null }
-            : t,
-        ),
-      );
+    const task = nextTask;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id
+          ? { ...t, status: "uploading", progress: 0, etaSeconds: null }
+          : t,
+      ),
+    );
 
-      try {
-        const uploadId =
-          Date.now().toString() + Math.random().toString().slice(2);
-        const chunkSize = 2 * 1024 * 1024; // 2MB to strictly comply with payload size limits
-        const totalChunks = Math.ceil(task.file.size / chunkSize);
+    try {
+      const uploadId = Date.now().toString() + Math.random().toString().slice(2);
+      const chunkSize = 2 * 1024 * 1024;
+      const totalChunks = Math.ceil(task.file.size / chunkSize);
+      let failed = false;
+      const startTime = Date.now();
 
-        let failed = false;
-        const startTime = Date.now();
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, task.file.size);
+        const chunk = task.file.slice(start, end);
 
-        for (let i = 0; i < totalChunks; i++) {
-          const start = i * chunkSize;
-          const end = Math.min(start + chunkSize, task.file.size);
-          const chunk = task.file.slice(start, end);
+        const formData = new FormData();
+        formData.append("chunk", chunk, task.file.name);
+        formData.append("uploadId", uploadId);
 
-          const formData = new FormData();
-          formData.append("chunk", chunk, task.file.name);
-          formData.append("uploadId", uploadId);
-
-          const res = await fetch("/api/films/upload-chunk", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!res.ok) {
-            console.error(`[Upload] Erreur HTTP ${res.status} sur le chunk ${i+1}/${totalChunks}`);
-            failed = true;
-            break;
-          }
-
-          const progress = Math.round(((i + 1) / totalChunks) * 100);
-          const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
-          let eta = null;
-          if (progress > 0 && progress < 100) {
-            const estimatedTotal = elapsedTime / (progress / 100);
-            eta = Math.round(estimatedTotal - elapsedTime);
-          }
-
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === task.id ? { ...t, progress, etaSeconds: eta } : t,
-            ),
-          );
-        }
-
-        if (failed) throw new Error("Chunk upload failed");
-
-        const finRes = await fetch("/api/films/upload-finalize", {
+        const res = await fetch("/api/films/upload-chunk", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uploadId,
-            filename: task.file.name,
-            originalName: task.file.name,
-            metadata: task.selectedMeta,
-            user: activeUser.id,
-          }),
+          body: formData,
         });
 
-        if (finRes.ok) {
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === task.id ? { ...t, status: "success" } : t,
-            ),
-          );
-          onRefresh(true); // reload global library silently without unmounting
-        } else {
-          console.error(`[Upload] Erreur à la finalisation: HTTP ${finRes.status}`);
-          setTasks((prev) =>
-            prev.map((t) => (t.id === task.id ? { ...t, status: "error" } : t)),
-          );
+        if (!res.ok) {
+          failed = true;
+          break;
         }
-      } catch (err) {
-        console.error(`[Upload] Exception catchée lors de l'envoi du fichier ${task.file.name}:`, err);
+
+        const progress = Math.round(((i + 1) / totalChunks) * 100);
+        const elapsedTime = (Date.now() - startTime) / 1000;
+        let eta = null;
+        if (progress > 0 && progress < 100) {
+          const estimatedTotal = elapsedTime / (progress / 100);
+          eta = Math.round(estimatedTotal - elapsedTime);
+        }
+
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? { ...t, progress, etaSeconds: eta } : t,
+          ),
+        );
+      }
+
+      if (failed) throw new Error("Chunk upload failed");
+
+      const finRes = await fetch("/api/films/upload-finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploadId,
+          filename: task.file.name,
+          originalName: task.file.name,
+          metadata: task.selectedMeta,
+          user: activeUser.id,
+        }),
+      });
+
+      if (finRes.ok) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? { ...t, status: "success" } : t,
+          ),
+        );
+        onRefresh(true);
+        notify(
+          "Les projectionnistes préparent les bobines pour le web. Ce processus d'optimisation intensif s'exécute en tâche de fond et peut prendre plusieurs dizaines de minutes.",
+          "🎬 En salle de montage..."
+        );
+      } else {
         setTasks((prev) =>
           prev.map((t) => (t.id === task.id ? { ...t, status: "error" } : t)),
         );
       }
+    } catch (err) {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, status: "error" } : t)),
+      );
     }
 
     isUploadingRef.current = false;
     setIsUploadingGlobal(false);
   };
+
+  useEffect(() => {
+    // Si aucun upload n'est en cours, on tente de lancer le suivant
+    if (!isUploadingGlobal) {
+      processUploadQueue();
+    }
+  }, [tasks, isUploadingGlobal]);
 
   const AdminPanelNav = () => (
     <div className="flex flex-wrap gap-2 border-b border-zinc-200 dark:border-zinc-800 mb-8 pb-4">
@@ -729,6 +735,163 @@ export default function ContributeApp({
           </button>
         </>
       )}
+    </div>
+  );
+
+  const renderTask = (task: UploadTask) => (
+    <div key={task.id} className="p-4 flex flex-col md:flex-row gap-4">
+      <div className="md:w-1/3 flex flex-col gap-1">
+        <div className="flex items-start justify-between">
+          <p
+            className="font-medium text-sm text-white line-clamp-1 flex-1"
+            title={task.file.name}
+          >
+            {task.file.name}
+          </p>
+          {task.status === "waiting" && (
+            <button
+              onClick={() => removeTask(task.id)}
+              className="text-zinc-600 hover:text-red-500 transition ml-2"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-zinc-500">
+          {(task.file.size / (1024 * 1024)).toFixed(0)} Mo
+        </p>
+
+        {task.status === "uploading" && (
+          <div className="mt-2 text-xs font-medium text-blue-400 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${task.progress}%` }}
+                />
+              </div>
+              {task.progress}%
+            </div>
+            {task.etaSeconds !== null && task.etaSeconds !== undefined && (
+              <div className="flex justify-between items-center bg-zinc-900/50 rounded px-2 py-1.5 mt-1 border border-zinc-800">
+                <span className="text-zinc-500 font-normal">
+                  Temps estimé restant
+                </span>
+                <span className="text-zinc-300">
+                  {Math.floor(task.etaSeconds / 60)}m {task.etaSeconds % 60}s
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+        {task.status === "success" && (
+          <p className="text-xs text-green-500 mt-2 flex items-center gap-1">
+            <CheckCircle className="w-3 h-3" /> Envoyé avec succès
+          </p>
+        )}
+        {task.status === "error" && (
+          <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+            <X className="w-3 h-3" /> Erreur lors de l'envoi
+          </p>
+        )}
+      </div>
+
+      <div className="md:w-2/3">
+        {task.status === "waiting" && !task.selectedMeta ? (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={task.tmdbQuery}
+                onChange={(e) =>
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.id === task.id ? { ...t, tmdbQuery: e.target.value } : t,
+                    ),
+                  )
+                }
+                onKeyDown={(e) =>
+                  e.key === "Enter" && searchTMDBForTask(task.id, task.tmdbQuery)
+                }
+                className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-500"
+                placeholder="Rechercher un autre titre..."
+              />
+              <button
+                onClick={() => searchTMDBForTask(task.id, task.tmdbQuery)}
+                className="px-3 bg-zinc-800 rounded text-xs font-medium text-white hover:bg-zinc-700 transition"
+              >
+                Rechercher
+              </button>
+            </div>
+
+            {task.isSearching ? (
+              <p className="text-xs text-zinc-500">Recherche TMDB en cours...</p>
+            ) : task.tmdbResults.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                {task.tmdbResults.map((res: any) => (
+                  <div
+                    key={res.id}
+                    onClick={() => updateTaskMeta(task.id, res)}
+                    className="w-[90px] shrink-0 cursor-pointer group"
+                  >
+                    {res.poster_path ? (
+                      <img
+                        src={`https://image.tmdb.org/t/p/w92${res.poster_path}`}
+                        className="w-full h-[135px] object-cover rounded bg-zinc-800 group-hover:ring-2 ring-gold-500 ring-offset-2 ring-offset-zinc-900 transition"
+                      />
+                    ) : (
+                      <div className="w-full h-[135px] bg-zinc-800 rounded flex items-center justify-center p-2 text-center text-[10px] text-zinc-400 group-hover:ring-2 ring-gold-500 ring-offset-2 ring-offset-zinc-900 transition">
+                        {res.title}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-zinc-400 mt-1 truncate group-hover:text-white transition">
+                      {res.title}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500">
+                Aucun résultat trouvé. Modifiez le titre pour chercher à nouveau.
+              </p>
+            )}
+          </div>
+        ) : task.selectedMeta ? (
+          <div className="flex items-start gap-4 p-3 bg-zinc-950 rounded border border-green-900/30 line-clamp-2">
+            {task.selectedMeta.poster_path ? (
+              <img
+                src={`https://image.tmdb.org/t/p/w92${task.selectedMeta.poster_path}`}
+                className="w-12 h-18 object-cover rounded shadow-sm"
+              />
+            ) : (
+              <div className="w-12 h-18 bg-zinc-800 rounded shadow-sm" />
+            )}
+            <div className="flex-1">
+              <p className="text-gold-500 font-medium text-xs mb-0.5 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />{" "}
+                {task.status === "success" ? "Importé" : "Métadonnées liées"}
+              </p>
+              <h4 className="font-bold text-white text-sm line-clamp-1">
+                {task.selectedMeta.title}{" "}
+                <span className="text-zinc-500 font-normal">
+                  ({task.selectedMeta.release_date?.split("-")[0]})
+                </span>
+              </h4>
+              <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">
+                {task.selectedMeta.overview}
+              </p>
+            </div>
+            {task.status === "waiting" && (
+              <button
+                onClick={() => updateTaskMeta(task.id, null)}
+                className="text-[10px] font-medium text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded transition shrink-0"
+              >
+                Modifier
+              </button>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 
@@ -796,13 +959,26 @@ export default function ContributeApp({
                 </label>
               </div>
 
-              {/* Liste des films en attente */}
-              {tasks.length > 0 && (
+              {/* Transfert en cours */}
+              {tasks.some(t => t.status === "uploading") && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
+                  <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+                    <h3 className="font-medium text-blue-400 flex items-center gap-2">
+                      <UploadCloud className="w-4 h-4 text-blue-400" /> Transfert en cours
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-zinc-800">
+                    {tasks.filter(t => t.status === "uploading").map(renderTask)}
+                  </div>
+                </div>
+              )}
+
+              {/* File d'attente */}
+              {tasks.some(t => t.status !== "uploading") && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                   <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
                     <h3 className="font-medium text-white flex items-center gap-2">
-                      <Database className="w-4 h-4 text-zinc-400" /> File
-                      d'attente ({tasks.length})
+                      <Database className="w-4 h-4 text-zinc-400" /> File d'attente ({tasks.filter(t => t.status !== "uploading").length})
                     </h3>
                     <button
                       onClick={resetUpload}
@@ -812,201 +988,7 @@ export default function ContributeApp({
                     </button>
                   </div>
                   <div className="divide-y divide-zinc-800">
-                    {tasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="p-4 flex flex-col md:flex-row gap-4"
-                      >
-                        <div className="md:w-1/3 flex flex-col gap-1">
-                          <div className="flex items-start justify-between">
-                            <p
-                              className="font-medium text-sm text-white line-clamp-1 flex-1"
-                              title={task.file.name}
-                            >
-                              {task.file.name}
-                            </p>
-                            {task.status === "waiting" && (
-                              <button
-                                onClick={() => removeTask(task.id)}
-                                className="text-zinc-600 hover:text-red-500 transition ml-2"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                          <p className="text-xs text-zinc-500">
-                            {(task.file.size / (1024 * 1024)).toFixed(0)} Mo
-                          </p>
-
-                          {task.status === "uploading" && (
-                            <div className="mt-2 text-xs font-medium text-blue-400 flex flex-col gap-1">
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-blue-500 transition-all duration-300"
-                                    style={{ width: `${task.progress}%` }}
-                                  />
-                                </div>
-                                {task.progress}%
-                              </div>
-                              {task.etaSeconds !== null &&
-                                task.etaSeconds !== undefined && (
-                                  <div className="flex justify-between items-center bg-zinc-900/50 rounded px-2 py-1.5 mt-1 border border-zinc-800">
-                                    <span className="text-zinc-500 font-normal">Temps estimé restant</span>
-                                    <span className="text-zinc-300">
-                                      {Math.floor(task.etaSeconds / 60)}m{" "}
-                                      {task.etaSeconds % 60}s
-                                    </span>
-                                  </div>
-                                )}
-                            </div>
-                          )}
-                          {task.status === "success" && (
-                            <p className="text-xs text-green-500 mt-2 flex items-center gap-1">
-                              <CheckCircle className="w-3 h-3" /> Envoyé avec
-                              succès
-                            </p>
-                          )}
-                          {task.status === "error" && (
-                            <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
-                              <X className="w-3 h-3" /> Erreur lors de l'envoi
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="md:w-2/3">
-                          {task.status === "waiting" && !task.selectedMeta ? (
-                            <div className="space-y-3">
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  value={task.tmdbQuery}
-                                  onChange={(e) =>
-                                    setTasks((prev) =>
-                                      prev.map((t) =>
-                                        t.id === task.id
-                                          ? { ...t, tmdbQuery: e.target.value }
-                                          : t,
-                                      ),
-                                    )
-                                  }
-                                  onKeyDown={(e) =>
-                                    e.key === "Enter" &&
-                                    searchTMDBForTask(task.id, task.tmdbQuery)
-                                  }
-                                  className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-500"
-                                  placeholder="Rechercher un autre titre..."
-                                />
-                                <button
-                                  onClick={() =>
-                                    searchTMDBForTask(task.id, task.tmdbQuery)
-                                  }
-                                  className="px-3 bg-zinc-800 rounded text-xs font-medium text-white hover:bg-zinc-700 transition"
-                                >
-                                  Rechercher
-                                </button>
-                              </div>
-
-                              {task.isSearching ? (
-                                <p className="text-xs text-zinc-500">
-                                  Recherche TMDB en cours...
-                                </p>
-                              ) : task.tmdbResults.length > 0 ? (
-                                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                                  {task.tmdbResults.map((res: any) => (
-                                    <div
-                                      key={res.id}
-                                      onClick={() =>
-                                        updateTaskMeta(task.id, res)
-                                      }
-                                      className="w-[90px] shrink-0 cursor-pointer group"
-                                    >
-                                      {res.poster_path ? (
-                                        <img
-                                          src={`https://image.tmdb.org/t/p/w92${res.poster_path}`}
-                                          className="w-full h-[135px] object-cover rounded bg-zinc-800 group-hover:ring-2 ring-gold-500 ring-offset-2 ring-offset-zinc-900 transition"
-                                        />
-                                      ) : (
-                                        <div className="w-full h-[135px] bg-zinc-800 rounded flex items-center justify-center p-2 text-center text-[10px] text-zinc-400 group-hover:ring-2 ring-gold-500 ring-offset-2 ring-offset-zinc-900 transition">
-                                          {res.title}
-                                        </div>
-                                      )}
-                                      <p className="text-[10px] text-zinc-400 mt-1 truncate group-hover:text-white transition">
-                                        {res.title}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-zinc-500">
-                                  Aucun résultat trouvé. Modifiez le titre pour
-                                  chercher à nouveau.
-                                </p>
-                              )}
-                            </div>
-                          ) : task.selectedMeta ? (
-                            <div className="flex items-start gap-4 p-3 bg-zinc-950 rounded border border-green-900/30 line-clamp-2">
-                              {task.selectedMeta.poster_path ? (
-                                <img
-                                  src={`https://image.tmdb.org/t/p/w92${task.selectedMeta.poster_path}`}
-                                  className="w-12 h-18 object-cover rounded shadow-sm"
-                                />
-                              ) : (
-                                <div className="w-12 h-18 bg-zinc-800 rounded shadow-sm" />
-                              )}
-                              <div className="flex-1">
-                                <p className="text-gold-500 font-medium text-xs mb-0.5 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />{" "}
-                                  {task.status === "success"
-                                    ? "Importé"
-                                    : "Métadonnées liées"}
-                                </p>
-                                <h4 className="font-bold text-white text-sm line-clamp-1">
-                                  {task.selectedMeta.title}{" "}
-                                  <span className="text-zinc-500 font-normal">
-                                    (
-                                    {
-                                      task.selectedMeta.release_date?.split(
-                                        "-",
-                                      )[0]
-                                    }
-                                    )
-                                  </span>
-                                </h4>
-                                <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">
-                                  {task.selectedMeta.overview}
-                                </p>
-                              </div>
-                              {task.status === "waiting" && (
-                                <button
-                                  onClick={() => updateTaskMeta(task.id, null)}
-                                  className="text-[10px] font-medium text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded transition shrink-0"
-                                >
-                                  Modifier
-                                </button>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="p-4 bg-zinc-950 border-t border-zinc-800 flex justify-end gap-3">
-                    <button
-                      onClick={submitUploadQueue}
-                      disabled={
-                        isUploadingGlobal ||
-                        tasks.filter(
-                          (t) => t.status === "waiting" && t.selectedMeta,
-                        ).length === 0
-                      }
-                      className="bg-red-600 text-white font-medium px-6 py-2.5 rounded hover:bg-red-500 transition disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isUploadingGlobal
-                        ? "Transfert en cours..."
-                        : "Lancer le téléchargement"}
-                    </button>
+                    {tasks.filter(t => t.status !== "uploading").map(renderTask)}
                   </div>
                 </div>
               )}
@@ -1091,12 +1073,34 @@ export default function ContributeApp({
                               </div>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleDeleteFilm(f.id, f.title)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded"
-                            >
-                              Supprimer
-                            </button>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/films/${f.id}/refresh-metadata`, { method: 'POST' });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                      notify(`Métadonnées mises à jour pour ${f.title}`, 'Succès');
+                                      onRefresh();
+                                    } else {
+                                      notify(data.error || 'Erreur lors de la mise à jour', 'Erreur');
+                                    }
+                                  } catch (e) {
+                                    notify('Erreur réseau', 'Erreur');
+                                  }
+                                }}
+                                title="Rechercher l'affiche / Rafraîchir les métadonnées"
+                                className="text-zinc-500 hover:text-blue-600 transition-all font-medium text-xs px-2.5 py-1.5 rounded flex items-center justify-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFilm(f.id, f.title)}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded"
+                              >
+                                Supprimer
+                              </button>
+                            </div>
                           )}
                         </td>
                       )}

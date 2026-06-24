@@ -456,13 +456,18 @@ export const transcodeQueue = new Queue('transcode', { connection: connection as
 const transcodeEvents = new QueueEvents('transcode', { connection: connection as any });
 
 transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
-    const { filmId, newFilename } = returnvalue as any;
+    let parsedReturn = returnvalue;
+    if (typeof returnvalue === 'string') {
+        try { parsedReturn = JSON.parse(returnvalue); } catch(e) {}
+    }
+    const { filmId, newFilename } = parsedReturn as any;
+    if (!filmId || !newFilename) return;
     const film = db.films.find((f: any) => f.id === filmId);
     if (film) {
         film.filename = newFilename;
         film.status = 'ready';
         saveDb();
-        console.log(`[Queue] Film ${filmId} marqué comme prêt.`);
+        console.log(`[Queue] Film ${filmId} marqué comme prêt. Fichier: ${newFilename}`);
     }
 });
 
@@ -1294,6 +1299,57 @@ app.get('/api/tmdb/search', requireAuth, async (req, res) => {
     } catch (err: any) {
         console.error("Erreur TMDB:", err);
         res.status(500).json({ error: 'Échec de la recherche TMDB', details: err.message });
+    }
+});
+
+app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: "Film introuvable" });
+
+    const apiKey = process.env.TMDB_API_KEY;
+    if (!apiKey) return res.status(400).json({ error: "Clé API TMDB non configurée" });
+
+    try {
+        let metaId = film.tmdbId;
+        
+        // Si on n'a pas de tmdbId, on tente de le trouver via le titre
+        if (!metaId) {
+            const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(film.title)}&language=fr-FR`);
+            const searchData = await searchRes.json();
+            if (searchData.results && searchData.results.length > 0) {
+                metaId = searchData.results[0].id;
+                film.tmdbId = metaId;
+            } else {
+                return res.status(404).json({ error: "Aucun résultat trouvé sur TMDB pour ce titre" });
+            }
+        }
+
+        const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${metaId}?api_key=${apiKey}&language=fr-FR&append_to_response=credits`);
+        const fullMeta = await creditsRes.json();
+        
+        if (fullMeta.poster_path) {
+            film.posterUrl = `https://image.tmdb.org/t/p/w500${fullMeta.poster_path}`;
+        }
+        if (fullMeta.overview) film.synopsis = fullMeta.overview;
+        if (fullMeta.release_date) film.year = parseInt(fullMeta.release_date.split('-')[0]);
+
+        if (fullMeta.credits && fullMeta.credits.cast) {
+            film.cast = fullMeta.credits.cast.slice(0, 10).map((c: any) => ({
+                name: c.name,
+                character: c.character,
+                profilePath: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null
+            }));
+        }
+        if (fullMeta.credits && fullMeta.credits.crew) {
+            const dir = fullMeta.credits.crew.find((c: any) => c.job === 'Director');
+            if (dir) film.director = dir.name;
+        }
+
+        saveDb();
+        res.json({ success: true, film });
+    } catch (err) {
+        console.error("TMDB Refresh error", err);
+        res.status(500).json({ error: "Erreur lors de la mise à jour des métadonnées" });
     }
 });
 
