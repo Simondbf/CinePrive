@@ -10,6 +10,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JWT_SECRET=${JWT_SECRET}
+      - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
       - /mnt/cineprive_stockage:/app/data
     depends_on:
@@ -24,6 +25,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JWT_SECRET=${JWT_SECRET}
+      - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
       - /mnt/cineprive_stockage:/app/data
     depends_on:
