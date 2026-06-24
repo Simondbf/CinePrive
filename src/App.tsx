@@ -487,7 +487,7 @@ export default function App() {
                                                <button onClick={async (e) => {
                                                    e.stopPropagation();
                                                    await fetch(`/api/notifications/${n.id}`, { method: 'DELETE' });
-                                                   fetchFilms();
+                                                   fetchFilms(true);
                                                }} className="text-zinc-500 hover:text-red-500 transition-colors ml-2 -mr-1">
                                                    <X className="w-3 h-3" />
                                                </button>
@@ -508,7 +508,7 @@ export default function App() {
                                if (activeUser.role === 'owner' || activeUser.role === 'admin') {
                                    await fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: activeUser.id}) });
                                    setHasUnread(false);
-                                   fetchFilms();
+                                   fetchFilms(true);
                                }
                            }} className="px-4 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-medium rounded text-sm hover:opacity-80 transition flex items-center gap-2">
                                <Check className="w-4 h-4"/> Lu

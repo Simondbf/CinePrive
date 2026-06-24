@@ -279,7 +279,7 @@ export default function ContributeApp({
       });
       if (res.ok) {
         notify("Le film a été rétabli avec succès.", "Succès");
-        onRefresh();
+        onRefresh(true);
       } else {
         const err = await res.json();
         notify(
@@ -380,7 +380,7 @@ export default function ContributeApp({
                 `Le film "${filmTitle}" a été suspendu temporairement.`,
                 "Succès",
               );
-              onRefresh();
+              onRefresh(true);
             } else {
               const err = await res.json();
               notify(err.error || "Impossible de suspendre le film", "Erreur");
@@ -400,7 +400,7 @@ export default function ContributeApp({
         "Supprimer définitivement un film",
         `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la destruction définitive du film "${filmTitle}" et de son fichier vidéo sur le serveur.`,
         async () => {
-          onRefresh();
+          onRefresh(true);
         },
       );
     }
@@ -1081,7 +1081,7 @@ export default function ContributeApp({
                                     const data = await res.json();
                                     if (data.success) {
                                       notify(`Métadonnées mises à jour pour ${f.title}`, 'Succès');
-                                      onRefresh();
+                                      onRefresh(true);
                                     } else {
                                       notify(data.error || 'Erreur lors de la mise à jour', 'Erreur');
                                     }
