@@ -332,11 +332,35 @@ app.use((req, res, next) => {
     next();
 });
 
-// Dossier de stockage des vidéos
+// Configuration des téléchargements Chunkés
 const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
+
+// Nettoyage automatique des chunks fantômes (> 12 heures)
+setInterval(() => {
+    try {
+        const files = fs.readdirSync(UPLOADS_DIR);
+        const now = Date.now();
+        const MAX_AGE = 12 * 60 * 60 * 1000; // 12 heures
+        
+        let cleaned = 0;
+        files.forEach(file => {
+            if (file.startsWith('temp_')) {
+                const filePath = path.join(UPLOADS_DIR, file);
+                const stats = fs.statSync(filePath);
+                if (now - stats.mtimeMs > MAX_AGE) {
+                    fs.unlinkSync(filePath);
+                    cleaned++;
+                }
+            }
+        });
+        if (cleaned > 0) console.log(`[Nettoyage] ${cleaned} chunk(s) fantôme(s) supprimé(s).`);
+    } catch (e) {
+        console.error('[Nettoyage] Erreur lors du nettoyage des chunks:', e);
+    }
+}, 60 * 60 * 1000); // Exécuter toutes les heures
 
 // BDD JSON locale
 const DATA_DIR = path.join(process.cwd(), 'data');

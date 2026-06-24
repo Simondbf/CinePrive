@@ -20,12 +20,12 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [adminNotifs, setAdminNotifs] = useState<any[]>([]);
 
-  // Routing Local Mode: 'viewer', 'upload', 'polls', 'admin'
-  const [rawViewMode, setRawViewMode] = useState<'viewer' | 'upload' | 'polls' | 'admin'>('viewer');
+  // Routing Local Mode: 'viewer', 'upload', 'admin'
+  const [rawViewMode, setRawViewMode] = useState<'viewer' | 'upload' | 'admin'>('viewer');
   const [isUploading, setIsUploading] = useState(false);
   const [transcodingStatuses, setTranscodingStatuses] = useState<Record<string, any>>({});
   
-  const setViewMode = (mode: 'viewer' | 'upload' | 'polls' | 'admin') => {
+  const setViewMode = (mode: 'viewer' | 'upload' | 'admin') => {
       if (isUploading && rawViewMode !== 'viewer') {
           if (!window.confirm("Un téléchargement est en cours. Si vous quittez la page, il sera annulé ! Êtes-vous sûr ?")) {
               return;
@@ -40,6 +40,7 @@ export default function App() {
   const [showFunding, setShowFunding] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPolls, setShowPolls] = useState(false);
   const [showBugReport, setShowBugReport] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
   const [hasUnread, setHasUnread] = useState(() => localStorage.getItem('inbox_read') !== 'true');
@@ -233,6 +234,30 @@ export default function App() {
               />
           )}
           {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
+          {showPolls && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPolls(false)} />
+                  <motion.div 
+                      initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                      className="bg-white dark:bg-[#16181c] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] relative z-10 flex flex-col"
+                  >
+                     <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                         <div className="flex items-center gap-2 text-red-600">
+                             <ListChecks className="w-5 h-5" />
+                             <h2 className="text-lg font-bold">Sondages</h2>
+                         </div>
+                         <button onClick={() => setShowPolls(false)} className="text-zinc-500 hover:text-white transition">
+                             <X className="w-5 h-5" />
+                         </button>
+                     </div>
+                     <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
+                        <Polls activeUser={activeUser} />
+                     </div>
+                  </motion.div>
+              </div>
+          )}
           {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
           
           {notification && (
@@ -319,8 +344,8 @@ export default function App() {
             </button>
 
             <button 
-                onClick={() => setViewMode('polls')}
-                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${viewMode === 'polls' ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                onClick={() => setShowPolls(true)}
+                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Sondages"
             >
                 <ListChecks className="w-4 h-4" /> <span>Sondages</span>
@@ -383,7 +408,7 @@ export default function App() {
                             
                             {/* Mobile specific navigation menu items */}
                             <div className="md:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
-                                <button onClick={() => { setViewMode('polls'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
                                 </button>
                                 <button onClick={() => { setShowFunding(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-500/10 transition flex items-center gap-3">
@@ -446,9 +471,7 @@ export default function App() {
       {navbarContent}
       
       <main>
-        {viewMode === 'polls' ? (
-           <Polls activeUser={activeUser} />
-        ) : viewMode === 'viewer' ? (
+        {viewMode === 'viewer' ? (
            <ViewerApp 
                activeUser={activeUser} 
                films={films} 

@@ -69,7 +69,7 @@ export default function Polls({ activeUser }: { activeUser: User }) {
     };
 
     return (
-        <div className="p-6 md:p-12 pb-24 max-w-[800px] mx-auto">
+        <div className="max-w-[800px] mx-auto pb-4">
             <div className="mb-8 p-6 bg-red-600 border border-red-500 rounded-xl shadow-lg">
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
                     <BarChart3 className="w-6 h-6" />

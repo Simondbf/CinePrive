@@ -974,11 +974,11 @@ export default function ContributeApp({
               )}
 
               {/* File d'attente */}
-              {tasks.some(t => t.status !== "uploading") && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              {tasks.some(t => t.status === "waiting" || t.status === "error") && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
                   <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
                     <h3 className="font-medium text-white flex items-center gap-2">
-                      <Database className="w-4 h-4 text-zinc-400" /> File d'attente ({tasks.filter(t => t.status !== "uploading").length})
+                      <Database className="w-4 h-4 text-zinc-400" /> File d'attente ({tasks.filter(t => t.status === "waiting" || t.status === "error").length})
                     </h3>
                     <button
                       onClick={resetUpload}
@@ -988,7 +988,27 @@ export default function ContributeApp({
                     </button>
                   </div>
                   <div className="divide-y divide-zinc-800">
-                    {tasks.filter(t => t.status !== "uploading").map(renderTask)}
+                    {tasks.filter(t => t.status === "waiting" || t.status === "error").map(renderTask)}
+                  </div>
+                </div>
+              )}
+
+              {/* Transferts terminés */}
+              {tasks.some(t => t.status === "success") && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+                    <h3 className="font-medium text-green-500 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" /> Transferts terminés ({tasks.filter(t => t.status === "success").length})
+                    </h3>
+                    <button
+                      onClick={() => setTasks(prev => prev.filter(t => t.status !== "success"))}
+                      className="text-xs text-zinc-400 hover:text-white transition"
+                    >
+                      Effacer
+                    </button>
+                  </div>
+                  <div className="divide-y divide-zinc-800">
+                    {tasks.filter(t => t.status === "success").map(renderTask)}
                   </div>
                 </div>
               )}
