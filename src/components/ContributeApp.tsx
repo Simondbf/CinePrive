@@ -590,23 +590,33 @@ export default function ContributeApp({
   };
 
   const removeTask = (taskId: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir annuler ce transfert ?")) return;
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setDialogState({
+      isOpen: true,
+      title: "Annuler le transfert",
+      message: "Êtes-vous sûr de vouloir annuler ce transfert ?",
+      isAlert: false,
+      onConfirm: () => {
+        setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      }
+    });
+  };
+
+  const cancelActiveUpload = (taskId: string) => {
+    setDialogState({
+      isOpen: true,
+      title: "Annuler le transfert en cours",
+      message: "Couper la connexion : Un transfert est en cours vers le serveur. Êtes-vous sûr de vouloir l'annuler ?",
+      isAlert: false,
+      onConfirm: () => {
+        isUploadingRef.current = false;
+        setIsUploadingGlobal(false);
+        setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      }
+    });
   };
 
   const resetUpload = () => {
-    if (isUploadingGlobal) {
-      if (
-        !window.confirm(
-          "Couper la connexion : Un transfert est en cours vers le serveur. Êtes-vous sûr de vouloir l'annuler ?",
-        )
-      ) {
-        return;
-      }
-    }
-    setTasks([]);
-    isUploadingRef.current = false;
-    setIsUploadingGlobal(false);
+    setTasks(prev => prev.filter(t => t.status !== "waiting" && t.status !== "error"));
   };
 
   const processUploadQueue = async () => {
@@ -637,6 +647,10 @@ export default function ContributeApp({
       const startTime = Date.now();
 
       for (let i = 0; i < totalChunks; i++) {
+        if (!isUploadingRef.current) {
+          failed = true;
+          break;
+        }
         const start = i * chunkSize;
         const end = Math.min(start + chunkSize, task.file.size);
         const chunk = task.file.slice(start, end);
@@ -812,6 +826,12 @@ export default function ContributeApp({
                 </span>
               </div>
             )}
+            <button
+              onClick={() => cancelActiveUpload(task.id)}
+              className="mt-2 text-xs text-red-400 hover:text-red-300 transition w-full py-1.5 bg-red-400/10 rounded border border-red-400/20"
+            >
+              Annuler l'upload en cours
+            </button>
           </div>
         )}
         {task.status === "success" && (

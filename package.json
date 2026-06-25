@@ -28,6 +28,8 @@
     "multer": "^2.1.1",
     "node-cron": "^4.5.0",
     "nodemailer": "^8.0.10",
+    "plyr": "^3.8.4",
+    "plyr-react": "^6.0.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "uuid": "^14.0.0",

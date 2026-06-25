@@ -502,7 +502,7 @@ export const transcodeQueue = new Queue('transcode', { connection: connection as
 const transcodeEvents = new QueueEvents('transcode', { connection: connection as any });
 
 transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
-    let parsedReturn = returnvalue;
+    let parsedReturn: any = returnvalue;
     if (typeof returnvalue === 'string') {
         try { parsedReturn = JSON.parse(returnvalue); } catch(e) {}
     }
