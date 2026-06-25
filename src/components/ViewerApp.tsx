@@ -10,11 +10,11 @@ interface Props {
     onPlay: (film: Film) => void;
     onUpdateUser: (u: User) => void;
     transcodingStatuses?: Record<string, any>;
+    searchQuery: string;
+    setSearchQuery: (s: string) => void;
 }
 
-export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, transcodingStatuses }: Props) {
-    const [searchQuery, setSearchQuery] = useState('');
-
+export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, transcodingStatuses, searchQuery, setSearchQuery }: Props) {
     const toggleMyList = async (filmId: string) => {
         const action = (activeUser.myList || []).includes(filmId) ? 'remove' : 'add';
         try {
@@ -33,16 +33,6 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     };
 
     // --- Computed Data ---
-    const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
-    
-    useEffect(() => {
-        try {
-            setDownloadedIds(JSON.parse(localStorage.getItem(`downloads_${activeUser.id}`) || '[]'));
-        } catch (e) {
-            setDownloadedIds([]);
-        }
-    }, [activeUser.id]);
-
     const filteredFilms = useMemo(() => {
         if (!searchQuery) return films;
         return films.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -56,7 +46,6 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             .slice(0, 12); // Garde les 12 derniers
 
         const maListeFilms = films.filter(f => activeUser.myList?.includes(f.id));
-        const mesTelechargements = films.filter(f => downloadedIds.includes(f.id));
 
         // Grouping genres
         const categories = new Map<string, Film[]>();
@@ -68,8 +57,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         // Structure d'affichage pour iterer facilement (Structural prototype)
         const blocs = [
             { title: "🎬 Nouveautés", films: nouveautes, alwaysShow: false },
-            { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: true },
-            { title: "⬇️ Mes Téléchargements", films: mesTelechargements, alwaysShow: true }
+            { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: true }
         ];
 
         Array.from(categories.entries()).forEach(([genre, gFilms]) => {
@@ -81,29 +69,10 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
 
     return (
         <div className="p-6 md:p-12 pb-24 max-w-[1600px] mx-auto space-y-12">
-            
-            {/* Header / Search Prototype */}
-            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl flex flex-col md:flex-row items-center gap-6 shadow-sm">
-                 <div className="flex-1 w-full">
-                     <h2 className="text-xl text-white font-medium mb-2">Espace de Visionnage</h2>
-                     <p className="text-sm text-zinc-400">Parcourez la bibliothèque privée et construisez votre liste.</p>
-                 </div>
-                 <div className="w-full md:w-96 relative">
-                     <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                     <input 
-                         type="text" 
-                         value={searchQuery}
-                         onChange={(e) => setSearchQuery(e.target.value)}
-                         placeholder="Rechercher un titre..."
-                         className="w-full bg-zinc-950 border border-zinc-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all"
-                     />
-                 </div>
-            </div>
-
             {/* Corps de l'interface */}
             {searchQuery ? (
                 <div>
-                    <h3 className="text-xl font-medium text-white mb-6">Résultats pour "{searchQuery}" ({filteredFilms.length})</h3>
+                    <h3 className="text-xl font-medium text-zinc-900 dark:text-white mb-6">Résultats pour "{searchQuery}" ({filteredFilms.length})</h3>
                     {filteredFilms.length > 0 ? (
                          <MovieGrid films={filteredFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} />
                     ) : (
@@ -137,7 +106,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                         
                         return (
                             <div key={idx} className="space-y-4">
-                                <h3 className="text-xl font-medium text-white">{list.title}</h3>
+                                <h3 className="text-xl font-medium text-zinc-900 dark:text-white">{list.title}</h3>
                                 {list.films.length > 0 ? (
                                     <MovieGrid films={list.films} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} />
                                 ) : (

@@ -152,13 +152,13 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                            </button>
                        </div>
                    </div>
-                   <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 mt-1">
+                   <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-900 dark:text-zinc-400 mt-1 font-medium">
                        <span>{film.year}</span>
-                       <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                       <span className="w-1 h-1 bg-zinc-400 dark:bg-zinc-600 rounded-full" />
                        <span className="truncate">{film.genre}</span>
                        {film.duration && film.duration !== '~120m' && (
                            <>
-                               <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                               <span className="w-1 h-1 bg-zinc-400 dark:bg-zinc-600 rounded-full" />
                                <span>{film.duration}</span>
                            </>
                        )}

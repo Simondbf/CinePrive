@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X } from 'lucide-react';
+import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
@@ -51,6 +51,7 @@ export default function App() {
   const [amoledActive, setAmoledActive] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [notification, setNotification] = useState<{title: string, message: string, action?: {label: string, onClick: () => void}} | null>(null);
 
   useEffect(() => {
@@ -331,6 +332,19 @@ export default function App() {
         </div>
         
         <div className="flex items-center gap-2 md:gap-4 ml-auto pb-1 pr-1">
+            {viewMode === 'viewer' && (
+                <div className="hidden md:flex relative items-center">
+                    <Search className="w-4 h-4 absolute left-3 text-zinc-500" />
+                    <input 
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Rechercher un titre..."
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-48 focus:w-64"
+                    />
+                </div>
+            )}
+
             <button 
                 onClick={() => {
                     setShowInbox(true);
@@ -477,6 +491,8 @@ export default function App() {
                films={films} 
                onPlay={(f) => setPlayingFilm(f)} 
                onUpdateUser={setActiveUser}
+               searchQuery={searchQuery}
+               setSearchQuery={setSearchQuery}
            />
         ) : viewMode === 'admin' ? (
            <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />

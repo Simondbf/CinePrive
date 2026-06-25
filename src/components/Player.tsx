@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { notify } from '../lib/notify';
 import { Film, User } from '../types';
 import { ArrowLeft, Settings, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plyr } from 'plyr-react';
-import 'plyr-react/plyr.css';
+import Plyr from 'plyr';
+import 'plyr/dist/plyr.css';
 
 interface Props {
   film: Film;
@@ -15,7 +15,8 @@ interface Props {
 export default function Player({ film, activeUser, onClose }: Props) {
   const [showCast, setShowCast] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
-  const playerRef = useRef<any>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<Plyr | null>(null);
   const saveProgressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
@@ -25,19 +26,53 @@ export default function Player({ film, activeUser, onClose }: Props) {
         notify("L'écran risque de rester noir.\n\nLes navigateurs Web ne supportent pas nativement le format .MKV. Téléchargez le fichier pour le lire avec VLC.", "Format Vidéo Incompatible");
     }
 
+    if (!videoRef.current) return;
+
+    // Initialize Plyr
+    const player = new Plyr(videoRef.current, {
+      controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
+      settings: ['captions', 'quality', 'speed', 'loop'],
+      captions: { active: false, update: true, language: 'fr' },
+      autoplay: true,
+    });
+    
+    playerRef.current = player;
+
+    player.on('ready', () => {
+        // Attempt to select French audio track if browser exposes audioTracks API (like Safari)
+        const media = (player as any).media;
+        if (media && (media as any).audioTracks) {
+            const tracks = (media as any).audioTracks;
+            for (let i = 0; i < tracks.length; i++) {
+                if (tracks[i].language.toLowerCase().startsWith('fr')) {
+                    tracks[i].enabled = true;
+                    break;
+                }
+            }
+        }
+        player.language = 'fr';
+    });
+
+    player.on('error', () => {
+        setPlaybackError(true);
+        notify("Le format de ce fichier n'est pas pris en charge par votre navigateur, ou le fichier est en cours de traitement vidéo.", "Erreur de Lecture");
+    });
+
     // Fetch initial progress
     fetch(`/api/progress/${activeUser.id}/${film.id}`)
         .then(r => r.json())
         .then(data => {
-            if (playerRef.current?.plyr && data.time > 0) {
-                playerRef.current.plyr.currentTime = data.time;
+            if (player && data.time > 0) {
+                // Wait for media to be ready to seek
+                player.once('canplay', () => {
+                    player.currentTime = data.time;
+                });
             }
         })
         .catch(console.error);
 
     // Save progress periodically
     saveProgressIntervalRef.current = setInterval(() => {
-        const player = playerRef.current?.plyr;
         if (player && player.playing) {
             fetch('/api/progress', {
                 method: 'POST',
@@ -49,56 +84,18 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
     return () => {
         if (saveProgressIntervalRef.current) clearInterval(saveProgressIntervalRef.current);
-        const player = playerRef.current?.plyr;
-        if (player) {
+        if (playerRef.current) {
             fetch('/api/progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: activeUser.id, filmId: film.id, time: player.currentTime }),
+                body: JSON.stringify({ userId: activeUser.id, filmId: film.id, time: playerRef.current.currentTime }),
                 keepalive: true
             }).catch(console.error);
+            playerRef.current.destroy();
         }
     };
   }, [activeUser.id, film.id, isMkv]);
 
-  useEffect(() => {
-      const player = playerRef.current?.plyr;
-      if (player) {
-          player.on('ready', () => {
-              // Attempt to select French audio track if browser exposes audioTracks API (like Safari)
-              const media = player.media;
-              if (media && media.audioTracks) {
-                  const tracks = media.audioTracks;
-                  for (let i = 0; i < tracks.length; i++) {
-                      if (tracks[i].language.toLowerCase().startsWith('fr')) {
-                          tracks[i].enabled = true;
-                          break;
-                      }
-                  }
-              }
-              // Attempt to select French subtitles
-              player.language = 'fr';
-          });
-      }
-  }, []);
-
-  const plyrSource = {
-      type: 'video' as const,
-      sources: [
-          {
-              src: film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`,
-              type: 'video/mp4',
-          }
-      ],
-      title: film.title
-  };
-
-  const plyrOptions = {
-      controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
-      settings: ['captions', 'quality', 'speed', 'loop'],
-      captions: { active: true, update: true, language: 'fr' },
-      autoplay: true,
-  };
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center select-none group">
@@ -152,11 +149,13 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
         <div className="w-full h-full relative z-10 flex items-center justify-center bg-black">
             <div className="w-full h-full [&>.plyr]:h-full [&>.plyr]:w-full [&_video]:max-h-screen">
-                <Plyr
-                    ref={playerRef}
-                    source={plyrSource}
-                    options={plyrOptions}
-                />
+                <video
+                    ref={videoRef}
+                    playsInline
+                    crossOrigin="anonymous"
+                >
+                    <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} type="video/mp4" />
+                </video>
             </div>
         </div>
 
