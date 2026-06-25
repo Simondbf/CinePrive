@@ -1085,7 +1085,13 @@ export default function ContributeApp({
                       <td className="px-6 py-4">
                         {(() => {
                             const d = new Date(f.addedAt);
-                            return `${d.toLocaleDateString()} à ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                            return new Intl.DateTimeFormat('fr-FR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            }).format(d).replace(' ', ' à ');
                         })()}
                       </td>
                       <td
