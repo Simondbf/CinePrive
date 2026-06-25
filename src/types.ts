@@ -38,6 +38,8 @@ export interface Film {
     director: string;
     cast?: Cast[];
     duration: string;
+    runtime?: number;
+    versionType?: string;
     posterUrl?: string;
     addedBy: string; // ID de l'utilisateur ayant uploadé
     addedAt: string;

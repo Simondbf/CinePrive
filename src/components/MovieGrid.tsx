@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Film, User } from '../types';
-import { Play, Plus, Check, Loader2, Download } from 'lucide-react';
+import { Play, Plus, Check, Loader2, Download, Info, X } from 'lucide-react';
 import { notify } from '../lib/notify';
+import { AnimatePresence, motion } from 'motion/react';
 
 interface Props {
   films: Film[];
@@ -13,6 +14,7 @@ interface Props {
 
 export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses }: Props) {
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
+  const [infoFilm, setInfoFilm] = useState<Film | null>(null);
 
   const handleToggle = async (e: React.MouseEvent, filmId: string) => {
       e.stopPropagation();
@@ -32,6 +34,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
   };
 
   return (
+    <>
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
       {films.map((film) => {
         const inList = (activeUser.myList || []).includes(film.id);
@@ -52,13 +55,13 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                             onPlay(film);
                         }
                     }}
-                    className="aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative cursor-pointer border border-zinc-800 hover:border-zinc-500 transition-colors shadow-sm"
+                    className="aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative cursor-pointer border border-zinc-200 dark:border-zinc-800 hover:border-red-500 transition-colors shadow-sm"
                 >
                     {film.posterUrl ? (
                         <img src={film.posterUrl} alt={film.title} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-zinc-900 text-zinc-500">
-                            <span className="font-bold text-lg mb-2 text-zinc-300">{film.title}</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-zinc-100 dark:bg-zinc-900 text-zinc-500">
+                            <span className="font-bold text-lg mb-2 text-zinc-900 dark:text-zinc-300">{film.title}</span>
                             <span className="text-xs">Aucune affiche</span>
                         </div>
                     )}
@@ -91,27 +94,43 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                             </button>
                         </div>
                     )}
+                    
+                    {/* Version Badge */}
+                    {film.versionType && (
+                        <div className="absolute top-2 left-2 right-2 flex justify-start pointer-events-none">
+                            <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
+                                {film.versionType}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Meta details (Classic prototype structurally organized data) */}
                 <div>
                    <div className="flex items-start justify-between gap-1">
-                       <h4 className="font-medium text-zinc-100 text-sm truncate pr-2 grow" title={film.title}>
+                       <h4 className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate pr-2 grow" title={film.title}>
                            {film.title}
                        </h4>
                        <div className="flex items-center gap-2 shrink-0">
+                           <button 
+                               onClick={(e) => { e.stopPropagation(); setInfoFilm(film); }}
+                               className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0 mt-0.5 transition-colors"
+                               title="Informations"
+                           >
+                               <Info className="w-4 h-4" />
+                           </button>
                            <a 
                                href={`/api/download/${film.id}`}
                                download={film.originalName || film.title}
                                onClick={(e) => handleDownload(e, film)}
-                               className="text-zinc-500 hover:text-gold-500 shrink-0 mt-0.5 transition-colors"
+                               className="text-zinc-400 hover:text-gold-500 shrink-0 mt-0.5 transition-colors"
                                title="Télécharger"
                            >
                                <Download className="w-4 h-4" />
                            </a>
                            <button 
                                onClick={(e) => handleToggle(e, film.id)}
-                               className="text-zinc-500 hover:text-white shrink-0 mt-0.5 transition-colors"
+                               className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0 mt-0.5 transition-colors"
                                title={inList ? "Retirer de ma liste" : "Ajouter à ma liste"}
                            >
                                {loadingListId === film.id ? (
@@ -124,15 +143,75 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                            </button>
                        </div>
                    </div>
-                   <div className="flex items-center gap-2 text-xs text-zinc-500 mt-1">
+                   <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 mt-1">
                        <span>{film.year}</span>
-                       <span className="w-1 h-1 bg-zinc-600 rounded-full" />
+                       <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
                        <span className="truncate">{film.genre}</span>
+                       {film.duration && film.duration !== '~120m' && (
+                           <>
+                               <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                               <span>{film.duration}</span>
+                           </>
+                       )}
                    </div>
                 </div>
             </div>
         );
       })}
     </div>
+
+    <AnimatePresence>
+        {infoFilm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInfoFilm(null)} />
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: -20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden"
+                >
+                    <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">À propos du film</h2>
+                        <button onClick={() => setInfoFilm(null)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="p-6">
+                        <div className="flex gap-6">
+                            {infoFilm.posterUrl && (
+                                <img src={infoFilm.posterUrl} alt={infoFilm.title} className="w-24 h-36 object-cover rounded shadow-md shrink-0" />
+                            )}
+                            <div>
+                                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-1">{infoFilm.title}</h3>
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 mb-4">
+                                    <span>{infoFilm.year}</span>
+                                    <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                                    <span>{infoFilm.genre}</span>
+                                    {infoFilm.duration && infoFilm.duration !== '~120m' && (
+                                        <>
+                                            <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                                            <span>{infoFilm.duration}</span>
+                                        </>
+                                    )}
+                                </div>
+                                {infoFilm.versionType && (
+                                    <span className="bg-red-50 dark:bg-red-500/10 text-red-600 border border-red-200 dark:border-red-500/20 text-xs font-bold px-2 py-1 rounded inline-block mb-4">
+                                        {infoFilm.versionType}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-300 mb-2">Synopsis</h4>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                {infoFilm.synopsis || "Aucun synopsis disponible pour ce film."}
+                            </p>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        )}
+    </AnimatePresence>
+    </>
   );
 }

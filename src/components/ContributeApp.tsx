@@ -455,10 +455,25 @@ export default function ContributeApp({
     progress: number;
     isSearching: boolean;
     etaSeconds?: number | null;
+    versionType?: string;
   }
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
   const isUploadingRef = useRef(false);
+
+  const [duplicateState, setDuplicateState] = useState<{
+    isOpen: boolean;
+    taskId: string;
+    meta: any;
+    existingVersions: string[];
+    selectedVersion: string;
+  }>({
+    isOpen: false,
+    taskId: "",
+    meta: null,
+    existingVersions: [],
+    selectedVersion: "Version Longue"
+  });
 
   useEffect(() => {
     if (onUploadStateChange) {
@@ -556,12 +571,26 @@ export default function ContributeApp({
   };
 
   const updateTaskMeta = (taskId: string, meta: any) => {
+    if (meta) {
+        const existing = films.filter(f => f.tmdbId === meta.id);
+        if (existing.length > 0) {
+            setDuplicateState({
+                isOpen: true,
+                taskId,
+                meta,
+                existingVersions: existing.map(f => f.versionType || "Standard"),
+                selectedVersion: "Version Longue"
+            });
+            return;
+        }
+    }
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, selectedMeta: meta } : t)),
+      prev.map((t) => (t.id === taskId ? { ...t, selectedMeta: meta, versionType: undefined } : t)),
     );
   };
 
   const removeTask = (taskId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir annuler ce transfert ?")) return;
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
 
@@ -652,6 +681,7 @@ export default function ContributeApp({
           originalName: task.file.name,
           metadata: task.selectedMeta,
           user: activeUser.id,
+          versionType: task.versionType
         }),
       });
 
@@ -1053,7 +1083,10 @@ export default function ContributeApp({
                         {uploader?.name || f.addedBy}
                       </td>
                       <td className="px-6 py-4">
-                        {new Date(f.addedAt).toLocaleDateString()}
+                        {(() => {
+                            const d = new Date(f.addedAt);
+                            return `${d.toLocaleDateString()} à ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                        })()}
                       </td>
                       <td
                         className="px-6 py-4 max-w-[200px] truncate"
@@ -1939,6 +1972,61 @@ export default function ContributeApp({
             </form>
           </div>
         )}
+
+      {/* Modal de duplication */}
+      {duplicateState.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl p-6 w-full max-w-sm border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-red-600 mb-2">Ce film existe déjà</h3>
+            <p className="text-zinc-600 dark:text-zinc-400 mb-4 text-sm">
+              Le film <strong>{duplicateState.meta?.title}</strong> est déjà présent dans la base de données.
+              <br/><br/>
+              Veuillez justifier cet ajout en précisant le type de version :
+            </p>
+            
+            <div className="space-y-3 mb-6">
+               <select 
+                   value={duplicateState.selectedVersion}
+                   onChange={(e) => setDuplicateState(prev => ({ ...prev, selectedVersion: e.target.value }))}
+                   className="w-full px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-sm text-zinc-900 dark:text-white"
+               >
+                   <option value="Version Longue">Version Longue</option>
+                   <option value="Version Courte">Version Courte</option>
+                   <option value="Qualité Supérieure">Qualité Supérieure</option>
+                   <option value="Parodie">Parodie</option>
+               </select>
+               
+               {duplicateState.existingVersions.includes(duplicateState.selectedVersion) && (
+                   <p className="text-xs text-red-500 font-medium">⚠️ Cette version ({duplicateState.selectedVersion}) existe déjà ! Vous ne pouvez pas uploader une copie identique.</p>
+               )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setDuplicateState(prev => ({ ...prev, isOpen: false }));
+                  setTasks(prev => prev.map(t => t.id === duplicateState.taskId ? { ...t, selectedMeta: null, versionType: undefined } : t));
+                }}
+                className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition"
+              >
+                Annuler
+              </button>
+              <button
+                disabled={duplicateState.existingVersions.includes(duplicateState.selectedVersion)}
+                onClick={() => {
+                  setTasks((prev) =>
+                    prev.map((t) => (t.id === duplicateState.taskId ? { ...t, selectedMeta: duplicateState.meta, versionType: duplicateState.selectedVersion } : t)),
+                  );
+                  setDuplicateState(prev => ({ ...prev, isOpen: false }));
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirmer l'ajout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de confirmation / alert generic */}
       {dialogState.isOpen && (

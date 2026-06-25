@@ -484,8 +484,24 @@ transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
     if (typeof returnvalue === 'string') {
         try { parsedReturn = JSON.parse(returnvalue); } catch(e) {}
     }
-    const { filmId, newFilename } = parsedReturn as any;
-    if (!filmId || !newFilename) return;
+    
+    if (!parsedReturn || typeof parsedReturn !== 'object') {
+        try {
+            const job = await transcodeQueue.getJob(jobId);
+            if (job && job.returnvalue) {
+                parsedReturn = typeof job.returnvalue === 'string' ? JSON.parse(job.returnvalue) : job.returnvalue;
+            }
+        } catch (e) {}
+    }
+
+    const filmId = parsedReturn?.filmId;
+    const newFilename = parsedReturn?.newFilename || parsedReturn?.outputFilename;
+
+    if (!filmId || !newFilename) {
+        console.error(`[Queue] Impossible de parser returnvalue pour la db:`, returnvalue);
+        return;
+    }
+
     const film = db.films.find((f: any) => f.id === filmId);
     if (film) {
         film.filename = newFilename;
@@ -1450,12 +1466,17 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
 
         let castData: any[] = [];
         let directorData = 'Vérifié par TMDB';
+        let runtimeData: number | undefined = undefined;
 
         if (metadata.id && process.env.TMDB_API_KEY) {
             try {
                 const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${metadata.id}?api_key=${process.env.TMDB_API_KEY}&language=fr-FR&append_to_response=credits`);
                 const fullMeta = await creditsRes.json();
                 
+                if (fullMeta.runtime) {
+                    runtimeData = fullMeta.runtime;
+                }
+
                 if (fullMeta.credits && fullMeta.credits.cast) {
                     castData = fullMeta.credits.cast.slice(0, 10).map((c: any) => ({
                         name: c.name,
@@ -1483,7 +1504,9 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             genre: mainGenre,
             director: directorData,
             cast: castData,
-            duration: '~120m',
+            duration: runtimeData ? `${runtimeData}m` : '~120m',
+            runtime: runtimeData,
+            versionType: body.versionType || undefined,
             posterUrl: metadata.poster_path ? `https://image.tmdb.org/t/p/w500${metadata.poster_path}` : undefined,
             addedBy: body.user || 'Unknown',
             addedAt: new Date().toISOString(),
