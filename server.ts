@@ -373,6 +373,28 @@ let db: any = { users: [], films: [] };
 if (fs.existsSync(dbFile)) {
     try {
         db = JSON.parse(fs.readFileSync(dbFile, 'utf-8'));
+        
+        // Migration of old statuses to new statuses
+        let migrated = false;
+        if (db.films && Array.isArray(db.films)) {
+            db.films.forEach((film: any) => {
+                if (film.status === 'ready') {
+                    film.status = 'AVAILABLE';
+                    migrated = true;
+                } else if (film.status === 'transcoding') {
+                    film.status = 'PROCESSING';
+                    migrated = true;
+                } else if (film.status === 'error') {
+                    film.status = 'ERROR';
+                    migrated = true;
+                }
+            });
+        }
+        if (migrated) {
+            fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
+            console.log('[DB] Migration des statuts de films appliquée.');
+        }
+
     } catch(e) { }
 }
 
@@ -505,9 +527,32 @@ transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
     const film = db.films.find((f: any) => f.id === filmId);
     if (film) {
         film.filename = newFilename;
-        film.status = 'ready';
+        film.status = 'AVAILABLE';
         saveDb();
         console.log(`[Queue] Film ${filmId} marqué comme prêt. Fichier: ${newFilename}`);
+        
+        // Notifications
+        if (!db.notifications) db.notifications = [];
+        const notifMessage = `🎬 Nouveau film disponible : ${film.title} est prêt !`;
+        const { v4: uuidv4 } = require('uuid');
+        db.notifications.push({
+            id: uuidv4(),
+            type: 'upload',
+            message: notifMessage,
+            createdAt: new Date().toISOString(),
+            readBy: []
+        });
+
+        // Webhook Discord
+        if (db.settings && db.settings.webhookUrl) {
+            try {
+                fetch(db.settings.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: notifMessage })
+                }).catch(e => console.error("Discord webhook failed", e));
+            } catch (e) {}
+        }
     }
 });
 
@@ -518,7 +563,7 @@ transcodeEvents.on('failed', async ({ jobId, failedReason }) => {
         if (job && job.data.filmId) {
             const film = db.films.find((f: any) => f.id === job.data.filmId);
             if (film) {
-                film.status = 'error';
+                film.status = 'ERROR';
                 saveDb();
             }
         }
@@ -529,6 +574,33 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
     await transcodeQueue.add('transcode-job', { filmId, inputFilename }, { jobId: filmId });
     console.log(`[Queue] Job ajouté à BullMQ pour le film ID: ${filmId}`);
 };
+
+import cron from 'node-cron';
+
+// Tâche planifiée : Mettre en pause à 07h00
+cron.schedule('0 7 * * *', async () => {
+    console.log('[Cron] 07h00 : Mise en pause de la file de transcodage.');
+    await transcodeQueue.pause();
+});
+
+// Tâche planifiée : Relancer à 01h00
+cron.schedule('0 1 * * *', async () => {
+    console.log('[Cron] 01h00 : Reprise de la file de transcodage.');
+    await transcodeQueue.resume();
+});
+
+// État initial au démarrage du serveur
+const initQueueState = async () => {
+    const hour = new Date().getHours();
+    if (hour >= 7 || hour < 1) {
+        console.log('[Cron] Démarrage hors du créneau 01h-07h. Mise en pause initiale de la file.');
+        await transcodeQueue.pause();
+    } else {
+        console.log('[Cron] Démarrage dans le créneau 01h-07h. File active.');
+        await transcodeQueue.resume();
+    }
+};
+initQueueState();
 
 // --- API POLLS ---
 app.get('/api/polls/config', (req, res) => {
@@ -1182,7 +1254,7 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
                     addedAt: new Date().toISOString(),
                     filename: '',
                     originalName: item.Path || item.Name,
-                    status: 'ready'
+                    status: 'AVAILABLE'
                 });
                 addedCount++;
             }
@@ -1512,7 +1584,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             addedAt: new Date().toISOString(),
             filename: finalFilename,
             originalName: originalName || filename,
-            status: isMp4 ? 'ready' : 'transcoding'
+            status: isMp4 ? 'AVAILABLE' : 'PROCESSING'
         };
 
         db.films.push(film);
@@ -1575,10 +1647,12 @@ app.get('/api/films/transcoding-status', requireAuth, async (req, res) => {
         const tasks: Record<string, any> = {};
         
         for (const job of activeJobs) {
-            tasks[job.data.filmId] = job.progress !== undefined && job.progress !== null && typeof job.progress === 'object' ? job.progress : { progress: 0, etaSeconds: null };
+            tasks[job.data.filmId] = job.progress !== undefined && job.progress !== null && typeof job.progress === 'object' 
+                ? { ...job.progress, state: 'active' } 
+                : { progress: 0, etaSeconds: null, state: 'active' };
         }
         for (const job of waitingJobs) {
-            tasks[job.data.filmId] = { progress: 0, etaSeconds: null };
+            tasks[job.data.filmId] = { progress: 0, etaSeconds: null, state: 'waiting' };
         }
         res.json(tasks);
     } catch (e) {

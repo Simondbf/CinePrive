@@ -25,6 +25,11 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
 
   const handleDownload = (e: React.MouseEvent, film: Film) => {
       e.stopPropagation();
+      if (film.status === 'PROCESSING') {
+          e.preventDefault();
+          notify("Le film est en cours de traitement et n'est pas encore téléchargeable.", "Non disponible");
+          return;
+      }
       const key = `downloads_${activeUser.id}`;
       const stored = JSON.parse(localStorage.getItem(key) || '[]');
       if (!stored.includes(film.id)) {
@@ -44,18 +49,18 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 {/* Poster Box */}
                 <div 
                     onClick={() => {
-                        if (film.status === 'transcoding') {
+                        if (film.status === 'PROCESSING') {
                             const status = transcodingStatuses?.[film.id];
-                            let extraText = "Ce processus intensif s'exécute en tâche de fond et peut prendre de plusieurs dizaines de minutes à plus d'une heure.";
-                            if (status && status.etaSeconds !== null && status.etaSeconds !== undefined) {
-                                extraText = `Temps estimé restant : environ ${Math.ceil(status.etaSeconds / 60)} minute(s).`;
+                            let extraText = "Le fichier sera converti cette nuit pour être disponible demain matin.";
+                            if (status && status.state === 'active') {
+                                extraText = "Le transcodage est actuellement en cours.";
                             }
                             notify(`Le film est en cours d'optimisation pour le web. ${extraText}`, "Traitement en cours");
                         } else {
                             onPlay(film);
                         }
                     }}
-                    className="aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative cursor-pointer border border-zinc-200 dark:border-zinc-800 hover:border-red-500 transition-colors shadow-sm"
+                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm ${film.status === 'PROCESSING' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-red-500'}`}
                 >
                     {film.posterUrl ? (
                         <img src={film.posterUrl} alt={film.title} className="w-full h-full object-cover" />
@@ -66,28 +71,32 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                         </div>
                     )}
                     
-                    {film.status === 'transcoding' && (
-                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 p-3 text-center">
-                            <Loader2 className="w-8 h-8 text-gold-400 animate-spin" />
-                            <span className="text-gold-400 font-medium text-xs tracking-wider uppercase animate-pulse">Conversion...</span>
-                            {transcodingStatuses && transcodingStatuses[film.id] && (
-                                <div className="text-xs text-zinc-400 mt-2 flex flex-col items-center">
-                                    <div className="w-full bg-zinc-800 rounded-full h-1.5 mb-1 max-w-[80px]">
-                                        <div className="bg-gold-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${transcodingStatuses[film.id].progress}%` }}></div>
-                                    </div>
-                                    <span>{transcodingStatuses[film.id].progress}%</span>
-                                    {transcodingStatuses[film.id].etaSeconds !== null && (
-                                        <span className="opacity-70 mt-1">
-                                            ~{Math.ceil(transcodingStatuses[film.id].etaSeconds / 60)} min restantes
-                                        </span>
+                    {film.status === 'PROCESSING' && (
+                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 p-4 text-center backdrop-blur-[2px]">
+                            {transcodingStatuses?.[film.id]?.state === 'active' ? (
+                                <>
+                                    <Loader2 className="w-8 h-8 text-gold-400 animate-spin" />
+                                    <span className="text-gold-400 font-bold text-sm tracking-wider uppercase bg-gold-400/10 px-3 py-1.5 rounded shadow-sm border border-gold-400/20">🎬 En salle de montage</span>
+                                    {transcodingStatuses[film.id].progress !== undefined && (
+                                        <div className="text-xs text-zinc-300 mt-2 flex flex-col items-center w-full px-4">
+                                            <div className="w-full bg-zinc-800 rounded-full h-1.5 mb-1 max-w-[120px]">
+                                                <div className="bg-gold-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${transcodingStatuses[film.id].progress}%` }}></div>
+                                            </div>
+                                            <span className="font-medium text-gold-300">{transcodingStatuses[film.id].progress}%</span>
+                                        </div>
                                     )}
-                                </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="text-4xl mb-2 animate-bounce opacity-80">🌙</div>
+                                    <span className="text-blue-300 font-bold text-sm tracking-wider uppercase bg-blue-500/20 px-3 py-1.5 rounded shadow-sm border border-blue-400/30">Prêt demain matin</span>
+                                </>
                             )}
                         </div>
                     )}
                     
                     {/* Hover actions */}
-                    {film.status !== 'transcoding' && (
+                    {film.status !== 'PROCESSING' && (
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
                             <button className="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full hover:scale-105 transition-transform shadow-lg">
                                 <Play className="w-6 h-6 fill-black ml-1" />
@@ -120,11 +129,11 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                <Info className="w-4 h-4" />
                            </button>
                            <a 
-                               href={`/api/download/${film.id}`}
-                               download={film.originalName || film.title}
+                               href={film.status === 'PROCESSING' ? '#' : `/api/download/${film.id}`}
+                               download={film.status === 'PROCESSING' ? undefined : (film.originalName || film.title)}
                                onClick={(e) => handleDownload(e, film)}
-                               className="text-zinc-400 hover:text-gold-500 shrink-0 mt-0.5 transition-colors"
-                               title="Télécharger"
+                               className={`shrink-0 mt-0.5 transition-colors ${film.status === 'PROCESSING' ? 'text-zinc-600 dark:text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-gold-500'}`}
+                               title={film.status === 'PROCESSING' ? "Téléchargement indisponible" : "Télécharger"}
                            >
                                <Download className="w-4 h-4" />
                            </a>

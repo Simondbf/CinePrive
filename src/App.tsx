@@ -197,7 +197,7 @@ export default function App() {
   }, [activeUser]);
 
   useEffect(() => {
-     const hasTranscoding = films.some(f => f.status === 'transcoding');
+     const hasTranscoding = films.some(f => f.status === 'PROCESSING');
      if (hasTranscoding) {
          const interval = setInterval(async () => {
              fetchFilms(true);

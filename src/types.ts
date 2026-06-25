@@ -45,7 +45,7 @@ export interface Film {
     addedAt: string;
     filename: string;
     originalName: string;
-    status: 'ready' | 'transcoding' | 'error';
+    status: 'AVAILABLE' | 'PROCESSING' | 'ERROR';
     pendingDeletion?: boolean;
     requestedDeletionBy?: string;
     requestedDeletionAt?: number;
