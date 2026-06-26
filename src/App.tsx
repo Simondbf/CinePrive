@@ -357,7 +357,39 @@ export default function App() {
                 {hasUnread && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-black"></span>}
             </button>
 
+            <button 
+                onClick={() => setShowPolls(true)}
+                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                title="Sondages"
+            >
+                <ListChecks className="w-4 h-4" /> <span>Sondages</span>
+            </button>
 
+            <button 
+                onClick={() => setShowFunding(true)}
+                className="hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20"
+                title="Soutenir"
+            >
+                <Heart className="w-4 h-4" /> <span>Soutenir</span>
+            </button>
+
+            {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                <button 
+                    onClick={() => setViewMode('admin')}
+                    className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    title="Administration"
+                >
+                    <Shield className="w-4 h-4"/> <span>Administration</span>
+                </button>
+            )}
+
+            <button 
+                onClick={() => setViewMode('upload')}
+                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                title="Ajouter un film"
+            >
+                <UploadCloud className="w-4 h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
+            </button>
 
             <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
                 {activeUser.status === 'pending' && (
@@ -383,7 +415,7 @@ export default function App() {
                             </div>
                             
                             {/* Navigation menu items */}
-                            <div className="border-b border-zinc-100 dark:border-zinc-800 py-1">
+                            <div className="md:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
                                 <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
                                 </button>

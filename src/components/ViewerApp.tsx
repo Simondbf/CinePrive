@@ -102,7 +102,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                     )}
                 </div>
             ) : (
-                <div className="space-y-16 md:space-y-20">
+                <div className="space-y-8 md:space-y-10">
                     {lists.map((list, idx) => {
                         if (list.films.length === 0 && !list.alwaysShow) return null;
                         

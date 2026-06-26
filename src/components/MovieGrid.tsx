@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Film, User } from '../types';
-import { Play, Plus, Check, Loader2, Download, Info, X } from 'lucide-react';
+import { Play, Plus, Check, Loader2, Download, Info, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -15,6 +15,14 @@ interface Props {
 export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses }: Props) {
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: 'left' | 'right') => {
+      if (scrollRef.current) {
+          const amount = direction === 'left' ? -600 : 600;
+          scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+      }
+  };
 
   const handleToggle = async (e: React.MouseEvent, filmId: string) => {
       e.stopPropagation();
@@ -39,8 +47,16 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
   };
 
   return (
-    <>
-    <div className="flex overflow-x-auto gap-6 pb-4 snap-x snap-mandatory hide-scrollbar">
+    <div className="relative group/grid">
+        {/* Left Arrow */}
+        <button 
+            onClick={(e) => { e.preventDefault(); scroll('left'); }}
+            className="hidden md:flex absolute left-0 top-0 bottom-4 z-10 w-12 items-center justify-center bg-black/50 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-sm rounded-l hover:bg-black/80"
+        >
+            <ChevronLeft className="w-8 h-8 text-white" />
+        </button>
+
+        <div ref={scrollRef} className="flex overflow-x-auto gap-6 pb-4 snap-x snap-mandatory hide-scrollbar">
       {films.map((film) => {
         const inList = (activeUser.myList || []).includes(film.id);
 
@@ -169,6 +185,14 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
       })}
     </div>
 
+        {/* Right Arrow */}
+        <button 
+            onClick={(e) => { e.preventDefault(); scroll('right'); }}
+            className="hidden md:flex absolute right-0 top-0 bottom-4 z-10 w-12 items-center justify-center bg-black/50 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-sm rounded-r hover:bg-black/80"
+        >
+            <ChevronRight className="w-8 h-8 text-white" />
+        </button>
+
     <AnimatePresence>
         {infoFilm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -221,6 +245,6 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
             </div>
         )}
     </AnimatePresence>
-    </>
+    </div>
   );
 }

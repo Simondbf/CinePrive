@@ -373,29 +373,33 @@ let db: any = { users: [], films: [] };
 if (fs.existsSync(dbFile)) {
     try {
         db = JSON.parse(fs.readFileSync(dbFile, 'utf-8'));
+    } catch (e) {
+        console.error("FATAL ERROR: Failed to parse db.json. Halting startup to prevent data corruption.", e);
+        process.exit(1);
+    }
         
-        // Migration of old statuses to new statuses
-        let migrated = false;
-        if (db.films && Array.isArray(db.films)) {
-            db.films.forEach((film: any) => {
-                if (film.status === 'ready') {
-                    film.status = 'AVAILABLE';
-                    migrated = true;
-                } else if (film.status === 'transcoding') {
-                    film.status = 'PROCESSING';
-                    migrated = true;
-                } else if (film.status === 'error') {
-                    film.status = 'ERROR';
-                    migrated = true;
-                }
-            });
-        }
-        if (migrated) {
-            fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
-            console.log('[DB] Migration des statuts de films appliquée.');
-        }
-
-    } catch(e) { }
+    // Migration of old statuses to new statuses
+    let migrated = false;
+    if (db.films && Array.isArray(db.films)) {
+        db.films.forEach((film: any) => {
+            if (film.status === 'ready') {
+                film.status = 'AVAILABLE';
+                migrated = true;
+            } else if (film.status === 'transcoding') {
+                film.status = 'PROCESSING';
+                migrated = true;
+            } else if (film.status === 'error') {
+                film.status = 'ERROR';
+                migrated = true;
+            }
+        });
+    }
+    if (migrated) {
+        const tmpFile = dbFile + '.tmp';
+        fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2));
+        fs.renameSync(tmpFile, dbFile);
+        console.log('[DB] Migration des statuts de films appliquée.');
+    }
 }
 
 // Initialisation simple
@@ -475,7 +479,11 @@ defaultPolls.forEach(defaultPoll => {
     }
 });
 
-const saveDb = () => fs.writeFileSync(dbFile, JSON.stringify(db, null, 2));
+const saveDb = () => {
+    const tmpFile = dbFile + '.tmp';
+    fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2));
+    fs.renameSync(tmpFile, dbFile);
+};
 
 let saveDbTimeout: NodeJS.Timeout | null = null;
 const debouncedSaveDb = () => {
