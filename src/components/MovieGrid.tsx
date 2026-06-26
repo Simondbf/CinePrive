@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Film, User } from '../types';
-import { Play, Plus, Check, Loader2, Download, Info, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -11,9 +11,10 @@ interface Props {
   onToggleList: (filmId: string) => void;
   transcodingStatuses?: Record<string, any>;
   onRemoveFromContinueWatching?: (filmId: string) => void;
+  isCompleteGrid?: boolean;
 }
 
-export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching }: Props) {
+export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching, isCompleteGrid }: Props) {
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -50,19 +51,21 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
   return (
     <div className="relative group/grid">
         {/* Left Arrow */}
-        <button 
-            onClick={(e) => { e.preventDefault(); scroll('left'); }}
-            className="hidden md:flex absolute left-0 top-0 bottom-4 z-10 w-12 items-center justify-center bg-black/50 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-sm rounded-l hover:bg-black/80"
-        >
-            <ChevronLeft className="w-8 h-8 text-white" />
-        </button>
+        {!isCompleteGrid && (
+            <button 
+                onClick={(e) => { e.preventDefault(); scroll('left'); }}
+                className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-20 items-center justify-center bg-black/40 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-md rounded-r hover:bg-black/60 shadow-lg"
+            >
+                <ChevronLeft className="w-6 h-6 text-white" />
+            </button>
+        )}
 
-        <div ref={scrollRef} className="flex overflow-x-auto gap-6 pb-4 snap-x snap-mandatory hide-scrollbar">
+        <div ref={scrollRef} className={isCompleteGrid ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6 pb-4" : "flex overflow-x-auto gap-4 md:gap-6 pb-4 snap-x snap-mandatory hide-scrollbar"}>
       {films.map((film) => {
         const inList = (activeUser.myList || []).includes(film.id);
 
         return (
-            <div key={film.id} className="group relative flex flex-col gap-2 shrink-0 w-28 sm:w-32 md:w-36 lg:w-44 snap-start">
+            <div key={film.id} className={`group relative flex flex-col gap-2 shrink-0 snap-start ${isCompleteGrid ? "w-full" : "w-28 sm:w-32 md:w-36 lg:w-44"}`}>
                 {/* Poster Box */}
                 <div 
                     onClick={() => {
@@ -165,15 +168,13 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                            </a>
                            <button 
                                onClick={(e) => handleToggle(e, film.id)}
-                               className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white shrink-0 mt-0.5 transition-colors"
+                               className={`shrink-0 mt-0.5 transition-colors ${inList ? 'text-red-500 hover:text-red-600' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                                title={inList ? "Retirer de ma liste" : "Ajouter à ma liste"}
                            >
                                {loadingListId === film.id ? (
                                    <Loader2 className="w-4 h-4 animate-spin" />
-                               ) : inList ? (
-                                   <Check className="w-4 h-4 text-green-500" />
                                ) : (
-                                   <Plus className="w-4 h-4" />
+                                   <Heart className="w-4 h-4" fill={inList ? "currentColor" : "none"} />
                                )}
                            </button>
                        </div>
@@ -196,12 +197,14 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
     </div>
 
         {/* Right Arrow */}
-        <button 
-            onClick={(e) => { e.preventDefault(); scroll('right'); }}
-            className="hidden md:flex absolute right-0 top-0 bottom-4 z-10 w-12 items-center justify-center bg-black/50 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-sm rounded-r hover:bg-black/80"
-        >
-            <ChevronRight className="w-8 h-8 text-white" />
-        </button>
+        {!isCompleteGrid && (
+            <button 
+                onClick={(e) => { e.preventDefault(); scroll('right'); }}
+                className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-20 items-center justify-center bg-black/40 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-md rounded-l hover:bg-black/60 shadow-lg"
+            >
+                <ChevronRight className="w-6 h-6 text-white" />
+            </button>
+        )}
 
     <AnimatePresence>
         {infoFilm && (

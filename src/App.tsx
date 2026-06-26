@@ -115,7 +115,9 @@ export default function App() {
       if (viewMode !== 'viewer') {
           setViewMode('viewer');
           setLogoTaps(0);
-          return;
+      } else {
+          setSearchQuery('');
+          setSelectedGenre(null);
       }
       
       const newTaps = logoTaps + 1;

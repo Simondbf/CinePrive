@@ -143,27 +143,45 @@ export default function Player({ film, activeUser, onClose }: Props) {
         notify("Le format de ce fichier n'est pas pris en charge par votre navigateur, ou le fichier est en cours de traitement vidéo.", "Erreur de Lecture");
     });
 
+    let hasSeeked = false;
+    
     // Fetch initial progress
     fetch(`/api/progress/${film.id}`)
         .then(r => r.json())
         .then(data => {
-            if (player && data.time > 0) {
-                // Wait for media to be ready to seek
-                player.once('loadedmetadata', () => {
-                    player.currentTime = data.time;
-                });
+            if (player && data.time > 0 && !hasSeeked) {
+                const seekToData = () => {
+                    if (!hasSeeked) {
+                        player.currentTime = data.time;
+                        hasSeeked = true;
+                    }
+                };
+                if (player.media.readyState >= 1) {
+                    seekToData();
+                } else {
+                    player.once('loadedmetadata', seekToData);
+                }
             }
         })
         .catch(console.error);
 
+    player.on('seeked', () => { hasSeeked = true; });
+
     // Save progress periodically
     saveProgressIntervalRef.current = setInterval(() => {
         if (player && player.playing) {
-            fetch('/api/progress', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filmId: film.id, time: player.currentTime })
-            }).catch(console.error);
+            const current = player.currentTime;
+            const duration = player.duration;
+            
+            if (duration > 0 && current / duration >= 0.95) {
+                fetch(`/api/progress/${film.id}`, { method: 'DELETE' }).catch(console.error);
+            } else if (current > 15) {
+                fetch('/api/progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filmId: film.id, time: current })
+                }).catch(console.error);
+            }
         }
     }, 10000); // save every 10 seconds
 
@@ -171,12 +189,18 @@ export default function Player({ film, activeUser, onClose }: Props) {
         window.removeEventListener('keydown', handleKeyDown);
         if (saveProgressIntervalRef.current) clearInterval(saveProgressIntervalRef.current);
         if (playerRef.current) {
-            fetch('/api/progress', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filmId: film.id, time: playerRef.current.currentTime }),
-                keepalive: true
-            }).catch(console.error);
+            const current = playerRef.current.currentTime;
+            const duration = playerRef.current.duration;
+            if (duration > 0 && current / duration >= 0.95) {
+                fetch(`/api/progress/${film.id}`, { method: 'DELETE', keepalive: true }).catch(console.error);
+            } else if (current > 15) {
+                fetch('/api/progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filmId: film.id, time: current }),
+                    keepalive: true
+                }).catch(console.error);
+            }
             playerRef.current.destroy();
         }
     };
@@ -187,26 +211,15 @@ export default function Player({ film, activeUser, onClose }: Props) {
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center select-none group" style={{ '--plyr-color-main': '#ef4444' } as React.CSSProperties}>
         <style>{`
             .plyr { touch-action: manipulation; }
-            .plyr__controls [data-plyr="rewind"],
-            .plyr__controls [data-plyr="play"],
-            .plyr__controls [data-plyr="fast-forward"] {
-                position: absolute !important;
-                top: 50% !important;
-                transform: translateY(-50%);
-                background: rgba(0,0,0,0.6) !important;
-                border-radius: 50% !important;
-                padding: 12px !important;
-                z-index: 20;
-            }
-            .plyr__controls [data-plyr="rewind"] { left: 30%; }
-            .plyr__controls [data-plyr="play"] { left: 50%; transform: translate(-50%, -50%); padding: 18px !important; }
-            .plyr__controls [data-plyr="fast-forward"] { right: 30%; }
-            .plyr__controls [data-plyr="play"] svg { width: 32px; height: 32px; }
             .plyr__progress { width: 100%; position: absolute; bottom: 60px; left: 0; padding: 0 20px; }
+            @media (max-width: 768px) {
+                .plyr__controls { padding-bottom: 20px !important; }
+                .plyr__progress { bottom: 80px; }
+            }
         `}</style>
         
         {/* Invisible Tap Zones for Mobile */}
-        <div className="absolute inset-0 z-30 flex md:hidden">
+        <div className="absolute inset-x-0 top-0 bottom-24 z-30 flex md:hidden">
             <div className="w-1/3" onClick={() => handleTap('left')} />
             <div className="w-1/3" onClick={() => handleTap('center')} /> {/* Center safe zone for native play/pause */}
             <div className="w-1/3" onClick={() => handleTap('right')} />
@@ -232,13 +245,13 @@ export default function Player({ film, activeUser, onClose }: Props) {
         </AnimatePresence>
 
         {/* Back Button Overlay */}
-        <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
             <button 
                 onClick={(e) => { e.stopPropagation(); handleClose(); }} 
-                className="text-white flex items-center gap-2 hover:text-gold-500 transition-colors pointer-events-auto bg-black/40 backdrop-blur px-4 py-2 rounded-full border border-white/10"
+                className="text-white flex items-center gap-2 hover:text-red-500 transition-colors pointer-events-auto bg-black/40 backdrop-blur px-4 py-2 rounded-full border border-white/10 shadow-lg"
             >
                 <ArrowLeft className="w-6 h-6" />
-                <span className="text-lg font-medium">Retour</span>
+                <span className="text-lg font-medium hidden sm:inline">Retour</span>
             </button>
 
             {film.cast && film.cast.length > 0 && (

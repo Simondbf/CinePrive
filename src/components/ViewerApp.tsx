@@ -65,20 +65,23 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     const lists = useMemo(() => {
         if (searchQuery || selectedGenre) return []; // En mode recherche/genre on n'affiche que les resultats
 
-        const nouveautes = [...films]
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const nouveautes = films
+            .filter(f => new Date(f.addedAt) >= thirtyDaysAgo)
             .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
-            .slice(0, 12); // Garde les 12 derniers
+            .slice(0, 12);
 
         const maListeFilms = films.filter(f => activeUser.myList?.includes(f.id));
         
         const reprendreFilms = films.filter(f => {
             const time = progress[f.id];
-            if (!time || !f.duration) return false;
+            if (!time || time <= 15) return false;
             
             let totalSeconds = 0;
             if (f.runtime) {
                 totalSeconds = f.runtime * 60;
-            } else {
+            } else if (f.duration) {
                 const parts = f.duration.split(' ');
                 let hours = 0;
                 let minutes = 0;
@@ -91,7 +94,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             if (totalSeconds === 0) return true; // Si pas de durée, on affiche
             
             const percentage = (time / totalSeconds) * 100;
-            return percentage > 0.5 && percentage < 95;
+            return percentage < 95;
         });
 
         // Grouping genres
@@ -104,14 +107,14 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         // Structure d'affichage pour iterer facilement (Structural prototype)
         const blocs = [
             { title: "🎬 Reprendre la lecture", films: reprendreFilms, alwaysShow: false, isContinueWatching: true },
-            { title: "🎬 Nouveautés", films: nouveautes, alwaysShow: false },
-            { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: true }
+            { title: "🎬 Nouveautés", films: nouveautes, alwaysShow: false, isCategory: true },
+            { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: false, isCategory: true }
         ];
 
         Array.from(categories.entries())
             .sort((a, b) => a[0].localeCompare(b[0]))
             .forEach(([genre, gFilms]) => {
-            blocs.push({ title: genre, films: gFilms, alwaysShow: false, isGenre: true });
+            blocs.push({ title: genre, films: gFilms, alwaysShow: false, isCategory: true });
         });
 
         return blocs;
@@ -119,12 +122,20 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
 
     const displayedFilms = useMemo(() => {
         if (searchQuery) return films.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
-        if (selectedGenre) return films.filter(f => f.genre === selectedGenre);
+        if (selectedGenre) {
+            if (selectedGenre === "📌 Ma Liste") return films.filter(f => activeUser.myList?.includes(f.id));
+            if (selectedGenre === "🎬 Nouveautés") {
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                return films.filter(f => new Date(f.addedAt) >= thirtyDaysAgo).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+            }
+            return films.filter(f => f.genre === selectedGenre);
+        }
         return [];
-    }, [films, searchQuery, selectedGenre]);
+    }, [films, searchQuery, selectedGenre, activeUser.myList]);
 
     return (
-        <div className="p-6 md:p-12 pb-24 max-w-[1600px] mx-auto space-y-12">
+        <div className="p-6 md:p-12 pb-24 max-w-[1600px] mx-auto space-y-8 md:space-y-10">
             {/* Corps de l'interface */}
             {(searchQuery || selectedGenre) ? (
                 <div>
@@ -142,7 +153,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                         )}
                     </div>
                     {displayedFilms.length > 0 ? (
-                         <MovieGrid films={displayedFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} />
+                         <MovieGrid films={displayedFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} isCompleteGrid={true} />
                     ) : (
                          <div className="p-12 flex flex-col items-center gap-4 justify-center text-center text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800 border-dashed">
                              <p>{searchQuery ? `Le film "${searchQuery}" n'est pas (encore) dans la bibliothèque.` : `Cette catégorie est vide.`}</p>
@@ -178,7 +189,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                             <div key={idx} className="space-y-4 md:space-y-6">
                                 <div className="flex items-center justify-between px-2">
                                     <h3 className="text-xl md:text-2xl font-medium text-zinc-900 dark:text-white">{list.title}</h3>
-                                    {list.isGenre && (
+                                    {list.isCategory && (
                                         <button 
                                             onClick={() => setSelectedGenre(list.title)}
                                             className="text-sm font-medium text-zinc-500 hover:text-red-500 transition-colors"
