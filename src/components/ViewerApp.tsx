@@ -60,7 +60,9 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: true }
         ];
 
-        Array.from(categories.entries()).forEach(([genre, gFilms]) => {
+        Array.from(categories.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .forEach(([genre, gFilms]) => {
             blocs.push({ title: `Genre : ${genre}`, films: gFilms, alwaysShow: false });
         });
 

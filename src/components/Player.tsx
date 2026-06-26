@@ -18,6 +18,36 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
   const saveProgressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tapsRef = useRef(0);
+  const [doubleTapInfo, setDoubleTapInfo] = useState<{ side: 'left' | 'right', seconds: number, visible: boolean }>({ side: 'left', seconds: 0, visible: false });
+
+  const handleTap = (side: 'left' | 'right') => {
+      tapsRef.current += 1;
+      
+      if (tapTimeoutRef.current) {
+          clearTimeout(tapTimeoutRef.current);
+      }
+
+      if (tapsRef.current >= 2) {
+          const skipAmount = (tapsRef.current - 1) * 15;
+          setDoubleTapInfo({ side, seconds: skipAmount, visible: true });
+          
+          if (playerRef.current) {
+              const player = playerRef.current;
+              if (side === 'left') {
+                  player.currentTime -= 15;
+              } else {
+                  player.currentTime += 15;
+              }
+          }
+      }
+
+      tapTimeoutRef.current = setTimeout(() => {
+          tapsRef.current = 0;
+          setDoubleTapInfo(prev => ({ ...prev, visible: false }));
+      }, 700);
+  };
 
   const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
 
@@ -35,9 +65,22 @@ export default function Player({ film, activeUser, onClose }: Props) {
       captions: { active: false, update: true, language: 'fr' },
       autoplay: true,
       seekTime: 15,
+      keyboard: { focused: true, global: true },
+      clickToPlay: true,
+      fullscreen: { enabled: true, fallback: true, iosNative: false },
+      // To prevent Plyr's default double click:
+      // (Plyr doesn't have an explicit option, but doubleClick is handled internally. We added absolute tap zones on top which will intercept clicks on mobile).
     });
     
     playerRef.current = player;
+
+    // Handle global keyboard shortcuts for closing the player
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' || e.key === 'Backspace') {
+            onClose();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
 
     player.on('ready', () => {
         // Attempt to select French audio track if browser exposes audioTracks API (like Safari)
@@ -65,7 +108,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
         .then(data => {
             if (player && data.time > 0) {
                 // Wait for media to be ready to seek
-                player.once('canplay', () => {
+                player.once('loadedmetadata', () => {
                     player.currentTime = data.time;
                 });
             }
@@ -84,6 +127,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
     }, 10000); // save every 10 seconds
 
     return () => {
+        window.removeEventListener('keydown', handleKeyDown);
         if (saveProgressIntervalRef.current) clearInterval(saveProgressIntervalRef.current);
         if (playerRef.current) {
             fetch('/api/progress', {
@@ -100,7 +144,52 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center select-none group" style={{ '--plyr-color-main': '#ef4444' } as React.CSSProperties}>
+        <style>{`
+            .plyr { touch-action: manipulation; }
+            .plyr__controls > [data-plyr="rewind"],
+            .plyr__controls > [data-plyr="play"],
+            .plyr__controls > [data-plyr="fast-forward"] {
+                position: absolute !important;
+                top: 50% !important;
+                transform: translateY(-50%);
+                background: rgba(0,0,0,0.6) !important;
+                border-radius: 50% !important;
+                padding: 12px !important;
+                z-index: 20;
+            }
+            .plyr__controls > [data-plyr="rewind"] { left: 35%; }
+            .plyr__controls > [data-plyr="play"] { left: 50%; transform: translate(-50%, -50%); padding: 18px !important; }
+            .plyr__controls > [data-plyr="fast-forward"] { right: 35%; }
+            .plyr__controls > [data-plyr="play"] svg { width: 32px; height: 32px; }
+            .plyr__progress { width: 100%; position: absolute; bottom: 60px; left: 0; padding: 0 20px; }
+        `}</style>
         
+        {/* Invisible Tap Zones for Mobile */}
+        <div className="absolute inset-0 z-30 flex md:hidden">
+            <div className="w-1/3" onClick={() => handleTap('left')} />
+            <div className="w-1/3" onClick={() => {}} /> {/* Center safe zone for native play/pause */}
+            <div className="w-1/3" onClick={() => handleTap('right')} />
+        </div>
+
+        {/* Double Tap Feedback Overlay */}
+        <AnimatePresence>
+            {doubleTapInfo.visible && (
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={`absolute top-1/2 -translate-y-1/2 z-40 bg-black/60 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 ${doubleTapInfo.side === 'left' ? 'left-1/4 -translate-x-1/2' : 'right-1/4 translate-x-1/2'}`}
+                >
+                    {doubleTapInfo.side === 'left' ? (
+                        <><ArrowLeft className="w-5 h-5" /> -{doubleTapInfo.seconds}s</>
+                    ) : (
+                        <>+{doubleTapInfo.seconds}s <ArrowLeft className="w-5 h-5 rotate-180" /></>
+                    )}
+                </motion.div>
+            )}
+        </AnimatePresence>
+
         {/* Back Button Overlay */}
         <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <button 
