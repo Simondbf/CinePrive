@@ -22,7 +22,21 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const tapsRef = useRef(0);
   const [doubleTapInfo, setDoubleTapInfo] = useState<{ side: 'left' | 'right', seconds: number, visible: boolean }>({ side: 'left', seconds: 0, visible: false });
 
-  const handleTap = (side: 'left' | 'right') => {
+  const handleClose = () => {
+      try {
+          if (document.fullscreenElement && document.exitFullscreen) {
+              document.exitFullscreen();
+          }
+          if (screen.orientation && screen.orientation.unlock) {
+              screen.orientation.unlock();
+          }
+      } catch (e) {
+          console.error(e);
+      }
+      onClose();
+  };
+
+  const handleTap = (side: 'left' | 'right' | 'center') => {
       tapsRef.current += 1;
       
       if (tapTimeoutRef.current) {
@@ -30,23 +44,30 @@ export default function Player({ film, activeUser, onClose }: Props) {
       }
 
       if (tapsRef.current >= 2) {
-          const skipAmount = (tapsRef.current - 1) * 15;
-          setDoubleTapInfo({ side, seconds: skipAmount, visible: true });
-          
-          if (playerRef.current) {
-              const player = playerRef.current;
-              if (side === 'left') {
-                  player.currentTime -= 15;
-              } else {
-                  player.currentTime += 15;
+          if (side !== 'center') {
+              const skipAmount = (tapsRef.current - 1) * 15;
+              setDoubleTapInfo({ side, seconds: skipAmount, visible: true });
+              
+              if (playerRef.current) {
+                  const player = playerRef.current;
+                  if (side === 'left') {
+                      player.currentTime -= 15;
+                  } else {
+                      player.currentTime += 15;
+                  }
               }
           }
       }
 
       tapTimeoutRef.current = setTimeout(() => {
+          if (tapsRef.current === 1) {
+              if (playerRef.current) {
+                  playerRef.current.toggleControls();
+              }
+          }
           tapsRef.current = 0;
           setDoubleTapInfo(prev => ({ ...prev, visible: false }));
-      }, 700);
+      }, 250);
   };
 
   const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
@@ -78,10 +99,29 @@ export default function Player({ film, activeUser, onClose }: Props) {
     // Handle global keyboard shortcuts for closing the player
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape' || e.key === 'Backspace') {
-            onClose();
+            handleClose();
         }
     };
     window.addEventListener('keydown', handleKeyDown);
+
+    const tryFullscreen = async () => {
+        try {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            }
+            if (screen.orientation && screen.orientation.lock) {
+                await screen.orientation.lock('landscape').catch(() => {});
+            }
+        } catch (e) {
+            console.warn("Fullscreen/Orientation lock failed:", e);
+        }
+    };
+
+    player.on('play', () => {
+        if (window.innerWidth <= 768) {
+             tryFullscreen();
+        }
+    });
 
     player.on('ready', () => {
         // Attempt to select French audio track if browser exposes audioTracks API (like Safari)
@@ -168,7 +208,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
         {/* Invisible Tap Zones for Mobile */}
         <div className="absolute inset-0 z-30 flex md:hidden">
             <div className="w-1/3" onClick={() => handleTap('left')} />
-            <div className="w-1/3" onClick={() => {}} /> {/* Center safe zone for native play/pause */}
+            <div className="w-1/3" onClick={() => handleTap('center')} /> {/* Center safe zone for native play/pause */}
             <div className="w-1/3" onClick={() => handleTap('right')} />
         </div>
 
@@ -194,7 +234,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
         {/* Back Button Overlay */}
         <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <button 
-                onClick={(e) => { e.stopPropagation(); onClose(); }} 
+                onClick={(e) => { e.stopPropagation(); handleClose(); }} 
                 className="text-white flex items-center gap-2 hover:text-gold-500 transition-colors pointer-events-auto bg-black/40 backdrop-blur px-4 py-2 rounded-full border border-white/10"
             >
                 <ArrowLeft className="w-6 h-6" />
@@ -221,7 +261,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     Ce format n'est pas supporté par votre navigateur actuel ou la conversion a échoué.
                 </p>
                 <div className="flex gap-4">
-                    <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
+                    <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
                         Retour
                     </button>
                     {!film.jellyfinId && (
