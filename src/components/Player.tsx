@@ -68,6 +68,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
       keyboard: { focused: true, global: true },
       clickToPlay: true,
       fullscreen: { enabled: true, fallback: true, iosNative: false },
+      i18n: { speed: 'Vitesse', normal: 'Normale' }
       // To prevent Plyr's default double click:
       // (Plyr doesn't have an explicit option, but doubleClick is handled internally. We added absolute tap zones on top which will intercept clicks on mobile).
     });
@@ -146,9 +147,9 @@ export default function Player({ film, activeUser, onClose }: Props) {
     <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center select-none group" style={{ '--plyr-color-main': '#ef4444' } as React.CSSProperties}>
         <style>{`
             .plyr { touch-action: manipulation; }
-            .plyr__controls > [data-plyr="rewind"],
-            .plyr__controls > [data-plyr="play"],
-            .plyr__controls > [data-plyr="fast-forward"] {
+            .plyr__controls [data-plyr="rewind"],
+            .plyr__controls [data-plyr="play"],
+            .plyr__controls [data-plyr="fast-forward"] {
                 position: absolute !important;
                 top: 50% !important;
                 transform: translateY(-50%);
@@ -157,10 +158,10 @@ export default function Player({ film, activeUser, onClose }: Props) {
                 padding: 12px !important;
                 z-index: 20;
             }
-            .plyr__controls > [data-plyr="rewind"] { left: 35%; }
-            .plyr__controls > [data-plyr="play"] { left: 50%; transform: translate(-50%, -50%); padding: 18px !important; }
-            .plyr__controls > [data-plyr="fast-forward"] { right: 35%; }
-            .plyr__controls > [data-plyr="play"] svg { width: 32px; height: 32px; }
+            .plyr__controls [data-plyr="rewind"] { left: 30%; }
+            .plyr__controls [data-plyr="play"] { left: 50%; transform: translate(-50%, -50%); padding: 18px !important; }
+            .plyr__controls [data-plyr="fast-forward"] { right: 30%; }
+            .plyr__controls [data-plyr="play"] svg { width: 32px; height: 32px; }
             .plyr__progress { width: 100%; position: absolute; bottom: 60px; left: 0; padding: 0 20px; }
         `}</style>
         
@@ -182,9 +183,9 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     className={`absolute top-1/2 -translate-y-1/2 z-40 bg-black/60 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 ${doubleTapInfo.side === 'left' ? 'left-1/4 -translate-x-1/2' : 'right-1/4 translate-x-1/2'}`}
                 >
                     {doubleTapInfo.side === 'left' ? (
-                        <><ArrowLeft className="w-5 h-5" /> -{doubleTapInfo.seconds}s</>
+                        <><ArrowLeft className="w-5 h-5" /> - {doubleTapInfo.seconds} s</>
                     ) : (
-                        <>+{doubleTapInfo.seconds}s <ArrowLeft className="w-5 h-5 rotate-180" /></>
+                        <>+ {doubleTapInfo.seconds} s <ArrowLeft className="w-5 h-5 rotate-180" /></>
                     )}
                 </motion.div>
             )}

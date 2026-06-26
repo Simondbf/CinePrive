@@ -333,14 +333,14 @@ export default function App() {
         
         <div className="flex items-center gap-2 md:gap-4 ml-auto pb-1 pr-1">
             {viewMode === 'viewer' && (
-                <div className="hidden md:flex relative items-center">
+                <div className="flex relative items-center">
                     <Search className="w-4 h-4 absolute left-3 text-zinc-500" />
                     <input 
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Rechercher un titre..."
-                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-48 focus:w-64"
+                        placeholder="Rechercher..."
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-32 md:w-48 focus:w-48 md:focus:w-64"
                     />
                 </div>
             )}
@@ -357,46 +357,7 @@ export default function App() {
                 {hasUnread && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-black"></span>}
             </button>
 
-            <button 
-                onClick={() => setShowPolls(true)}
-                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
-                title="Sondages"
-            >
-                <ListChecks className="w-4 h-4" /> <span>Sondages</span>
-            </button>
 
-            <button 
-                onClick={() => setShowFunding(true)}
-                className="hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20"
-                title="Soutenir"
-            >
-                <Heart className="w-4 h-4" /> <span>Soutenir</span>
-            </button>
-
-            {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
-                <button 
-                    onClick={() => setViewMode('admin')}
-                    className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
-                    title="Administration"
-                >
-                    <Shield className="w-4 h-4"/> <span>Administration</span>
-                </button>
-            )}
-
-            <button 
-                onClick={() => setViewMode('upload')}
-                className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
-                title="Ajouter un film"
-            >
-                <UploadCloud className="w-4 h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
-            </button>
-
-            <button 
-                onClick={() => setShowSettings(true)}
-                className="hidden md:flex p-1.5 text-zinc-500 hover:text-red-600 transition ml-2 border-l border-zinc-200 dark:border-zinc-800 pl-4"
-            >
-                <Settings className="w-5 h-5" />
-            </button>
 
             <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
                 {activeUser.status === 'pending' && (
@@ -406,9 +367,10 @@ export default function App() {
                 )}
                 <div 
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className={`w-8 h-8 rounded shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer`}
+                    className={`w-9 h-9 rounded-full shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer overflow-hidden bg-cover bg-center`}
+                    style={(activeUser as any).avatarUrl ? { backgroundImage: `url(${(activeUser as any).avatarUrl})` } : {}}
                 >
-                    {(activeUser.name || activeUser.username || '?').charAt(0).toUpperCase()}
+                    {!(activeUser as any).avatarUrl && (activeUser.name || activeUser.username || '?').charAt(0).toUpperCase()}
                 </div>
                 
                 {/* Netflix-style click dropdown */}
@@ -420,8 +382,8 @@ export default function App() {
                                 <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Patron' : (activeUser.role === 'admin' ? 'Admin' : 'Membre')}</p>
                             </div>
                             
-                            {/* Mobile specific navigation menu items */}
-                            <div className="md:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
+                            {/* Navigation menu items */}
+                            <div className="border-b border-zinc-100 dark:border-zinc-800 py-1">
                                 <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
                                 </button>
@@ -433,29 +395,17 @@ export default function App() {
                                 </button>
                                 {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
                                      <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
-                                         <Shield className="w-4 h-4" /> Admin
+                                         <Shield className="w-4 h-4" /> Administration
                                      </button>
                                 )}
+                            </div>
+
+                            <div className="border-b border-zinc-100 dark:border-zinc-800 py-1">
                                 <button onClick={() => { setShowSettings(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <Settings className="w-4 h-4" /> Paramètres
                                 </button>
                                 <button onClick={() => { setShowBugReport(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <MessageSquare className="w-4 h-4" /> Signaler un problème
-                                </button>
-                            </div>
-
-                            <div className="hidden md:block border-b border-zinc-100 dark:border-zinc-800 py-1">
-                                <button 
-                                    onClick={() => { setShowSettings(true); setShowUserMenu(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3"
-                                >
-                                   <Settings className="w-4 h-4" /> Paramètres
-                                </button>
-                                <button 
-                                    onClick={() => { setShowBugReport(true); setShowUserMenu(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3"
-                                >
-                                   <MessageSquare className="w-4 h-4" /> Signaler un problème
                                 </button>
                             </div>
                             <button 

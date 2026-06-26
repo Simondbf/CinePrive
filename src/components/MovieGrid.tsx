@@ -40,12 +40,12 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
 
   return (
     <>
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+    <div className="flex overflow-x-auto gap-6 pb-4 snap-x snap-mandatory hide-scrollbar">
       {films.map((film) => {
         const inList = (activeUser.myList || []).includes(film.id);
 
         return (
-            <div key={film.id} className="group relative flex flex-col gap-2">
+            <div key={film.id} className="group relative flex flex-col gap-2 shrink-0 w-40 sm:w-48 md:w-56 snap-start">
                 {/* Poster Box */}
                 <div 
                     onClick={() => {

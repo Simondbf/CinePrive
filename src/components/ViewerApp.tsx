@@ -102,13 +102,13 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                     )}
                 </div>
             ) : (
-                <div className="space-y-12">
+                <div className="space-y-16 md:space-y-20">
                     {lists.map((list, idx) => {
                         if (list.films.length === 0 && !list.alwaysShow) return null;
                         
                         return (
-                            <div key={idx} className="space-y-4">
-                                <h3 className="text-xl font-medium text-zinc-900 dark:text-white">{list.title}</h3>
+                            <div key={idx} className="space-y-4 md:space-y-6">
+                                <h3 className="text-xl md:text-2xl font-medium text-zinc-900 dark:text-white px-2">{list.title}</h3>
                                 {list.films.length > 0 ? (
                                     <MovieGrid films={list.films} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} />
                                 ) : (
