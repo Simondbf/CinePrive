@@ -30,10 +30,11 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
     // Initialize Plyr
     const player = new Plyr(videoRef.current, {
-      controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
+      controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
       settings: ['captions', 'quality', 'speed', 'loop'],
       captions: { active: false, update: true, language: 'fr' },
       autoplay: true,
+      seekTime: 15,
     });
     
     playerRef.current = player;
@@ -59,7 +60,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
     });
 
     // Fetch initial progress
-    fetch(`/api/progress/${activeUser.id}/${film.id}`)
+    fetch(`/api/progress/${film.id}`)
         .then(r => r.json())
         .then(data => {
             if (player && data.time > 0) {
@@ -77,7 +78,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             fetch('/api/progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: activeUser.id, filmId: film.id, time: player.currentTime })
+                body: JSON.stringify({ filmId: film.id, time: player.currentTime })
             }).catch(console.error);
         }
     }, 10000); // save every 10 seconds
@@ -88,7 +89,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             fetch('/api/progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: activeUser.id, filmId: film.id, time: playerRef.current.currentTime }),
+                body: JSON.stringify({ filmId: film.id, time: playerRef.current.currentTime }),
                 keepalive: true
             }).catch(console.error);
             playerRef.current.destroy();
@@ -98,7 +99,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
 
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center select-none group">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col justify-center select-none group" style={{ '--plyr-color-main': '#ef4444' } as React.CSSProperties}>
         
         {/* Back Button Overlay */}
         <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
