@@ -586,18 +586,21 @@ export default function ContributeApp({
     e.target.value = "";
   };
 
-  const updateTaskMeta = (taskId: string, meta: any) => {
+  const updateTaskMeta = async (taskId: string, meta: any) => {
     if (meta) {
-        const existing = films.filter(f => f.tmdbId === meta.id);
-        if (existing.length > 0) {
-            setDuplicateState({
-                isOpen: true,
-                taskId,
-                meta,
-                existingVersions: existing.map(f => f.versionType || "Standard"),
-                selectedVersion: "Version Longue"
-            });
-            return;
+        try {
+            const res = await fetch('/api/films');
+            if (res.ok) {
+                const data = await res.json();
+                const existing = data.films.find((f: any) => f.tmdbId === meta.id);
+                if (existing) {
+                    notify("Film déjà présent dans le catalogue", "Upload bloqué");
+                    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error("Erreur vérification doublon", e);
         }
     }
     setTasks((prev) =>

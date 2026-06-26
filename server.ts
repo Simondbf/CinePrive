@@ -1577,20 +1577,23 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
 
     try {
         // Assembler les chunks
-        const ws = fs.createWriteStream(finalPath);
         for (let i = 0; i < totalChunks; i++) {
             const chunkPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}_${i}`);
             if (!fs.existsSync(chunkPath)) {
                  console.error(`[Upload] Chunk introuvable: ${chunkPath}`);
-                 ws.close();
-                 fs.unlinkSync(finalPath); // Nettoyer
+                 if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); // Nettoyer
                  return res.status(400).json({ error: `Fichier temporaire (chunk ${i}) introuvable` });
             }
-            const data = fs.readFileSync(chunkPath);
-            ws.write(data);
+            await new Promise((resolve, reject) => {
+                const rs = fs.createReadStream(chunkPath);
+                const ws = fs.createWriteStream(finalPath, { flags: 'a' });
+                rs.pipe(ws);
+                rs.on('error', reject);
+                ws.on('error', reject);
+                ws.on('finish', resolve);
+            });
             fs.unlinkSync(chunkPath); // Nettoyer le chunk une fois écrit
         }
-        ws.end();
         console.log(`[Upload] Fichier final généré avec succès: ${finalFilename}`);
 
         const metadata = typeof body.metadata === 'string' ? JSON.parse(body.metadata || '{}') : (body.metadata || {});
