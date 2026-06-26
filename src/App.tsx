@@ -166,7 +166,7 @@ export default function App() {
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
-      if (activeUser && (activeUser.role === 'admin' || activeUser.role === 'owner')) {
+      if (activeUser && activeUser.role === 'owner') {
           const nres = await fetch('/api/notifications');
           if (nres.ok) {
               const ndata = await nres.json();
@@ -417,13 +417,13 @@ export default function App() {
                 <Heart className="w-4 h-4" /> <span>Soutenir</span>
             </button>
 
-            {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+            {activeUser.role === 'owner' && (
                 <button 
                     onClick={() => setViewMode('admin')}
                     className={`hidden md:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
-                    title="Administration"
+                    title="Salle des Serveurs"
                 >
-                    <Shield className="w-4 h-4"/> <span>Administration</span>
+                    <Shield className="w-4 h-4"/> <span>Salle des Serveurs</span>
                 </button>
             )}
 
@@ -469,9 +469,9 @@ export default function App() {
                                 <button onClick={() => { setViewMode('upload'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <UploadCloud className="w-4 h-4" /> Ajouter un film
                                 </button>
-                                {(activeUser.role === 'owner' || activeUser.role === 'admin') && (
+                                {activeUser.role === 'owner' && (
                                      <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
-                                         <Shield className="w-4 h-4" /> Administration
+                                         <Shield className="w-4 h-4" /> Salle des Serveurs
                                      </button>
                                 )}
                             </div>
@@ -544,7 +544,7 @@ export default function App() {
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                           {(activeUser.role === 'owner' || activeUser.role === 'admin') && adminNotifs.length > 0 ? (
+                           {activeUser.role === 'owner' && adminNotifs.length > 0 ? (
                                adminNotifs.map(n => (
                                    <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
                                        <div className="flex justify-between items-start mb-1">
@@ -572,7 +572,7 @@ export default function App() {
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
                            <button onClick={async () => {
                                setShowInbox(false);
-                               if (activeUser.role === 'owner' || activeUser.role === 'admin') {
+                               if (activeUser.role === 'owner') {
                                    await fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: activeUser.id}) });
                                    setHasUnread(false);
                                    fetchFilms(true);

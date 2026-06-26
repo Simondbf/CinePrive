@@ -64,9 +64,6 @@ export default function ContributeApp({
     closeOnConfirm?: boolean;
   }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
 
-  const [hasUnlockedAdmin, setHasUnlockedAdmin] = useState(false);
-  const [adminPinInput, setAdminPinInput] = useState("");
-
   // Nouveaux états locaux pour les super-codes
   const [customCodeInput, setCustomCodeInput] = useState("");
   const [maxUsesInput, setMaxUsesInput] = useState("");
@@ -656,6 +653,27 @@ export default function ContributeApp({
     setIsUploadingGlobal(true);
 
     const task = nextTask;
+
+    try {
+        const res = await fetch('/api/films');
+        if (res.ok) {
+            const data = await res.json();
+            const existing = data.films.find((f: any) => f.tmdbId === task.selectedMeta.id);
+            if (existing) {
+                notify(`Film déjà présent : ${task.selectedMeta.title}`, "Upload bloqué");
+                setTasks((prev) => prev.filter((t) => t.id !== task.id));
+                isUploadingRef.current = false;
+                setIsUploadingGlobal(false);
+                
+                // Launch the next one
+                setTimeout(() => processUploadQueue(), 100);
+                return;
+            }
+        }
+    } catch (e) {
+        console.error("Erreur vérification doublon pre-upload", e);
+    }
+
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id
@@ -797,7 +815,7 @@ export default function ContributeApp({
                   className={`px-4 py-2 font-medium rounded transition-colors ${tab === "security" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
                   onClick={() => setTab("security")}
                 >
-                  Espace Simon
+                  Sécurité
                 </button>
             </>
           )}
@@ -981,52 +999,12 @@ export default function ContributeApp({
     </div>
   );
 
-  if (mode === "admin" && settings?.securityCode && !hasUnlockedAdmin) {
-      return (
-          <div className="p-6 md:p-12 max-w-md mx-auto flex flex-col items-center justify-center min-h-[60vh]">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 w-full shadow-sm text-center">
-                  <Shield className="w-12 h-12 text-red-600 mx-auto mb-4" />
-                  <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">Régie Technique</h2>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-8">Veuillez entrer le code PIN pour accéder à l'administration.</p>
-                  <form 
-                      onSubmit={(e) => {
-                          e.preventDefault();
-                          if (adminPinInput === settings?.securityCode) {
-                              setHasUnlockedAdmin(true);
-                          } else {
-                              notify("Code PIN incorrect", "Accès refusé");
-                              setAdminPinInput("");
-                          }
-                      }}
-                      className="space-y-4"
-                  >
-                      <input 
-                          type="password"
-                          value={adminPinInput}
-                          onChange={(e) => setAdminPinInput(e.target.value.replace(/\D/g, '').substring(0, 6))}
-                          placeholder="••••••"
-                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-3 text-center text-2xl tracking-[0.5em] font-mono focus:ring-2 focus:ring-red-500 outline-none dark:text-white"
-                          autoFocus
-                      />
-                      <button 
-                          type="submit"
-                          disabled={adminPinInput.length !== 6}
-                          className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black py-3 rounded-lg font-medium transition hover:opacity-90 disabled:opacity-50"
-                      >
-                          Déverrouiller
-                      </button>
-                  </form>
-              </div>
-          </div>
-      );
-  }
-
   return (
     <div className="p-6 md:p-12 pb-24 max-w-[1200px] mx-auto">
       <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-red-600 rounded-r shadow-sm">
         <div>
           <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">
-            {mode === "upload" ? "Espace Contributeur" : "Administration"}
+            {mode === "upload" ? "Espace Contributeur" : "Salle des Serveurs"}
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 text-sm">
             {mode === "upload"
