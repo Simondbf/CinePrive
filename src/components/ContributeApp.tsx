@@ -9,6 +9,12 @@ import {
   Server,
   X,
   RefreshCw,
+  Shield,
+  Loader2,
+  Trash2,
+  Edit2,
+  LogOut,
+  Settings
 } from "lucide-react";
 
 interface Props {
@@ -975,7 +981,7 @@ export default function ContributeApp({
     </div>
   );
 
-  if (mode === "admin" && settings.securityCode && !hasUnlockedAdmin) {
+  if (mode === "admin" && settings?.securityCode && !hasUnlockedAdmin) {
       return (
           <div className="p-6 md:p-12 max-w-md mx-auto flex flex-col items-center justify-center min-h-[60vh]">
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 w-full shadow-sm text-center">
@@ -985,7 +991,7 @@ export default function ContributeApp({
                   <form 
                       onSubmit={(e) => {
                           e.preventDefault();
-                          if (adminPinInput === settings.securityCode) {
+                          if (adminPinInput === settings?.securityCode) {
                               setHasUnlockedAdmin(true);
                           } else {
                               notify("Code PIN incorrect", "Accès refusé");

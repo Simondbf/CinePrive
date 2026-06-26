@@ -62,7 +62,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
       tapTimeoutRef.current = setTimeout(() => {
           if (tapsRef.current === 1) {
               if (playerRef.current) {
-                  playerRef.current.toggleControls();
+                  (playerRef.current as any).toggleControls();
               }
           }
           tapsRef.current = 0;
@@ -109,8 +109,8 @@ export default function Player({ film, activeUser, onClose }: Props) {
             if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
                 await document.documentElement.requestFullscreen();
             }
-            if (screen.orientation && screen.orientation.lock) {
-                await screen.orientation.lock('landscape').catch(() => {});
+            if (screen.orientation && (screen.orientation as any).lock) {
+                await (screen.orientation as any).lock('landscape').catch(() => {});
             }
         } catch (e) {
             console.warn("Fullscreen/Orientation lock failed:", e);
@@ -156,7 +156,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                         hasSeeked = true;
                     }
                 };
-                if (player.media.readyState >= 1) {
+                if ((player as any).media.readyState >= 1) {
                     seekToData();
                 } else {
                     player.once('loadedmetadata', seekToData);

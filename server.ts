@@ -1590,7 +1590,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
                 rs.pipe(ws);
                 rs.on('error', reject);
                 ws.on('error', reject);
-                ws.on('finish', resolve);
+                ws.on('finish', () => resolve(null));
             });
             fs.unlinkSync(chunkPath); // Nettoyer le chunk une fois écrit
         }
