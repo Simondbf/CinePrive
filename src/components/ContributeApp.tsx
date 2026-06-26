@@ -27,7 +27,7 @@ export default function ContributeApp({
   onUploadStateChange,
 }: Props) {
   const [tab, setTab] = useState<
-    "upload" | "library" | "users" | "requests" | "polls" | "funding"
+    "upload" | "library" | "users" | "requests" | "polls" | "funding" | "security"
   >(mode === "upload" ? "upload" : "users");
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
@@ -39,7 +39,16 @@ export default function ContributeApp({
     allowRegistrations: boolean;
     fundingCurrent?: number;
     fundingGoal?: number;
+    webhookUrl?: string;
+    securityCode?: string;
   }>({ allowRegistrations: true });
+
+  const [webhookUrlInput, setWebhookUrlInput] = useState('');
+  const [securityCodeInput, setSecurityCodeInput] = useState('');
+  const [showSecurityCodeInput, setShowSecurityCodeInput] = useState(false);
+  const [isSavingServer, setIsSavingServer] = useState(false);
+  const [isSavingSecurityCode, setIsSavingSecurityCode] = useState(false);
+  const [isRegeneratingSecurityCode, setIsRegeneratingSecurityCode] = useState(false);
   const [dialogState, setDialogState] = useState<{
     isOpen: boolean;
     title: string;
@@ -67,7 +76,11 @@ export default function ContributeApp({
       .catch(console.error);
     fetch("/api/settings")
       .then((r) => r.json())
-      .then(setSettings)
+      .then((data) => {
+          setSettings(data);
+          setWebhookUrlInput(data.webhookUrl || "");
+          if (data.securityCode) setSecurityCodeInput(data.securityCode);
+      })
       .catch(console.error);
     fetch("/api/invites")
       .then((r) => r.json())
@@ -758,12 +771,20 @@ export default function ContributeApp({
             Demandes ({requestsList.length})
           </button>
           {(activeUser.role === "owner" || activeUser.role === "admin") && (
-            <button
-              className={`px-4 py-2 font-medium rounded transition-colors ${tab === "funding" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
-              onClick={() => setTab("funding")}
-            >
-              Financement
-            </button>
+            <>
+                <button
+                  className={`px-4 py-2 font-medium rounded transition-colors ${tab === "funding" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+                  onClick={() => setTab("funding")}
+                >
+                  Financement
+                </button>
+                <button
+                  className={`px-4 py-2 font-medium rounded transition-colors ${tab === "security" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+                  onClick={() => setTab("security")}
+                >
+                  Espace Simon
+                </button>
+            </>
           )}
           <button
             className={`px-4 py-2 font-medium rounded transition-colors ${tab === "polls" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
@@ -1894,6 +1915,145 @@ export default function ContributeApp({
             )}
           </div>
         </div>
+      )}
+
+      {tab === "security" && (activeUser.role === "owner" || activeUser.role === "admin") && (
+          <div className="space-y-6">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+                      <Server className="w-5 h-5" /> Intégrations Systèmes
+                  </h3>
+                  <div className="space-y-4 max-w-xl">
+                      <div>
+                          <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-2 flex items-center gap-1">
+                              Webhook Discord (Notifications Bug & Upload)
+                          </label>
+                          <input 
+                              type="url"
+                              placeholder="https://discord.com/api/webhooks/..."
+                              value={webhookUrlInput}
+                              onChange={e => setWebhookUrlInput(e.target.value)}
+                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm"
+                          />
+                      </div>
+                      <button 
+                          type="button"
+                          disabled={isSavingServer}
+                          onClick={async () => {
+                              setIsSavingServer(true);
+                              try {
+                                  await fetch('/api/settings', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ webhookUrl: webhookUrlInput })
+                                  });
+                                  notify("Webhook sauvegardé avec succès", "Succès");
+                                  fetchData();
+                              } catch (e) {
+                                  notify("Erreur de sauvegarde", "Erreur");
+                              }
+                              setIsSavingServer(false);
+                          }}
+                          className="bg-zinc-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-medium text-sm transition hover:opacity-90 disabled:opacity-50"
+                      >
+                          Sauvegarder
+                      </button>
+                  </div>
+              </div>
+
+              {activeUser.role === 'owner' && (
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                      <h3 className="text-lg font-medium text-red-600 mb-6 flex items-center gap-2">
+                          Sécurité du Studio (Code de Validation)
+                      </h3>
+                      <div className="space-y-6 max-w-xl">
+                          <div>
+                              <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-2">
+                                  Code de sécurité actuel (6 chiffres)
+                              </label>
+                              <div className="flex gap-2">
+                                  <input 
+                                      type={showSecurityCodeInput ? "text" : "password"}
+                                      maxLength={6}
+                                      value={securityCodeInput}
+                                      onChange={e => {
+                                          const val = e.target.value.replace(/\D/g, '').substring(0, 6);
+                                          setSecurityCodeInput(val);
+                                      }}
+                                      className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm tracking-[0.5em] font-mono text-center font-bold"
+                                  />
+                                  <button 
+                                      type="button"
+                                      onClick={() => setShowSecurityCodeInput(!showSecurityCodeInput)}
+                                      className="px-4 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm hover:opacity-80 font-medium"
+                                  >
+                                      {showSecurityCodeInput ? "Masquer" : "Afficher"}
+                                  </button>
+                              </div>
+                              <p className="text-xs text-zinc-500 mt-2">Ce code est requis pour valider les actions de destruction définitive.</p>
+                          </div>
+                          
+                          <div className="flex flex-col sm:flex-row gap-3">
+                              <button 
+                                  type="button"
+                                  disabled={isSavingSecurityCode || securityCodeInput.length !== 6}
+                                  onClick={async () => {
+                                      setIsSavingSecurityCode(true);
+                                      try {
+                                          const res = await fetch('/api/settings', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ securityCode: securityCodeInput })
+                                          });
+                                          if (res.ok) {
+                                              notify("Code de sécurité mis à jour", "Succès");
+                                              fetchData();
+                                          } else {
+                                              notify("Erreur d'enregistrement", "Erreur");
+                                          }
+                                      } catch (e) {
+                                          notify("Erreur réseau", "Erreur");
+                                      }
+                                      setIsSavingSecurityCode(false);
+                                  }}
+                                  className="flex-1 bg-zinc-900 dark:bg-white text-white dark:text-black py-2.5 rounded-lg font-medium text-sm transition hover:opacity-90 disabled:opacity-50"
+                              >
+                                  Sauvegarder le code manuellement
+                              </button>
+                              
+                              <button 
+                                  type="button"
+                                  disabled={isRegeneratingSecurityCode}
+                                  onClick={async () => {
+                                      if (!window.confirm("Êtes-vous sûr de vouloir régénérer un nouveau code ? L'ancien code sera immédiatement révoqué.")) return;
+                                      setIsRegeneratingSecurityCode(true);
+                                      try {
+                                          const res = await fetch('/api/settings/security/regenerate', { method: 'POST' });
+                                          const data = await res.json();
+                                          if (res.ok) {
+                                              setSecurityCodeInput(data.securityCode);
+                                              let msg = "Nouveau code généré ! ";
+                                              if (data.sentToDiscord) msg += "Envoyé sur Discord.";
+                                              else if (data.sentToEmail) msg += `Envoyé par e-mail à ${data.emailSentTo}.`;
+                                              notify(msg, "Succès");
+                                              fetchData();
+                                          } else {
+                                              notify(data.error || "Erreur de régénération", "Erreur");
+                                          }
+                                      } catch (e) {
+                                          notify("Erreur réseau", "Erreur");
+                                      }
+                                      setIsRegeneratingSecurityCode(false);
+                                  }}
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium text-sm transition disabled:opacity-50 text-center"
+                              >
+                                  Régénérer & Envoyer
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              )}
+          </div>
       )}
 
       {(activeUser.role === "owner" || activeUser.role === "admin") &&

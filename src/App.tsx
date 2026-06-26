@@ -51,7 +51,9 @@ export default function App() {
   const [amoledActive, setAmoledActive] = useState(false);
   const [logoTaps, setLogoTaps] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [notification, setNotification] = useState<{title: string, message: string, action?: {label: string, onClick: () => void}} | null>(null);
 
   useEffect(() => {
@@ -344,6 +346,46 @@ export default function App() {
                     />
                 </div>
             )}
+            
+            {viewMode === 'viewer' && (
+                <div className="relative">
+                    <button 
+                        onClick={() => { setShowCategories(!showCategories); setShowUserMenu(false); }}
+                        className="text-sm font-medium px-3 py-1.5 text-zinc-600 dark:text-zinc-400 hover:text-red-600 transition"
+                    >
+                        Catégories
+                    </button>
+                    <AnimatePresence>
+                        {showCategories && (
+                            <>
+                                <div className="fixed inset-0 z-30" onClick={() => setShowCategories(false)} />
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden z-40 py-2"
+                                >
+                                    <button 
+                                        onClick={() => { setSelectedGenre(null); setShowCategories(false); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-white hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 transition"
+                                    >
+                                        Toutes les catégories
+                                    </button>
+                                    {Array.from(new Set(films.map(f => f.genre))).sort().map(genre => (
+                                        <button 
+                                            key={genre}
+                                            onClick={() => { setSelectedGenre(genre); setShowCategories(false); }}
+                                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+                                        >
+                                            {genre}
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
+                </div>
+            )}
 
             <button 
                 onClick={() => {
@@ -475,6 +517,8 @@ export default function App() {
                onUpdateUser={setActiveUser}
                searchQuery={searchQuery}
                setSearchQuery={setSearchQuery}
+               selectedGenre={selectedGenre}
+               setSelectedGenre={setSelectedGenre}
            />
         ) : viewMode === 'admin' ? (
            <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />

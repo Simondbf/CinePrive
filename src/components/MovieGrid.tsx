@@ -10,9 +10,10 @@ interface Props {
   onPlay: (film: Film) => void;
   onToggleList: (filmId: string) => void;
   transcodingStatuses?: Record<string, any>;
+  onRemoveFromContinueWatching?: (filmId: string) => void;
 }
 
-export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses }: Props) {
+export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching }: Props) {
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,7 +62,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
         const inList = (activeUser.myList || []).includes(film.id);
 
         return (
-            <div key={film.id} className="group relative flex flex-col gap-2 shrink-0 w-40 sm:w-48 md:w-56 snap-start">
+            <div key={film.id} className="group relative flex flex-col gap-2 shrink-0 w-28 sm:w-32 md:w-36 lg:w-44 snap-start">
                 {/* Poster Box */}
                 <div 
                     onClick={() => {
@@ -122,11 +123,20 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                     
                     {/* Version Badge */}
                     {film.versionType && (
-                        <div className="absolute top-2 left-2 right-2 flex justify-start pointer-events-none">
+                        <div className="absolute top-2 left-2 flex justify-start pointer-events-none">
                             <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
                                 {film.versionType}
                             </span>
                         </div>
+                    )}
+                    
+                    {onRemoveFromContinueWatching && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onRemoveFromContinueWatching(film.id); }}
+                            className="absolute top-2 right-2 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white z-40 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
                     )}
                 </div>
 

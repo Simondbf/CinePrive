@@ -1295,9 +1295,26 @@ app.post('/api/progress', requireAuth, (req: any, res) => {
     res.json({ success: true });
 });
 
+app.get('/api/progress', requireAuth, (req: any, res) => {
+    const userProgress: Record<string, number> = {};
+    Object.keys(db.progress).forEach(key => {
+        if (key.startsWith(`${req.user.id}_`)) {
+            const filmId = key.replace(`${req.user.id}_`, '');
+            userProgress[filmId] = db.progress[key];
+        }
+    });
+    res.json(userProgress);
+});
+
 app.get('/api/progress/:filmId', requireAuth, (req: any, res) => {
     const time = db.progress[`${req.user.id}_${req.params.filmId}`] || 0;
     res.json({ time });
+});
+
+app.delete('/api/progress/:filmId', requireAuth, (req: any, res) => {
+    delete db.progress[`${req.user.id}_${req.params.filmId}`];
+    debouncedSaveDb();
+    res.json({ success: true });
 });
 
 // Demandes (Requests)
