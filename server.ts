@@ -13,6 +13,7 @@ import { exec, spawn } from 'child_process';
 import nodemailer from 'nodemailer';
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = 3000;
 
 app.use(express.json({ limit: '5mb' }));
@@ -20,7 +21,10 @@ app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(cookieParser());
 
 app.use('/api', (req, res, next) => {
-    console.log(`[HTTP] ${req.method} ${req.url}`);
+    let ipStr = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
+    if (Array.isArray(ipStr)) ipStr = ipStr[0];
+    const ip = typeof ipStr === 'string' ? ipStr.split(',')[0].trim() : 'unknown';
+    console.log(`[HTTP] ${ip} - ${req.method} ${req.url}`);
     next();
 });
 
@@ -922,7 +926,9 @@ const loginAttempts: Record<string, { count: number, lockedUntil: number }> = {}
 
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
-    const ip = req.ip || req.connection.remoteAddress || 'unknown';
+    let ipStr = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
+    if (Array.isArray(ipStr)) ipStr = ipStr[0];
+    const ip = typeof ipStr === 'string' ? ipStr.split(',')[0].trim() : 'unknown';
     const lockKey = `${(username || '').toLowerCase()}_${ip}`;
     
     let attempts = loginAttempts[lockKey] || { count: 0, lockedUntil: 0 };

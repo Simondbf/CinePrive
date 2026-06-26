@@ -82,7 +82,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
     // Initialize Plyr
     const player = new Plyr(videoRef.current, {
       controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
-      settings: ['captions', 'quality', 'speed', 'loop'],
+      settings: ['captions', 'quality', 'speed', 'loop', 'audio'],
       captions: { active: false, update: true, language: 'fr' },
       autoplay: true,
       seekTime: 15,

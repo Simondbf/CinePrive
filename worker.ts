@@ -57,69 +57,90 @@ const worker = new Worker('transcode', async (job) => {
     const isH264 = videoCodecStr.toLowerCase() === 'h264';
     console.log(`[Worker] Analyse : codec vidéo = ${videoCodecStr}. Remuxing rapide : ${isH264 ? 'OUI' : 'NON'}`);
 
-    await new Promise((resolve, reject) => {
-        const args = isH264 ? [
-            '-y', '-i', inputPath,
-            '-c:v', 'copy',
-            '-c:a', 'aac',
-            '-movflags', '+faststart',
-            outputPath
-        ] : [
-            '-y', '-i', inputPath,
-            '-threads', '2',
-            '-c:v', 'libx264', '-preset', 'fast',
-            '-c:a', 'aac',
-            '-movflags', '+faststart',
-            outputPath
-        ];
-
-        const ffmpegProcess = spawn('ffmpeg', args);
-
-        ffmpegProcess.stderr.on('data', async (data) => {
-            const output = data.toString();
-            const timeMatch = output.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/);
-            
-            if (timeMatch && totalDuration > 0) {
-                const currentTime = parseTimeToSeconds(timeMatch[1]);
-                const progress = Math.min(100, Math.round((currentTime / totalDuration) * 100));
-                
-                const speedMatch = output.match(/speed=\s*([\d.]+)x/);
-                let eta = null;
-                if (speedMatch) {
-                    const speed = parseFloat(speedMatch[1]);
-                    if (speed > 0) {
-                        eta = Math.round((totalDuration - currentTime) / speed);
-                    }
-                }
-                await job.updateProgress({ progress, etaSeconds: eta });
-            }
-        });
-
-        ffmpegProcess.on('error', (err) => {
-            reject(err);
-        });
-
-        ffmpegProcess.on('close', (code) => {
-            if (code !== 0) {
-                reject(new Error(`FFmpeg a échoué avec le code ${code}`));
-            } else {
-                resolve(null);
-            }
-        });
-    });
-
-    console.log(`[Worker] SUCCÈS pour le film ID: ${filmId}. Converti en ${outputFilename}`);
-
     try {
-        if (fs.existsSync(inputPath)) {
-            fs.unlinkSync(inputPath);
-            console.log(`[Worker] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
-        }
-    } catch (unlinkErr) {
-        console.error(`[Worker] Impossible de supprimer l'original ${inputFilename}:`, unlinkErr);
-    }
+        await new Promise((resolve, reject) => {
+            const args = isH264 ? [
+                '-y', '-i', inputPath,
+                '-map', '0:v:0', '-map', '0:a?', '-map', '0:s?',
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-c:s', 'mov_text',
+                '-movflags', '+faststart',
+                outputPath
+            ] : [
+                '-y', '-i', inputPath,
+                '-map', '0:v:0', '-map', '0:a?', '-map', '0:s?',
+                '-threads', '2',
+                '-c:v', 'libx264', '-preset', 'fast',
+                '-c:a', 'aac',
+                '-c:s', 'mov_text',
+                '-movflags', '+faststart',
+                outputPath
+            ];
 
-    return { filmId, newFilename: outputFilename };
+            const ffmpegProcess = spawn('ffmpeg', args);
+
+            ffmpegProcess.stderr.on('data', async (data) => {
+                const output = data.toString();
+                const timeMatch = output.match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/);
+                
+                if (timeMatch && totalDuration > 0) {
+                    const currentTime = parseTimeToSeconds(timeMatch[1]);
+                    const progress = Math.min(100, Math.round((currentTime / totalDuration) * 100));
+                    
+                    const speedMatch = output.match(/speed=\s*([\d.]+)x/);
+                    let eta = null;
+                    if (speedMatch) {
+                        const speed = parseFloat(speedMatch[1]);
+                        if (speed > 0) {
+                            eta = Math.round((totalDuration - currentTime) / speed);
+                        }
+                    }
+                    await job.updateProgress({ progress, etaSeconds: eta });
+                }
+            });
+
+            ffmpegProcess.on('error', (err) => {
+                reject(err);
+            });
+
+            ffmpegProcess.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(`FFmpeg a échoué avec le code ${code}`));
+                } else {
+                    resolve(null);
+                }
+            });
+        });
+
+        console.log(`[Worker] SUCCÈS pour le film ID: ${filmId}. Converti en ${outputFilename}`);
+
+        try {
+            if (fs.existsSync(inputPath)) {
+                fs.unlinkSync(inputPath);
+                console.log(`[Worker] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
+            }
+        } catch (unlinkErr) {
+            console.error(`[Worker] Impossible de supprimer l'original ${inputFilename}:`, unlinkErr);
+        }
+
+        return { filmId, newFilename: outputFilename };
+    } catch (err) {
+        console.error(`[Worker] ÉCHEC du transcodage pour le film ID: ${filmId}. Nettoyage des fichiers...`);
+        try {
+            if (fs.existsSync(outputPath)) {
+                fs.unlinkSync(outputPath);
+                console.log(`[Worker] Fichier partiel supprimé : ${outputPath}`);
+            }
+            if (fs.existsSync(inputPath)) {
+                fs.unlinkSync(inputPath);
+                console.log(`[Worker] Fichier source supprimé suite à l'erreur : ${inputPath}`);
+            }
+        } catch (cleanupErr) {
+            console.error(`[Worker] Erreur lors du nettoyage :`, cleanupErr);
+        }
+        throw err;
+    }
 }, { connection: connection as any });
 
 worker.on('failed', (job, err) => {
