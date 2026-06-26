@@ -674,6 +674,8 @@ export default function ContributeApp({
         const formData = new FormData();
         formData.append("chunk", chunk, task.file.name);
         formData.append("uploadId", uploadId);
+        formData.append("chunkIndex", i.toString());
+        formData.append("totalChunks", totalChunks.toString());
 
         const res = await fetch("/api/films/upload-chunk", {
           method: "POST",
@@ -711,7 +713,8 @@ export default function ContributeApp({
           originalName: task.file.name,
           metadata: task.selectedMeta,
           user: activeUser.id,
-          versionType: task.versionType
+          versionType: task.versionType,
+          totalChunks
         }),
       });
 

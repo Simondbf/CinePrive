@@ -1187,6 +1187,24 @@ app.post('/api/films/:id/restore', requireAuth, requireRole(['owner', 'admin']),
     res.json({ success: true, message: `Le film "${film.title}" a été restauré.` });
 });
 
+app.put('/api/films/:id/genre', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const { id } = req.params;
+    const { genre } = req.body;
+    
+    if (!genre) return res.status(400).json({ error: "Le genre est requis" });
+
+    const filmIndex = db.films.findIndex((f: any) => f.id === id);
+    if (filmIndex === -1) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+
+    db.films[filmIndex].genre = genre;
+    db.films[filmIndex].genreOverride = genre;
+    saveDb();
+
+    res.json({ success: true, film: db.films[filmIndex] });
+});
+
 app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
     const { id } = req.params;
     const filmIndex = db.films.findIndex((f: any) => f.id === id);
@@ -1509,12 +1527,12 @@ app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', '
 
 // Upload Video par paquets (Chunking pour contourner Cloudflare)
 app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (req: any, res) => {
-    const { uploadId } = req.body;
+    const { uploadId, chunkIndex } = req.body;
     const chunkFile = req.file;
 
     console.log(`[Upload] Réception d'un chunk pour l'upload ${uploadId}...`);
 
-    if (!uploadId || !chunkFile) {
+    if (!uploadId || !chunkFile || chunkIndex === undefined) {
         console.error(`[Upload] Données manquantes pour le chunk de ${uploadId}`);
         return res.status(400).json({ error: 'Données manquantes' });
     }
@@ -1525,12 +1543,11 @@ app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (
         return res.status(400).json({ error: 'ID invalide' });
     }
 
-    const targetPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}`);
+    const targetPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}_${chunkIndex}`);
 
     try {
-        fs.appendFileSync(targetPath, fs.readFileSync(chunkFile.path));
-        fs.unlinkSync(chunkFile.path);
-        console.log(`[Upload] Chunk sauvegardé et ajouté à ${targetPath}`);
+        fs.renameSync(chunkFile.path, targetPath);
+        console.log(`[Upload] Chunk sauvegardé à ${targetPath}`);
         res.json({ success: true });
     } catch (e) {
         console.error("[Upload] Erreur de chunk:", e);
@@ -1540,17 +1557,11 @@ app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (
 
 app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: any, res) => {
     const body = req.body;
-    const { uploadId, filename, originalName } = body;
+    const { uploadId, filename, originalName, totalChunks } = body;
 
     console.log(`[Upload] Requête finalize reçue pour uploadId: ${uploadId}`);
 
-    // Use multer upload instead to accept multipart if we send it that way? We sent it via express.json? Wait!
-    // No, multipart/form-data requires multer. Let's use upload.none() for the finalize endpoint if formData is used. 
-    // Or we just send it as application/json from the client! (JSON is easier).
-    // The previous request used formData. Let's check how I am planning to send finalize.
-    // Client can do: fetch(..., { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({...}) })
-    
-    if (!uploadId || !filename) {
+    if (!uploadId || !filename || !totalChunks) {
         console.error(`[Upload] Échec finalize: données manquantes pour ${uploadId}`);
         return res.status(400).json({ error: 'Données manquantes' });
     }
@@ -1560,19 +1571,27 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
 
     const safeName = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     const finalFilename = `${Date.now()}_${safeName}`;
-    const tempPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}`);
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
     console.log(`[Upload] Construction du fichier final: ${finalPath}`);
 
     try {
-        if (fs.existsSync(tempPath)) {
-            fs.renameSync(tempPath, finalPath);
-            console.log(`[Upload] Fichier final généré avec succès: ${finalFilename}`);
-        } else {
-             console.error(`[Upload] Fichier temporaire introuvable: ${tempPath}`);
-            return res.status(400).json({ error: 'Fichier temporaire introuvable' });
+        // Assembler les chunks
+        const ws = fs.createWriteStream(finalPath);
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}_${i}`);
+            if (!fs.existsSync(chunkPath)) {
+                 console.error(`[Upload] Chunk introuvable: ${chunkPath}`);
+                 ws.close();
+                 fs.unlinkSync(finalPath); // Nettoyer
+                 return res.status(400).json({ error: `Fichier temporaire (chunk ${i}) introuvable` });
+            }
+            const data = fs.readFileSync(chunkPath);
+            ws.write(data);
+            fs.unlinkSync(chunkPath); // Nettoyer le chunk une fois écrit
         }
+        ws.end();
+        console.log(`[Upload] Fichier final généré avec succès: ${finalFilename}`);
 
         const metadata = typeof body.metadata === 'string' ? JSON.parse(body.metadata || '{}') : (body.metadata || {});
         const genreIds = metadata.genre_ids || [];
@@ -1609,7 +1628,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
 
         const isMp4 = finalFilename.toLowerCase().endsWith('.mp4');
 
-        const film = {
+        const filmData = {
             id: uuidv4(),
             tmdbId: metadata.id,
             title: metadata.title || 'Inconnu',
@@ -1629,28 +1648,48 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             status: isMp4 ? 'AVAILABLE' : 'PROCESSING'
         };
 
-        db.films.push(film);
+        const existingFilmIndex = db.films.findIndex(f => f.tmdbId && f.tmdbId === metadata.id);
         
-        // Notifications
-        if (!db.notifications) db.notifications = [];
-        const notifMessage = `🎬 Nouveau film ajouté : ${film.title}`;
-        db.notifications.push({
-            id: uuidv4(),
-            type: 'upload',
-            message: notifMessage,
-            createdAt: new Date().toISOString(),
-            readBy: []
-        });
+        let film: any = null;
+        if (existingFilmIndex !== -1) {
+            // Update existant
+            const oldFilm = db.films[existingFilmIndex];
+            if (oldFilm.filename) {
+                const oldPath = path.join(UPLOADS_DIR, oldFilm.filename);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            }
+            filmData.id = oldFilm.id;
+            filmData.addedAt = oldFilm.addedAt;
+            if (oldFilm.genreOverride) {
+                filmData.genre = oldFilm.genreOverride;
+                (filmData as any).genreOverride = oldFilm.genreOverride;
+            }
+            db.films[existingFilmIndex] = filmData;
+            film = filmData;
+            console.log(`[Upload] Film mis à jour : ${film.title}`);
+        } else {
+            film = filmData;
+            db.films.push(film);
+            
+            if (!db.notifications) db.notifications = [];
+            const notifMessage = `🎬 Nouveau film ajouté : ${film.title}`;
+            db.notifications.push({
+                id: uuidv4(),
+                type: 'upload',
+                message: notifMessage,
+                createdAt: new Date().toISOString(),
+                readBy: []
+            });
 
-        // Webhook Discord
-        if (db.settings && db.settings.webhookUrl) {
-            try {
-                fetch(db.settings.webhookUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: notifMessage })
-                }).catch(e => console.error("Discord webhook failed", e));
-            } catch (e) {}
+            if (db.settings && db.settings.webhookUrl) {
+                try {
+                    fetch(db.settings.webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: notifMessage })
+                    }).catch(e => console.error("Discord webhook failed", e));
+                } catch (e) {}
+            }
         }
         
         saveDb();

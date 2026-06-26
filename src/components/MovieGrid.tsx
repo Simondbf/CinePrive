@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Film, User } from '../types';
-import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -17,6 +17,8 @@ interface Props {
 export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching, isCompleteGrid }: Props) {
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
+  const [editingGenre, setEditingGenre] = useState(false);
+  const [newGenre, setNewGenre] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -31,6 +33,27 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
       setLoadingListId(filmId);
       await onToggleList(filmId);
       setLoadingListId(null);
+  };
+
+  const handleUpdateGenre = async () => {
+      if (!infoFilm || !newGenre.trim()) return;
+      try {
+          const res = await fetch(`/api/films/${infoFilm.id}/genre`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ genre: newGenre.trim() })
+          });
+          if (res.ok) {
+              const { film } = await res.json();
+              setInfoFilm(film);
+              setEditingGenre(false);
+              notify("Le genre a été mis à jour avec succès.", "Succès");
+          } else {
+              notify("Erreur lors de la mise à jour du genre.", "Erreur");
+          }
+      } catch (err) {
+          notify("Erreur de connexion.", "Erreur");
+      }
   };
 
   const handleDownload = (e: React.MouseEvent, film: Film) => {
@@ -232,7 +255,31 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                 <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 mb-4">
                                     <span>{infoFilm.year}</span>
                                     <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
-                                    <span>{infoFilm.genre}</span>
+                                    {editingGenre ? (
+                                        <div className="flex items-center gap-1">
+                                            <input
+                                                type="text"
+                                                value={newGenre}
+                                                onChange={(e) => setNewGenre(e.target.value)}
+                                                className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 text-xs text-zinc-900 dark:text-white"
+                                            />
+                                            <button onClick={handleUpdateGenre} className="text-green-500 hover:text-green-600">
+                                                <Check className="w-3 h-3" />
+                                            </button>
+                                            <button onClick={() => setEditingGenre(false)} className="text-red-500 hover:text-red-600">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1">
+                                            <span>{infoFilm.genre}</span>
+                                            {(activeUser.role === 'admin' || activeUser.role === 'owner') && (
+                                                <button onClick={() => { setEditingGenre(true); setNewGenre(infoFilm.genre); }} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+                                                    <Edit2 className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                     {infoFilm.duration && infoFilm.duration !== '~120m' && (
                                         <>
                                             <span className="w-1 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
