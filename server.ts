@@ -571,7 +571,18 @@ transcodeEvents.on('failed', async ({ jobId, failedReason }) => {
 });
 
 export const enqueueTranscode = async (filmId: string, inputFilename: string) => {
-    await transcodeQueue.add('transcode-job', { filmId, inputFilename }, { jobId: filmId });
+    try {
+        await transcodeQueue.remove(filmId);
+    } catch(e) {}
+    await transcodeQueue.add(
+        'transcode-job', 
+        { filmId, inputFilename }, 
+        { 
+            jobId: filmId,
+            removeOnComplete: true,
+            removeOnFail: 50
+        }
+    );
     console.log(`[Queue] Job ajouté à BullMQ pour le film ID: ${filmId}`);
 };
 

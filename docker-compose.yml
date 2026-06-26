@@ -1,3 +1,4 @@
+version: '3.8'
 services:
   web:
     build: .
@@ -12,7 +13,6 @@ services:
       - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
       - ./data:/app/data
-      - /mnt/cineprive_stockage/films:/app/data/uploads
     depends_on:
       - redis
 
@@ -28,7 +28,6 @@ services:
       - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
       - ./data:/app/data
-      - /mnt/cineprive_stockage/films:/app/data/uploads
     depends_on:
       - redis
 
