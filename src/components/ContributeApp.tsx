@@ -907,8 +907,8 @@ export default function ContributeApp({
   );
 
   const renderTask = (task: UploadTask) => (
-    <div key={task.id} className="p-4 flex flex-col md:flex-row gap-4">
-      <div className="md:w-1/3 flex flex-col gap-1">
+    <div key={task.id} className="p-4 flex flex-col lg:flex-row gap-4">
+      <div className="lg:w-1/3 flex flex-col gap-1">
         <div className="flex items-start justify-between">
           <p
             className="font-medium text-sm text-white line-clamp-1 flex-1"
@@ -975,7 +975,7 @@ export default function ContributeApp({
         )}
       </div>
 
-      <div className="md:w-2/3">
+      <div className="lg:w-2/3">
         {(task.status === "waiting" || task.status === "duplicate") && !task.selectedMeta ? (
           <div className="space-y-3">
             <div className="flex gap-2">
@@ -1075,7 +1075,7 @@ export default function ContributeApp({
   );
 
   return (
-    <div className="p-6 md:p-12 pb-24 max-w-[1200px] mx-auto">
+    <div className="p-6 lg:p-12 pb-24 max-w-[1200px] mx-auto">
       <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-red-600 rounded-r shadow-sm">
         <div>
           <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">
@@ -1115,7 +1115,7 @@ export default function ContributeApp({
           <>
             <div className="flex flex-col gap-6">
               {/* Zone de Drop / Selection Multiple */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <label
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -1407,7 +1407,7 @@ export default function ContributeApp({
 
             {activeUser.role === "owner" && (
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
+                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-4">
                   <h3 className="text-lg font-medium text-zinc-900 dark:text-white">
                     Codes d'Invitation
                   </h3>
