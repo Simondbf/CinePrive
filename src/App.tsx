@@ -181,7 +181,7 @@ export default function App() {
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
-      if (activeUser && activeUser.role === 'owner') {
+      if (activeUser && (activeUser.role === 'owner' || activeUser.role === 'admin')) {
           const nres = await fetch('/api/notifications');
           if (nres.ok) {
               const ndata = await nres.json();
@@ -264,7 +264,7 @@ export default function App() {
                       className="bg-white dark:bg-[#16181c] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] relative z-10 flex flex-col"
                   >
                      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
-                         <div className="flex items-center gap-2 text-red-600">
+                         <div className="flex items-center gap-2 text-primary-600">
                              <ListChecks className="w-5 h-5" />
                              <h2 className="text-lg font-bold">Sondages</h2>
                          </div>
@@ -289,7 +289,7 @@ export default function App() {
                      className="bg-zinc-900 border border-zinc-800 text-white rounded-xl shadow-2xl p-4 w-80 text-center flex flex-col gap-3 pointer-events-auto"
                   >
                       <div className="flex flex-col items-center">
-                          <h3 className={`font-bold text-sm mb-1 ${notification.title.toLowerCase().includes('erreur') ? 'text-red-500' : 'text-blue-400'}`}>{notification.title}</h3>
+                          <h3 className={`font-bold text-sm mb-1 ${notification.title.toLowerCase().includes('erreur') ? 'text-primary-500' : 'text-blue-400'}`}>{notification.title}</h3>
                           <p className="text-sm text-zinc-300 whitespace-pre-wrap">{notification.message}</p>
                       </div>
                       
@@ -300,7 +300,7 @@ export default function App() {
                                       notification.action!.onClick();
                                       setNotification(null);
                                   }} 
-                                  className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition cursor-pointer"
+                                  className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold rounded transition cursor-pointer"
                               >
                                   {notification.action.label}
                               </button>
@@ -323,7 +323,7 @@ export default function App() {
           return null;
       }
       return (
-        <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
+        <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-primary-500/30 transition-colors`}>
            <Player film={film} activeUser={activeUser} onClose={() => navigate(-1)} />
            {globalModals}
         </div>
@@ -342,14 +342,14 @@ export default function App() {
             {viewMode !== 'viewer' && (
                 <button 
                     onClick={() => setViewMode('viewer')}
-                    className="p-2 -ml-2 text-zinc-500 hover:text-red-600 transition hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 rounded-full max-lg:portrait:hidden"
+                    className="p-2 -ml-2 text-zinc-500 hover:text-primary-600 transition hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 rounded-full max-lg:portrait:hidden"
                     title="Retour"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
             )}
             <div 
-               className="text-xl font-bold tracking-tight mr-2 xl:mr-10 flex items-center gap-2 text-red-600 cursor-pointer select-none"
+               className="text-xl font-bold tracking-tight mr-2 xl:mr-10 flex items-center gap-2 text-primary-600 cursor-pointer select-none"
                onClick={handleLogoClick}
             >
                 <Monitor className="w-6 h-6 shrink-0" /> <span className="hidden sm:inline">CinéPrivé</span>
@@ -365,7 +365,7 @@ export default function App() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Rechercher..."
-                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-32 xl:w-48 focus:w-48 xl:focus:w-64 max-lg:portrait:w-full max-lg:portrait:focus:w-full"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all w-32 xl:w-48 focus:w-48 xl:focus:w-64 max-lg:portrait:w-full max-lg:portrait:focus:w-full"
                     />
                 </div>
             )}
@@ -374,7 +374,7 @@ export default function App() {
                 <div className="relative max-lg:portrait:hidden">
                     <button 
                         onClick={() => { setShowCategories(!showCategories); setShowUserMenu(false); }}
-                        className="text-sm font-medium px-3 py-1.5 text-zinc-600 dark:text-zinc-400 hover:text-red-600 transition"
+                        className="text-sm font-medium px-3 py-1.5 text-zinc-600 dark:text-zinc-400 hover:text-primary-600 transition"
                     >
                         Catégories
                     </button>
@@ -390,7 +390,7 @@ export default function App() {
                                 >
                                     <button 
                                         onClick={() => { setSelectedGenre(null); setShowCategories(false); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-white hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 transition"
+                                        className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-white hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:text-primary-600 transition"
                                     >
                                         Toutes les catégories
                                     </button>
@@ -416,15 +416,15 @@ export default function App() {
                     setHasUnread(false);
                     localStorage.setItem('inbox_read', 'true');
                 }}
-                className="relative p-1.5 text-zinc-500 hover:text-red-600 transition max-lg:portrait:hidden"
+                className="relative p-1.5 text-zinc-500 hover:text-primary-600 transition max-lg:portrait:hidden"
             >
                 <Inbox className="w-5 h-5" />
-                {hasUnread && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-black"></span>}
+                {hasUnread && <span className="absolute top-1 right-1 w-2 h-2 bg-primary-500 rounded-full border border-white dark:border-black"></span>}
             </button>
 
             <button 
                 onClick={() => setShowPolls(true)}
-                className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-primary-600 bg-primary-50 dark:bg-primary-500/10 border border-primary-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Sondages"
             >
                 <ListChecks className="w-4 h-4" /> <span>Sondages</span>
@@ -441,7 +441,7 @@ export default function App() {
             {activeUser.role === 'owner' && (
                 <button 
                     onClick={() => setViewMode('admin')}
-                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                     title="Salle des Serveurs"
                 >
                     <Shield className="w-4 h-4"/> <span>Salle des Serveurs</span>
@@ -451,7 +451,7 @@ export default function App() {
             {(activeUser.role === 'owner' || activeUser.role === 'admin' || activeUser.role === 'technician') && (
                 <button 
                     onClick={() => setViewMode('upload')}
-                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                     title="Ajouter un film"
                 >
                     <UploadCloud className="w-4 h-4"/> <span className="hidden xl:inline">Ajouter un film</span>
@@ -466,7 +466,7 @@ export default function App() {
                 )}
                 <div 
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className={`w-9 h-9 rounded-full shrink-0 ${activeUser.color || 'bg-red-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer overflow-hidden bg-cover bg-center`}
+                    className={`w-9 h-9 rounded-full shrink-0 ${activeUser.color || 'bg-primary-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer overflow-hidden bg-cover bg-center`}
                     style={(activeUser as any).avatarUrl ? { backgroundImage: `url(${(activeUser as any).avatarUrl})` } : {}}
                 >
                     {!(activeUser as any).avatarUrl && (activeUser.name || activeUser.username || '?').charAt(0).toUpperCase()}
@@ -483,24 +483,24 @@ export default function App() {
                             
                             {/* Navigation menu items */}
                             <div className="xl:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
-                                <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
                                 </button>
                                 <button onClick={() => { setShowFunding(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-500/10 transition flex items-center gap-3">
                                      <Heart className="w-4 h-4" /> Soutenir
                                 </button>
                                 {activeUser.role === 'owner' && (
-                                     <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                     <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                          <Shield className="w-4 h-4" /> Salle des Serveurs
                                      </button>
                                 )}
                             </div>
 
                             <div className="border-b border-zinc-100 dark:border-zinc-800 py-1">
-                                <button onClick={() => { setShowSettings(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                <button onClick={() => { setShowSettings(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <Settings className="w-4 h-4" /> Paramètres
                                 </button>
-                                <button onClick={() => { setShowBugReport(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
+                                <button onClick={() => { setShowBugReport(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <MessageSquare className="w-4 h-4" /> Signaler un problème
                                 </button>
                             </div>
@@ -540,7 +540,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
+    <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-primary-500/30 transition-colors`}>
       {navbarContent}
       
       <main>
@@ -589,22 +589,22 @@ export default function App() {
                       className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden text-zinc-900 dark:text-white"
                   >
                       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
-                          <Inbox className="w-5 h-5 text-red-600" />
+                          <Inbox className="w-5 h-5 text-primary-600" />
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                           {activeUser.role === 'owner' && adminNotifs.length > 0 ? (
+                           {(activeUser.role === 'owner' || activeUser.role === 'admin') && adminNotifs.length > 0 ? (
                                adminNotifs.map(n => (
-                                   <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
+                                   <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
                                        <div className="flex justify-between items-start mb-1">
-                                           <span className="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">{n.type}</span>
+                                           <span className="text-xs font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">{n.type}</span>
                                            <div className="flex items-center gap-2">
                                                <span className="text-[10px] text-zinc-500">{new Date(n.createdAt).toLocaleDateString()}</span>
                                                <button onClick={async (e) => {
                                                    e.stopPropagation();
                                                    await fetch(`/api/notifications/${n.id}`, { method: 'DELETE' });
                                                    fetchFilms(true);
-                                               }} className="text-zinc-500 hover:text-red-500 transition-colors ml-2 -mr-1">
+                                               }} className="text-zinc-500 hover:text-primary-500 transition-colors ml-2 -mr-1">
                                                    <X className="w-3 h-3" />
                                                </button>
                                            </div>

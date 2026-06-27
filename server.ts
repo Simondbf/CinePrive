@@ -1424,7 +1424,7 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
 });
 
 // Notifications
-app.get('/api/notifications', requireAuth, requireRole(['owner']), (req, res) => {
+app.get('/api/notifications', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     res.json(db.notifications || []);
 });
 app.post('/api/notifications/:id/read', requireAuth, (req: any, res) => {

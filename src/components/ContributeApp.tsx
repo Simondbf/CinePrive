@@ -931,21 +931,15 @@ export default function ContributeApp({
               en attente)
             </button>
           )}
-          <button
-            className={`px-4 py-2 font-medium rounded transition-colors ${tab === "requests" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
-            onClick={() => setTab("requests")}
-          >
-            Demandes ({requestsList.length})
-          </button>
           {(activeUser.role === "owner" || activeUser.role === "admin") && (
             <>
                 <button
-                  className={`px-4 py-2 font-medium rounded transition-colors flex items-center gap-2 ${tab === "quarantine" ? "bg-red-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+                  className={`px-4 py-2 font-medium rounded transition-colors flex items-center gap-2 ${tab === "quarantine" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
                   onClick={() => setTab("quarantine")}
                 >
                   <AlertTriangle className="w-4 h-4" /> Quarantaine
                   {films.filter(f => (f as any).isQuarantined).length > 0 && (
-                      <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{films.filter(f => (f as any).isQuarantined).length}</span>
+                      <span className="bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full">{films.filter(f => (f as any).isQuarantined).length}</span>
                   )}
                 </button>
                 <button
@@ -992,7 +986,7 @@ export default function ContributeApp({
           {(task.status === "waiting" || task.status === "duplicate") && (
             <button
               onClick={() => removeTask(task.id)}
-              className="text-zinc-600 hover:text-red-500 transition ml-2"
+              className="text-zinc-600 hover:text-primary-500 transition ml-2"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1025,7 +1019,7 @@ export default function ContributeApp({
             )}
             <button
               onClick={() => cancelActiveUpload(task.id)}
-              className="mt-2 text-xs text-red-400 hover:text-red-300 transition w-full py-1.5 bg-red-400/10 rounded border border-red-400/20"
+              className="mt-2 text-xs text-primary-400 hover:text-primary-300 transition w-full py-1.5 bg-primary-400/10 rounded border border-primary-400/20"
             >
               Annuler l'upload en cours
             </button>
@@ -1037,7 +1031,7 @@ export default function ContributeApp({
           </p>
         )}
         {task.status === "error" && (
-          <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+          <p className="text-xs text-primary-500 mt-2 flex items-center gap-1">
             <X className="w-3 h-3" /> Erreur lors de l'envoi
           </p>
         )}
@@ -1156,7 +1150,7 @@ export default function ContributeApp({
           accept="video/*,.mkv" 
           onChange={handleReplaceFile} 
       />
-      <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-red-600 rounded-r shadow-sm">
+      <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-primary-600 rounded-r shadow-sm">
         <div>
           <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">
             {mode === "upload" ? "Espace Contributeur" : "Salle des Serveurs"}
@@ -1182,7 +1176,7 @@ export default function ContributeApp({
       {tab === "upload" &&
         (activeUser.status === "pending" ? (
           <div className="p-12 text-center bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-            <h3 className="text-xl font-medium text-red-600 mb-2">
+            <h3 className="text-xl font-medium text-primary-600 mb-2">
               Accès Restreint
             </h3>
             <p className="text-zinc-600 dark:text-zinc-400">
@@ -1254,7 +1248,7 @@ export default function ContributeApp({
                     </h3>
                     <button
                       onClick={abortUploads}
-                      className="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1"
+                      className="text-xs text-primary-400 hover:text-primary-300 transition flex items-center gap-1"
                     >
                       <X className="w-3 h-3" /> Vider et forcer l'arrêt
                     </button>
@@ -1366,7 +1360,7 @@ export default function ContributeApp({
                                     onClick={() =>
                                       handleDeleteFilm(f.id, f.title)
                                     }
-                                    className="text-white hover:bg-red-500 transition-all font-semibold text-[11px] bg-red-600 hover:shadow-sm px-2.5 py-1.5 rounded tracking-wide uppercase"
+                                    className="text-white hover:bg-primary-500 transition-all font-semibold text-[11px] bg-primary-600 hover:shadow-sm px-2.5 py-1.5 rounded tracking-wide uppercase"
                                   >
                                     Détruire
                                   </button>
@@ -1415,7 +1409,7 @@ export default function ContributeApp({
                               <button
                                 onClick={() => handleDeleteFilm(f.id, f.title)}
                                 disabled={activeUser.role !== "owner"}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-primary-500 hover:text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-950/60 transition-all font-medium text-xs bg-primary-50 dark:bg-primary-950/30 px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Supprimer
                               </button>
@@ -1432,56 +1426,7 @@ export default function ContributeApp({
         </div>
       )}
 
-      {tab === "requests" && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
-            <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr>
-                <th className="px-6 py-4 font-medium">Titre demandé</th>
-                <th className="px-6 py-4 font-medium">Demandeur</th>
-                <th className="px-6 py-4 font-medium">Date</th>
-                <th className="px-6 py-4 font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {requestsList.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-8">
-                    Aucune demande en cours.
-                  </td>
-                </tr>
-              ) : (
-                requestsList.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                  >
-                    <td className="px-6 py-4 font-medium text-zinc-900 dark:text-white">
-                      {r.title}
-                    </td>
-                    <td className="px-6 py-4">{r.userName}</td>
-                    <td className="px-6 py-4">
-                      {new Date(r.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      {(activeUser.role === "owner" ||
-                        activeUser.role === "admin" ||
-                        r.userId === activeUser.id) && (
-                        <button
-                          onClick={() => handleDeleteRequest(r.id)}
-                          className="text-red-500 hover:text-red-600 underline text-xs"
-                        >
-                          Supprimer
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+
 
       {tab === "users" &&
         (activeUser.role === "owner" || activeUser.role === "admin") && (
@@ -1504,7 +1449,7 @@ export default function ContributeApp({
                   </div>
                   <button
                     onClick={handleToggleRegistration}
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${settings.allowRegistrations ? "bg-green-500" : "bg-zinc-200 dark:bg-zinc-700"}`}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${settings.allowRegistrations ? "bg-green-500" : "bg-zinc-200 dark:bg-zinc-700"}`}
                   >
                     <span
                       className={`${settings.allowRegistrations ? "translate-x-6" : "translate-x-1"} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
@@ -1573,7 +1518,7 @@ export default function ContributeApp({
                         </span>
                         <span className="flex items-center gap-4">
                           {inv.used ? (
-                            <span className="text-red-500 text-sm font-medium">
+                            <span className="text-primary-500 text-sm font-medium">
                               Épuisé
                             </span>
                           ) : (
@@ -1583,7 +1528,7 @@ export default function ContributeApp({
                           )}
                           <button
                             onClick={() => deleteInvite(inv.code)}
-                            className="text-zinc-500 hover:text-red-500 text-xs underline"
+                            className="text-zinc-500 hover:text-primary-500 text-xs underline"
                           >
                             Supprimer
                           </button>
@@ -1672,7 +1617,7 @@ export default function ContributeApp({
                                       )
                                     }
                                     disabled={activeUser.role !== "owner"}
-                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Refuser
                                   </button>
@@ -1680,7 +1625,7 @@ export default function ContributeApp({
                             </>
                           ) : u.status === "pending_ban" ? (
                             <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
-                              <span className="text-[10px] bg-red-500/10 text-red-500 font-semibold px-2 py-1 rounded border border-red-500/15 whitespace-nowrap">
+                              <span className="text-[10px] bg-primary-500/10 text-primary-500 font-semibold px-2 py-1 rounded border border-primary-500/15 whitespace-nowrap">
                                 ⚠️ Suspendu par {u.requestedBanBy || "Admin"}
                               </span>
                               <div className="flex gap-1.5 mt-1 sm:mt-0">
@@ -1692,7 +1637,7 @@ export default function ContributeApp({
                                         u.name || u.username,
                                       )
                                     }
-                                    className="text-white hover:bg-red-500 transition-all font-semibold text-[11px] bg-red-600 hover:shadow-sm px-2.5 py-1.5 rounded tracking-wide uppercase"
+                                    className="text-white hover:bg-primary-500 transition-all font-semibold text-[11px] bg-primary-600 hover:shadow-sm px-2.5 py-1.5 rounded tracking-wide uppercase"
                                   >
                                     Bannir déf.
                                   </button>
@@ -1721,7 +1666,7 @@ export default function ContributeApp({
                                       )
                                     }
                                     disabled={activeUser.role !== "owner"}
-                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Bannir
                                   </button>
@@ -1740,7 +1685,7 @@ export default function ContributeApp({
 
       {tab === "quarantine" && (activeUser.role === "owner" || activeUser.role === "admin") && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-            <h3 className="text-lg font-medium text-red-600 dark:text-red-500 mb-6 flex items-center gap-2">
+            <h3 className="text-lg font-medium text-primary-600 dark:text-primary-500 mb-6 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" /> Films en Quarantaine
             </h3>
             <div className="overflow-x-auto">
@@ -1780,14 +1725,14 @@ export default function ContributeApp({
                         <td className="px-6 py-4">
                             <div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700">
                                 {f.reports && f.reports.map((r: any) => (
-                                    <div key={r.id} className="bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-100 dark:border-red-900/50 flex justify-between items-center gap-2">
+                                    <div key={r.id} className="bg-primary-50 dark:bg-primary-950/30 p-2 rounded border border-primary-100 dark:border-primary-900/50 flex justify-between items-center gap-2">
                                         <div>
-                                            <p className="text-xs text-red-800 dark:text-red-400 font-medium">Par {r.userName}</p>
-                                            <p className="text-xs text-red-600 dark:text-red-500 mt-1">Timecode: <span className="font-mono bg-red-100 dark:bg-red-900/50 px-1 py-0.5 rounded">{new Date(r.timecode * 1000).toISOString().substr(11, 8)}</span></p>
+                                            <p className="text-xs text-primary-800 dark:text-primary-400 font-medium">Par {r.userName}</p>
+                                            <p className="text-xs text-primary-600 dark:text-primary-500 mt-1">Timecode: <span className="font-mono bg-primary-100 dark:bg-primary-900/50 px-1 py-0.5 rounded">{new Date(r.timecode * 1000).toISOString().substr(11, 8)}</span></p>
                                         </div>
                                         <button
                                             onClick={() => setPreviewVideo({ url: f.jellyfinId ? `/api/stream/${f.jellyfinId}` : `/videos/${f.filename}`, timecode: r.timecode })}
-                                            className="text-xs font-medium bg-red-200 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-3 py-1.5 rounded hover:bg-red-300 dark:hover:bg-red-900/60 transition-colors shrink-0 flex items-center gap-1"
+                                            className="text-xs font-medium bg-primary-200 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-3 py-1.5 rounded hover:bg-primary-300 dark:hover:bg-primary-900/60 transition-colors shrink-0 flex items-center gap-1"
                                         >
                                             <Video className="w-3 h-3" />
                                             Aperçu
@@ -1807,7 +1752,7 @@ export default function ContributeApp({
                               <button
                                 onClick={() => handleDeleteFilm(f.id, f.title)}
                                 disabled={activeUser.role !== "owner"}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 font-medium text-xs bg-red-50 dark:bg-red-950/30 px-3 py-1.5 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-primary-600 hover:text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-950/60 font-medium text-xs bg-primary-50 dark:bg-primary-950/30 px-3 py-1.5 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 title={activeUser.role !== "owner" ? "Seul le Patron peut détruire un fichier" : "Détruire définitivement"}
                               >
                                 Détruire le Fichier
@@ -1844,7 +1789,7 @@ export default function ContributeApp({
                         fundingCurrent: parseFloat(e.target.value),
                       }))
                     }
-                    className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1862,7 +1807,7 @@ export default function ContributeApp({
                         fundingGoal: parseFloat(e.target.value),
                       }))
                     }
-                    className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1882,7 +1827,7 @@ export default function ContributeApp({
                     ),
                   );
                 }}
-                className="mt-4 w-full bg-red-600 text-white font-medium py-2 rounded hover:bg-red-500 transition"
+                className="mt-4 w-full bg-primary-600 text-white font-medium py-2 rounded hover:bg-primary-500 transition"
               >
                 Valider les modifications
               </button>
@@ -2072,7 +2017,7 @@ export default function ContributeApp({
                                 },
                               });
                             }}
-                            className="text-xs text-red-600 hover:underline px-2 py-1 bg-red-50 dark:bg-red-900/10 rounded"
+                            className="text-xs text-primary-600 hover:underline px-2 py-1 bg-primary-50 dark:bg-primary-900/10 rounded"
                           >
                             Supprimer
                           </button>
@@ -2127,7 +2072,7 @@ export default function ContributeApp({
                               </div>
                               <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-red-600 rounded-full transition-all duration-500"
+                                  className="h-full bg-primary-600 rounded-full transition-all duration-500"
                                   style={{ width: `${percentage}%` }}
                                 />
                               </div>
@@ -2172,7 +2117,7 @@ export default function ContributeApp({
                               placeholder="https://discord.com/api/webhooks/..."
                               value={webhookUrlInput}
                               onChange={e => setWebhookUrlInput(e.target.value)}
-                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm"
+                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white text-sm"
                           />
                       </div>
                       <button 
@@ -2202,7 +2147,7 @@ export default function ContributeApp({
 
               {activeUser.role === 'owner' && (
                   <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                      <h3 className="text-lg font-medium text-red-600 mb-6 flex items-center gap-2">
+                      <h3 className="text-lg font-medium text-primary-600 mb-6 flex items-center gap-2">
                           Sécurité du Studio (Code de Validation)
                       </h3>
                       <div className="space-y-6 max-w-xl">
@@ -2219,7 +2164,7 @@ export default function ContributeApp({
                                           const val = e.target.value.replace(/\D/g, '').substring(0, 6);
                                           setSecurityCodeInput(val);
                                       }}
-                                      className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm tracking-[0.5em] font-mono text-center font-bold"
+                                      className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white text-sm tracking-[0.5em] font-mono text-center font-bold"
                                   />
                                   <button 
                                       type="button"
@@ -2284,7 +2229,7 @@ export default function ContributeApp({
                                       }
                                       setIsRegeneratingSecurityCode(false);
                                   }}
-                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg font-medium text-sm transition disabled:opacity-50 text-center"
+                                  className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg font-medium text-sm transition disabled:opacity-50 text-center"
                               >
                                   Régénérer & Envoyer
                               </button>
@@ -2402,7 +2347,7 @@ export default function ContributeApp({
       {duplicateState.isOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl p-6 w-full max-w-sm border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-red-600 mb-2">Ce film existe déjà</h3>
+            <h3 className="text-lg font-bold text-primary-600 mb-2">Ce film existe déjà</h3>
             <p className="text-zinc-600 dark:text-zinc-400 mb-4 text-sm">
               Le film <strong>{duplicateState.meta?.title}</strong> est déjà présent dans la base de données.
               <br/><br/>
@@ -2422,7 +2367,7 @@ export default function ContributeApp({
                </select>
                
                {duplicateState.existingVersions.includes(duplicateState.selectedVersion) && (
-                   <p className="text-xs text-red-500 font-medium">⚠️ Cette version ({duplicateState.selectedVersion}) existe déjà ! Vous ne pouvez pas uploader une copie identique.</p>
+                   <p className="text-xs text-primary-500 font-medium">⚠️ Cette version ({duplicateState.selectedVersion}) existe déjà ! Vous ne pouvez pas uploader une copie identique.</p>
                )}
             </div>
 
@@ -2495,9 +2440,9 @@ export default function ContributeApp({
       {/* Modal de Validation de Sécurité par Code */}
       {securityModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-white dark:bg-zinc-920 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-red-500/20 dark:border-red-500/10 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 mb-4 text-red-600">
-              <span className="p-2 bg-red-500/10 rounded-lg">
+          <div className="bg-white dark:bg-zinc-920 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-primary-500/20 dark:border-primary-500/10 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4 text-primary-600">
+              <span className="p-2 bg-primary-500/10 rounded-lg">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
@@ -2517,7 +2462,7 @@ export default function ContributeApp({
                 <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
                   {securityModal.title}
                 </h3>
-                <p className="text-xs text-red-600 dark:text-red-400 font-semibold uppercase tracking-wider">
+                <p className="text-xs text-primary-600 dark:text-primary-400 font-semibold uppercase tracking-wider">
                   Autorisation requise
                 </p>
               </div>
@@ -2568,14 +2513,14 @@ export default function ContributeApp({
                       error: "",
                     }));
                   }}
-                  className="w-full tracking-[0.4em] text-center font-mono text-3xl font-extrabold bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-zinc-900 dark:text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all select-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700 placeholder:opacity-30"
+                  className="w-full tracking-[0.4em] text-center font-mono text-3xl font-extrabold bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-zinc-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all select-all placeholder:text-zinc-300 dark:placeholder:text-zinc-700 placeholder:opacity-30"
                   placeholder="000000"
                   autoFocus
                 />
               </div>
 
               {securityModal.error && (
-                <p className="text-xs text-red-600 dark:text-red-400 font-medium text-center bg-red-500/10 border border-red-500/20 py-2 px-3 rounded-lg animate-shake">
+                <p className="text-xs text-primary-600 dark:text-primary-400 font-medium text-center bg-primary-500/10 border border-primary-500/20 py-2 px-3 rounded-lg animate-shake">
                   ⚠️ {securityModal.error}
                 </p>
               )}
@@ -2595,7 +2540,7 @@ export default function ContributeApp({
                 type="button"
                 onClick={handleConfirmSecurityAction}
                 disabled={securityModal.code.length !== 6}
-                className="flex-1 py-3 text-sm font-medium text-white bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:hover:bg-red-600 rounded-xl shadow-md transition-all uppercase tracking-wide"
+                className="flex-1 py-3 text-sm font-medium text-white bg-primary-600 hover:bg-primary-500 disabled:opacity-40 disabled:hover:bg-primary-600 rounded-xl shadow-md transition-all uppercase tracking-wide"
               >
                 Valider et Détruire
               </button>
@@ -2608,7 +2553,7 @@ export default function ContributeApp({
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden w-full max-w-4xl shadow-2xl relative">
             <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-black/50">
               <h3 className="text-white font-medium flex items-center gap-2">
-                <Video className="w-5 h-5 text-red-500" />
+                <Video className="w-5 h-5 text-primary-500" />
                 Aperçu du Signalement
               </h3>
               <button

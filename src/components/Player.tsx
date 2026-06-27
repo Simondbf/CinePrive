@@ -274,7 +274,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
         <div className="absolute top-0 left-0 right-0 p-6 z-50 pointer-events-none flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
             <button 
                 onClick={(e) => { e.stopPropagation(); handleClose(); }} 
-                className="text-white flex items-center gap-2 hover:text-red-500 transition-colors pointer-events-auto bg-black/40 backdrop-blur px-4 py-2 rounded-full border border-white/10 shadow-lg"
+                className="text-white flex items-center gap-2 hover:text-primary-500 transition-colors pointer-events-auto bg-black/40 backdrop-blur px-4 py-2 rounded-full border border-white/10 shadow-lg"
             >
                 <ArrowLeft className="w-6 h-6" />
                 <span className="text-lg font-medium hidden sm:inline">Retour</span>
@@ -283,7 +283,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             <div className="flex items-center gap-3">
                 <button 
                     onClick={(e) => { e.stopPropagation(); setShowReportModal(true); }} 
-                    className="pointer-events-auto flex items-center gap-2 px-4 py-2 transition-colors rounded-full backdrop-blur border border-white/10 bg-black/40 text-white hover:text-red-500 hover:border-red-500/50"
+                    className="pointer-events-auto flex items-center gap-2 px-4 py-2 transition-colors rounded-full backdrop-blur border border-white/10 bg-black/40 text-white hover:text-primary-500 hover:border-primary-500/50"
                     title="Signaler un contenu inapproprié"
                 >
                     <AlertTriangle className="w-5 h-5" />
@@ -319,7 +319,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             fetch(`/api/films/${film.id}/remux`, { method: 'POST' })
                               .then(() => notify("Une demande de conversion en MP4 a été envoyée au serveur. Revenez plus tard.", "Conversion en cours"))
                               .catch(() => notify("Erreur de connexion", "Erreur"));
-                        }} className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition text-white">
+                        }} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg font-medium transition text-white">
                             Convertir en MP4 (Serveur)
                         </button>
                     )}
@@ -377,7 +377,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto"
                 >
                     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
-                        <div className="flex items-center gap-3 text-red-500 mb-4">
+                        <div className="flex items-center gap-3 text-primary-500 mb-4">
                             <AlertTriangle className="w-8 h-8" />
                             <h2 className="text-xl font-bold text-white">Signaler un abus</h2>
                         </div>
@@ -398,7 +398,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             <button 
                                 onClick={handleReport}
                                 disabled={isReporting}
-                                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                                className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
                             >
                                 {isReporting ? 'Envoi...' : 'Confirmer le signalement'}
                             </button>

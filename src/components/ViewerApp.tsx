@@ -160,7 +160,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                         {selectedGenre && (
                             <button 
                                 onClick={() => setSelectedGenre(null)}
-                                className="text-sm font-medium text-red-600 hover:text-red-500"
+                                className="text-sm font-medium text-primary-600 hover:text-primary-500"
                             >
                                 Retour à l'accueil
                             </button>
@@ -186,7 +186,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                                          notify('Erreur lors de la demande.', 'Erreur');
                                      }
                                  }}
-                                 className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition shadow-lg"
+                                 className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white font-medium rounded-full transition shadow-lg"
                              >
                                  Demander l'ajout du film
                              </button>
@@ -206,7 +206,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                                     {list.isCategory && (
                                         <button 
                                             onClick={() => setSelectedGenre(list.title)}
-                                            className="text-sm font-medium text-zinc-500 hover:text-red-500 transition-colors"
+                                            className="text-sm font-medium text-zinc-500 hover:text-primary-500 transition-colors"
                                         >
                                             Tout voir
                                         </button>

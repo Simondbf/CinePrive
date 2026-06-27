@@ -70,12 +70,12 @@ export default function Polls({ activeUser }: { activeUser: User }) {
 
     return (
         <div className="max-w-[800px] mx-auto pb-4">
-            <div className="mb-8 p-6 bg-red-600 border border-red-500 rounded-xl shadow-lg">
+            <div className="mb-8 p-6 bg-primary-600 border border-primary-500 rounded-xl shadow-lg">
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
                     <BarChart3 className="w-6 h-6" />
                     Sondages du Patron
                 </h2>
-                <p className="text-red-100 text-sm max-w-xl">
+                <p className="text-primary-100 text-sm max-w-xl">
                     Participez à la construction de la plateforme. En tant qu'utilisateur de la première heure, votre avis compte sur la Direction Artistique et les prochaines fonctionnalités.
                 </p>
             </div>
@@ -88,7 +88,7 @@ export default function Polls({ activeUser }: { activeUser: User }) {
                     const isMultiple = !!poll.allowMultiple;
                     return (
                     <div key={poll.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                        <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">{poll.title} {isMultiple && <span className="text-xs text-red-500 font-normal ml-2">(Choix multiples)</span>}</h3>
+                        <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">{poll.title} {isMultiple && <span className="text-xs text-primary-500 font-normal ml-2">(Choix multiples)</span>}</h3>
                         <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-6">{poll.desc}</p>
                         
                         {submitted[poll.id] ? (
@@ -103,26 +103,26 @@ export default function Polls({ activeUser }: { activeUser: User }) {
                                     return (
                                     <label 
                                         key={opt.id} 
-                                        className={`flex items-center p-4 border rounded cursor-pointer transition ${checked ? 'border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                                        className={`flex items-center p-4 border rounded cursor-pointer transition ${checked ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
                                     >
                                         <input 
                                             type={isMultiple ? "checkbox" : "radio"} name={isMultiple ? `${poll.id}-${opt.id}` : poll.id}
                                             checked={checked} 
                                             onChange={() => isMultiple ? handleVoteMultiple(poll.id, opt.id) : handleVoteSingle(poll.id, opt.id)}
-                                            className="w-4 h-4 text-red-600 border-zinc-300 focus:ring-red-500 rounded-sm"
+                                            className="w-4 h-4 text-primary-600 border-zinc-300 focus:ring-primary-500 rounded-sm"
                                         />
                                         <span className="ml-3 font-medium text-zinc-900 dark:text-white">{opt.label}</span>
                                     </label>
                                 )})}
                                 
                                 {(poll.allowCustom !== false) && poll.options.length > 0 && (
-                                    <label className={`flex flex-col p-4 border rounded cursor-pointer transition ${currentVotes.includes('custom') ? 'border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>
+                                    <label className={`flex flex-col p-4 border rounded cursor-pointer transition ${currentVotes.includes('custom') ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>
                                         <div className="flex items-center">
                                             <input 
                                                 type={isMultiple ? "checkbox" : "radio"} name={isMultiple ? `${poll.id}-custom` : poll.id}
                                                 checked={currentVotes.includes('custom')} 
                                                 onChange={() => isMultiple ? handleVoteMultiple(poll.id, 'custom') : handleVoteSingle(poll.id, 'custom')}
-                                                className="w-4 h-4 text-red-600 border-zinc-300 focus:ring-red-500 rounded-sm mt-1"
+                                                className="w-4 h-4 text-primary-600 border-zinc-300 focus:ring-primary-500 rounded-sm mt-1"
                                             />
                                             <span className="ml-3 font-medium text-zinc-900 dark:text-white flex items-center gap-2"><Edit3 className="w-4 h-4"/> Autre suggestion :</span>
                                         </div>

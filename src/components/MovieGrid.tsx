@@ -103,7 +103,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                             onPlay(film);
                         }
                     }}
-                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm ${film.status === 'PROCESSING' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-red-500'}`}
+                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm ${film.status === 'PROCESSING' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-primary-500'}`}
                 >
                     {film.posterUrl ? (
                         <img src={film.posterUrl} alt={film.title} className="w-full h-full object-cover" />
@@ -150,7 +150,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                     {/* Version Badge */}
                     {film.versionType && (
                         <div className="absolute top-2 left-2 flex justify-start pointer-events-none">
-                            <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
+                            <span className="bg-primary-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
                                 {film.versionType}
                             </span>
                         </div>
@@ -191,7 +191,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                            </a>
                            <button 
                                onClick={(e) => handleToggle(e, film.id)}
-                               className={`shrink-0 mt-0.5 transition-colors ${inList ? 'text-red-500 hover:text-red-600' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                               className={`shrink-0 mt-0.5 transition-colors ${inList ? 'text-primary-500 hover:text-primary-600' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                                title={inList ? "Retirer de ma liste" : "Ajouter à ma liste"}
                            >
                                {loadingListId === film.id ? (
@@ -266,7 +266,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                             <button onClick={handleUpdateGenre} className="text-green-500 hover:text-green-600">
                                                 <Check className="w-3 h-3" />
                                             </button>
-                                            <button onClick={() => setEditingGenre(false)} className="text-red-500 hover:text-red-600">
+                                            <button onClick={() => setEditingGenre(false)} className="text-primary-500 hover:text-primary-600">
                                                 <X className="w-3 h-3" />
                                             </button>
                                         </div>
@@ -288,7 +288,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                     )}
                                 </div>
                                 {infoFilm.versionType && (
-                                    <span className="bg-red-50 dark:bg-red-500/10 text-red-600 border border-red-200 dark:border-red-500/20 text-xs font-bold px-2 py-1 rounded inline-block mb-4">
+                                    <span className="bg-primary-50 dark:bg-primary-500/10 text-primary-600 border border-primary-200 dark:border-primary-500/20 text-xs font-bold px-2 py-1 rounded inline-block mb-4">
                                         {infoFilm.versionType}
                                     </span>
                                 )}

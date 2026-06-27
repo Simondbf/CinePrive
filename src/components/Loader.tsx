@@ -20,7 +20,7 @@ export default function Loader() {
         <line x1="12" x2="12" y1="17" y2="21"></line>
       </svg>
       <h1 className="mt-5 text-2xl font-bold tracking-tight">CinéPrivé</h1>
-      <div className="mt-4 w-10 h-10 border-[3px] border-red-600/20 border-t-red-600 rounded-full animate-spin"></div>
+      <div className="mt-4 w-10 h-10 border-[3px] border-primary-600/20 border-t-primary-600 rounded-full animate-spin"></div>
     </div>
   );
 }

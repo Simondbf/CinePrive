@@ -44,11 +44,11 @@ export default function EasterEgg({ onClose }: Props) {
                 <X className="w-8 h-8" />
             </button>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                <div className="w-[100vw] h-[100vw] sm:w-[50vw] sm:h-[50vw] border-[1px] border-red-500/30 rounded-full animate-[spin_10s_linear_infinite]" />
-                <div className="absolute w-[80vw] h-[80vw] sm:w-[40vw] sm:h-[40vw] border-[1px] border-red-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
+                <div className="w-[100vw] h-[100vw] sm:w-[50vw] sm:h-[50vw] border-[1px] border-primary-500/30 rounded-full animate-[spin_10s_linear_infinite]" />
+                <div className="absolute w-[80vw] h-[80vw] sm:w-[40vw] sm:h-[40vw] border-[1px] border-primary-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
             </div>
             <div className="relative z-10 p-8 flex flex-col items-center max-w-2xl text-center">
-                <Film className="w-16 h-16 text-red-600 mb-8 animate-pulse" />
+                <Film className="w-16 h-16 text-primary-600 mb-8 animate-pulse" />
                 <AnimatePresence mode="wait">
                     <motion.h2 
                         key={currentIndex}

@@ -110,7 +110,7 @@ export default function AuthScreen({ onLogin }: Props) {
       <div className="min-h-screen bg-zinc-50 dark:bg-[#16181c] dark:amoled:bg-black flex flex-col items-center justify-center text-zinc-900 dark:text-white px-4 transition-colors">
           <div className="w-full max-w-md">
               <h1 className="text-4xl md:text-5xl font-bold font-sans tracking-tight text-center mb-12 text-zinc-900 dark:text-zinc-100 flex items-center justify-center gap-3">
-                  <Monitor className="w-10 h-10 text-red-600" />
+                  <Monitor className="w-10 h-10 text-primary-600" />
                   CinéPrivé
               </h1>
 
@@ -129,7 +129,7 @@ export default function AuthScreen({ onLogin }: Props) {
                               <input 
                                   type="email" value={email} onChange={e => setEmail(e.target.value)} required
                                   placeholder="exemple@email.com"
-                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
+                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                               />
                           </div>
                       ) : (
@@ -142,7 +142,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                           <input 
                                               type="email" value={email} onChange={e => setEmail(e.target.value)} required
                                               placeholder="exemple@email.com"
-                                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
+                                              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                                           />
                                       </div>
                                       {settings && settings.allowRegistrations === false && (
@@ -154,7 +154,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                               <input 
                                                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                                                   placeholder="Ex: XYZ-123"
-                                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
+                                                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
                                               />
                                           </div>
                                       )}
@@ -167,7 +167,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                   <input 
                                       value={username} onChange={e => setUsername(e.target.value)} required
                                       placeholder={!isLogin ? "Ex: Simon" : "Votre nom ou email"}
-                                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
+                                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                                   />
                               </div>
                               <div>
@@ -175,7 +175,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                   <div className="relative">
                                       <input 
                                           type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
-                                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-20 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white truncate"
+                                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-20 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                                       />
                                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors">
                                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -190,14 +190,14 @@ export default function AuthScreen({ onLogin }: Props) {
                                               type="checkbox" 
                                               checked={rememberMe} 
                                               onChange={e => setRememberMe(e.target.checked)} 
-                                              className="w-4 h-4 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer" 
+                                              className="w-4 h-4 rounded border-zinc-300 text-primary-600 focus:ring-primary-500 cursor-pointer" 
                                           />
                                           Se souvenir de moi
                                       </label>
                                       <button 
                                           type="button" 
                                           onClick={() => { setIsForgotPassword(true); setError(''); setMessage(''); }} 
-                                          className="text-red-600 dark:text-red-500 hover:underline font-medium"
+                                          className="text-primary-600 dark:text-primary-500 hover:underline font-medium"
                                       >
                                           Mot de passe oublié ?
                                       </button>
@@ -206,12 +206,12 @@ export default function AuthScreen({ onLogin }: Props) {
                           </>
                       )}
 
-                      {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+                      {error && <p className="text-primary-500 text-sm font-medium">{error}</p>}
                       {message && <p className="text-green-500 text-sm font-medium bg-green-500/10 p-3 rounded">{message}</p>}
 
                       <button 
                           type="submit" disabled={isLoading}
-                          className="w-full bg-red-600 hover:bg-red-500 text-white font-semibold py-2 rounded mt-4 transition flex justify-center items-center gap-2 disabled:opacity-50"
+                          className="w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 rounded mt-4 transition flex justify-center items-center gap-2 disabled:opacity-50"
                       >
                           {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isForgotPassword ? 'Envoyer le lien' : (isLogin ? <><LogIn className="w-5 h-5" /> Se connecter</> : 'S\'inscrire'))}
                       </button>

@@ -164,7 +164,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
             >
                 <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        <Settings className="w-5 h-5 text-red-600" />
+                        <Settings className="w-5 h-5 text-primary-600" />
                         Paramètres
                     </h2>
                 </div>
@@ -175,21 +175,21 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                         <div className="grid grid-cols-3 gap-3">
                             <button 
                                 onClick={() => setThemeMode('light')}
-                                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition ${themeMode === 'light' ? 'border-red-500 bg-red-50 dark:bg-red-500/10 text-red-600' : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition ${themeMode === 'light' ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 text-primary-600' : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
                             >
                                 <Sun className="w-5 h-5 mb-2" />
                                 <span className="text-sm font-medium">Clair</span>
                             </button>
                             <button 
                                 onClick={() => setThemeMode('dark')}
-                                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition ${themeMode === 'dark' ? 'border-red-500 bg-red-50 dark:bg-red-500/10 text-red-600' : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition ${themeMode === 'dark' ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 text-primary-600' : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
                             >
                                 <Moon className="w-5 h-5 mb-2" />
                                 <span className="text-sm font-medium">Sombre</span>
                             </button>
                             <button 
                                 onClick={() => setThemeMode('system')}
-                                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition ${themeMode === 'system' ? 'border-red-500 bg-red-50 dark:bg-red-500/10 text-red-600' : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
+                                className={`flex flex-col items-center justify-center p-3 rounded-lg border transition ${themeMode === 'system' ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 text-primary-600' : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
                             >
                                 <Monitor className="w-5 h-5 mb-2" />
                                 <span className="text-sm font-medium">Système</span>
@@ -226,7 +226,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                                     value={oldPassword}
                                     onChange={e => setOldPassword(e.target.value)}
                                     required
-                                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white text-sm"
                                 />
                             </div>
                             <div>
@@ -236,10 +236,10 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                                     value={newPassword}
                                     onChange={e => setNewPassword(e.target.value)}
                                     required
-                                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-red-500 outline-none text-zinc-900 dark:text-white text-sm"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white text-sm"
                                 />
                             </div>
-                            {err && <p className="text-red-500 text-xs font-medium">{err}</p>}
+                            {err && <p className="text-primary-500 text-xs font-medium">{err}</p>}
                             {msg && <p className="text-green-500 text-xs font-medium">{msg}</p>}
                             <button 
                                 type="submit"
