@@ -60,11 +60,15 @@ export default function App() {
   const [notification, setNotification] = useState<{title: string, message: string, action?: {label: string, onClick: () => void}} | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const categoriesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
      const handleClickOutside = (event: MouseEvent) => {
          if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
              setShowUserMenu(false);
+         }
+         if (categoriesRef.current && !categoriesRef.current.contains(event.target as Node)) {
+             setShowCategories(false);
          }
      };
      document.addEventListener('mousedown', handleClickOutside);
@@ -371,7 +375,7 @@ export default function App() {
             )}
             
             {viewMode === 'viewer' && (
-                <div className="relative max-lg:portrait:hidden">
+                <div className="relative max-lg:portrait:hidden" ref={categoriesRef}>
                     <button 
                         onClick={() => { setShowCategories(!showCategories); setShowUserMenu(false); }}
                         className="text-sm font-medium px-3 py-1.5 text-zinc-600 dark:text-zinc-400 hover:text-primary-600 transition"
@@ -380,31 +384,28 @@ export default function App() {
                     </button>
                     <AnimatePresence>
                         {showCategories && (
-                            <>
-                                <div className="fixed inset-0 z-30" onClick={() => setShowCategories(false)} />
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 10 }}
-                                    className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden z-40 py-2"
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden z-40 py-2"
+                            >
+                                <button 
+                                    onClick={() => { setSelectedGenre(null); setShowCategories(false); }}
+                                    className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-white hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:text-primary-600 transition"
                                 >
+                                    Toutes les catégories
+                                </button>
+                                {Array.from(new Set(films.flatMap(f => f.genres || [f.genre]))).filter(Boolean).sort().map(genre => (
                                     <button 
-                                        onClick={() => { setSelectedGenre(null); setShowCategories(false); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-zinc-900 dark:text-white hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:text-primary-600 transition"
+                                        key={genre}
+                                        onClick={() => { setSelectedGenre(genre); setShowCategories(false); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
                                     >
-                                        Toutes les catégories
+                                        {genre}
                                     </button>
-                                    {Array.from(new Set(films.map(f => f.genre))).sort().map(genre => (
-                                        <button 
-                                            key={genre}
-                                            onClick={() => { setSelectedGenre(genre); setShowCategories(false); }}
-                                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-                                        >
-                                            {genre}
-                                        </button>
-                                    ))}
-                                </motion.div>
-                            </>
+                                ))}
+                            </motion.div>
                         )}
                     </AnimatePresence>
                 </div>
