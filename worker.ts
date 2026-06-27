@@ -54,25 +54,35 @@ const worker = new Worker('transcode', async (job) => {
         });
     });
 
+    const audioCodecStr = await new Promise<string>((resolve) => {
+        execFile('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
+             resolve((stdout || '').trim());
+        });
+    });
+
     const isH264 = videoCodecStr.toLowerCase() === 'h264';
+    const isAac = audioCodecStr.toLowerCase() === 'aac';
+    const audioAction = isAac ? 'copy' : 'aac';
+
     console.log(`[Worker] Analyse : codec vidéo = ${videoCodecStr}. Remuxing rapide : ${isH264 ? 'OUI' : 'NON'}`);
+    console.log(`[Worker] Analyse : codec audio = ${audioCodecStr}. Action audio : ${audioAction}`);
 
     try {
         await new Promise((resolve, reject) => {
             const args = isH264 ? [
                 '-y', '-i', inputPath,
-                '-map', '0:v:0', '-map', '0:a?', '-map', '0:s?',
+                '-map', '0:v:0', '-map', '0:a', '-map', '0:s?',
                 '-c:v', 'copy',
-                '-c:a', 'aac',
+                '-c:a', audioAction,
                 '-c:s', 'mov_text',
                 '-movflags', '+faststart',
                 outputPath
             ] : [
                 '-y', '-i', inputPath,
-                '-map', '0:v:0', '-map', '0:a?', '-map', '0:s?',
+                '-map', '0:v:0', '-map', '0:a', '-map', '0:s?',
                 '-threads', '2',
                 '-c:v', 'libx264', '-preset', 'fast',
-                '-c:a', 'aac',
+                '-c:a', audioAction,
                 '-c:s', 'mov_text',
                 '-movflags', '+faststart',
                 outputPath

@@ -600,7 +600,7 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
         'transcode-job', 
         { filmId, inputFilename }, 
         { 
-            jobId: filmId,
+            jobId: `${filmId}_${Date.now()}`,
             removeOnComplete: true,
             removeOnFail: 50
         }
