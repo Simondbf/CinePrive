@@ -277,7 +277,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
                         Retour
                     </button>
-                    {!film.jellyfinId && (
+                    {!film.jellyfinId && (activeUser?.role === 'owner' || activeUser?.role === 'admin' || activeUser?.role === 'technician') && (
                         <button onClick={(e) => { 
                             e.stopPropagation();
                             fetch(`/api/films/${film.id}/remux`, { method: 'POST' })

@@ -448,13 +448,15 @@ export default function App() {
                 </button>
             )}
 
-            <button 
-                onClick={() => setViewMode('upload')}
-                className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
-                title="Ajouter un film"
-            >
-                <UploadCloud className="w-4 h-4"/> <span className="hidden xl:inline">Ajouter un film</span>
-            </button>
+            {(activeUser.role === 'owner' || activeUser.role === 'admin' || activeUser.role === 'technician') && (
+                <button 
+                    onClick={() => setViewMode('upload')}
+                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    title="Ajouter un film"
+                >
+                    <UploadCloud className="w-4 h-4"/> <span className="hidden xl:inline">Ajouter un film</span>
+                </button>
+            )}
 
             <div ref={userMenuRef} className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
                 {activeUser.status === 'pending' && (

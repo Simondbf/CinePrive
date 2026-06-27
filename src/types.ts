@@ -5,7 +5,7 @@ export interface User {
     email?: string;
     name: string;
     color: string;
-    role: 'owner' | 'admin' | 'user';
+    role: 'owner' | 'admin' | 'technician' | 'user';
     status?: 'pending' | 'active' | 'pending_ban';
     requestedBanBy?: string;
     requestedBanAt?: number;

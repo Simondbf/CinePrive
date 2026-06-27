@@ -1228,7 +1228,7 @@ app.put('/api/films/:id/genre', requireAuth, requireRole(['owner', 'admin']), (r
     res.json({ success: true, film: db.films[filmIndex] });
 });
 
-app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin', 'technician']), (req: any, res) => {
     const { id } = req.params;
     const filmIndex = db.films.findIndex((f: any) => f.id === id);
     if (filmIndex === -1) {
@@ -1236,8 +1236,8 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin']), (req:
     }
     const film = db.films[filmIndex];
 
-    // Si l'utilisateur est un simple admin, il ne fait qu'une suppression temporaire (mise en attente)
-    if (req.user.role === 'admin') {
+    // Si l'utilisateur est un simple admin ou technicien, il ne fait qu'une suppression temporaire (mise en attente)
+    if (req.user.role === 'admin' || req.user.role === 'technician') {
         film.pendingDeletion = true;
         film.requestedDeletionBy = req.user.name || req.user.username;
         film.requestedDeletionAt = Date.now();
@@ -1497,7 +1497,7 @@ app.get('/api/tmdb/search', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
+app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', 'admin', 'technician']), async (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
     if (!film) return res.status(404).json({ error: "Film introuvable" });
 
@@ -1754,7 +1754,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     }
 });
 
-app.post('/api/films/:id/remux', requireRole(['owner', 'admin']), (req: any, res) => {
+app.post('/api/films/:id/remux', requireRole(['owner', 'admin', 'technician']), (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
     

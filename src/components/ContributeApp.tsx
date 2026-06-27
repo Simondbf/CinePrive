@@ -130,7 +130,7 @@ export default function ContributeApp({
       } else {
         setCustomCodeInput("");
         setMaxUsesInput("");
-        fetchData();
+        fetch("/api/invites").then(r => r.json()).then(setInvitesList).catch(console.error);
       }
     } catch (e) {
       console.error(e);
@@ -153,7 +153,7 @@ export default function ContributeApp({
   const deleteInvite = async (code: string) => {
     try {
       await fetch(`/api/invites/${code}`, { method: "DELETE" });
-      fetchData();
+      fetch("/api/invites").then(r => r.json()).then(setInvitesList).catch(console.error);
     } catch (e) {
       console.error(e);
     }
@@ -383,8 +383,8 @@ export default function ContributeApp({
   };
 
   const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
-    if (activeUser.role === "admin") {
-      // Si simple admin -> suppression temporaire sans code
+    if (activeUser.role === "admin" || activeUser.role === "technician") {
+      // Si simple admin/technician -> suppression temporaire sans code
       setDialogState({
         isOpen: true,
         title: "Suspendre le film",
@@ -1218,7 +1218,8 @@ export default function ContributeApp({
                 <th className="px-6 py-4 font-medium">Date d'import</th>
                 <th className="px-6 py-4 font-medium">Fichier d'origine</th>
                 {(activeUser.role === "owner" ||
-                  activeUser.role === "admin") && (
+                  activeUser.role === "admin" ||
+                  activeUser.role === "technician") && (
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 )}
               </tr>
@@ -1265,7 +1266,8 @@ export default function ContributeApp({
                           : ""}
                       </td>
                       {(activeUser.role === "owner" ||
-                        activeUser.role === "admin") && (
+                        activeUser.role === "admin" ||
+                        activeUser.role === "technician") && (
                         <td className="px-6 py-4 text-right">
                           {f.pendingDeletion ? (
                             <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
@@ -1527,35 +1529,31 @@ export default function ContributeApp({
                               ? "Patron"
                               : u.role === "admin"
                                 ? "Admin"
-                                : "Membre"}
+                                : u.role === "technician"
+                                  ? "Technicien"
+                                  : "Membre"}
                           </span>
+                          {u.role === "technician" && (
+                              <span className="text-[10px] text-zinc-500 block max-w-[150px] leading-tight">Peut lancer des transcodages et remplacer des fichiers vidéo</span>
+                          )}
                           {activeUser.role === "owner" &&
                             u.id !== activeUser.id && (
-                              <div className="flex items-center gap-1">
+                              <div className="flex flex-col gap-1 items-start mt-1">
                                 {u.role === "admin" ? (
-                                  <button
-                                    onClick={() =>
-                                      handleChangeRole(u.id, "user")
-                                    }
-                                    className="text-[10px] sm:text-xs text-red-500 hover:underline"
-                                  >
-                                    Rétrograder à User
-                                  </button>
+                                  <>
+                                    <button onClick={() => handleChangeRole(u.id, "technician")} className="text-[10px] sm:text-xs text-red-500 hover:underline">Rétrograder à Technicien</button>
+                                    <button onClick={() => handleChangeRole(u.id, "user")} className="text-[10px] sm:text-xs text-red-500 hover:underline">Rétrograder à User</button>
+                                  </>
+                                ) : u.role === "technician" ? (
+                                  <>
+                                    <button onClick={() => setDialogState({ isOpen: true, title: "Promouvoir Admin", message: `Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`, onConfirm: () => handleChangeRole(u.id, "admin") })} className="text-[10px] sm:text-xs text-purple-600 hover:underline">Promouvoir Admin</button>
+                                    <button onClick={() => handleChangeRole(u.id, "user")} className="text-[10px] sm:text-xs text-red-500 hover:underline">Rétrograder à User</button>
+                                  </>
                                 ) : (
-                                  <button
-                                    onClick={() => {
-                                      setDialogState({
-                                        isOpen: true,
-                                        title: "Promouvoir Admin",
-                                        message: `Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`,
-                                        onConfirm: () =>
-                                          handleChangeRole(u.id, "admin"),
-                                      });
-                                    }}
-                                    className="text-[10px] sm:text-xs text-purple-600 hover:underline"
-                                  >
-                                    Promouvoir Admin
-                                  </button>
+                                  <>
+                                    <button onClick={() => handleChangeRole(u.id, "technician")} className="text-[10px] sm:text-xs text-blue-500 hover:underline">Promouvoir Technicien</button>
+                                    <button onClick={() => setDialogState({ isOpen: true, title: "Promouvoir Admin", message: `Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`, onConfirm: () => handleChangeRole(u.id, "admin") })} className="text-[10px] sm:text-xs text-purple-600 hover:underline">Promouvoir Admin</button>
+                                  </>
                                 )}
                               </div>
                             )}
