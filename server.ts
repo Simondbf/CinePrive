@@ -13,7 +13,7 @@ import { exec, spawn } from 'child_process';
 import nodemailer from 'nodemailer';
 
 const app = express();
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 const PORT = 3000;
 
 app.use(express.json({ limit: '5mb' }));
@@ -1574,6 +1574,7 @@ app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (
         res.json({ success: true });
     } catch (e) {
         console.error("[Upload] Erreur de chunk:", e);
+        if (req.file) fs.unlinkSync(req.file.path);
         res.status(500).json({ error: 'Erreur écriture chunk' });
     }
 });
@@ -1753,7 +1754,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     }
 });
 
-app.post('/api/films/:id/remux', requireAuth, (req: any, res) => {
+app.post('/api/films/:id/remux', requireRole(['owner', 'admin']), (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
     
