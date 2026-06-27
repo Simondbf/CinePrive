@@ -328,12 +328,12 @@ export default function App() {
 
   // Navbar shared between Viewer and Admin
   const navbarContent = (
-      <nav className={`sticky top-0 w-full z-40 ${amoledActive ? 'bg-white/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 lg:px-12 py-4 transition-colors`}>
-        <div className="flex items-center gap-4">
+      <nav className={`sticky top-0 w-full z-50 ${amoledActive ? 'bg-white/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 lg:px-12 py-4 transition-colors`}>
+        <div className="flex items-center gap-4 shrink-0">
             {viewMode !== 'viewer' && (
                 <button 
                     onClick={() => setViewMode('viewer')}
-                    className="p-2 -ml-2 text-zinc-500 hover:text-red-600 transition hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 rounded-full"
+                    className="p-2 -ml-2 text-zinc-500 hover:text-red-600 transition hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 rounded-full max-lg:portrait:hidden"
                     title="Retour"
                 >
                     <ArrowLeft className="w-5 h-5" />
@@ -343,26 +343,26 @@ export default function App() {
                className="text-xl font-bold tracking-tight mr-2 lg:mr-10 flex items-center gap-2 text-red-600 cursor-pointer select-none"
                onClick={handleLogoClick}
             >
-                <Monitor className="w-6 h-6" /> CinéPrivé
+                <Monitor className="w-6 h-6 shrink-0" /> <span className="hidden sm:inline">CinéPrivé</span>
             </div>
         </div>
         
-        <div className="flex items-center gap-2 lg:gap-4 ml-auto pb-1 pr-1">
+        <div className="flex items-center gap-2 lg:gap-4 ml-auto pb-1 pr-1 flex-1 justify-end">
             {viewMode === 'viewer' && (
-                <div className="flex relative items-center">
+                <div className="flex relative items-center max-lg:portrait:flex-1 max-lg:portrait:mx-2 max-lg:portrait:w-full">
                     <Search className="w-4 h-4 absolute left-3 text-zinc-500" />
                     <input 
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Rechercher..."
-                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-32 lg:w-48 focus:w-48 lg:focus:w-64"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-32 lg:w-48 focus:w-48 lg:focus:w-64 max-lg:portrait:w-full max-lg:portrait:focus:w-full"
                     />
                 </div>
             )}
             
             {viewMode === 'viewer' && (
-                <div className="relative">
+                <div className="relative max-lg:portrait:hidden">
                     <button 
                         onClick={() => { setShowCategories(!showCategories); setShowUserMenu(false); }}
                         className="text-sm font-medium px-3 py-1.5 text-zinc-600 dark:text-zinc-400 hover:text-red-600 transition"
@@ -407,7 +407,7 @@ export default function App() {
                     setHasUnread(false);
                     localStorage.setItem('inbox_read', 'true');
                 }}
-                className="relative p-1.5 text-zinc-500 hover:text-red-600 transition"
+                className="relative p-1.5 text-zinc-500 hover:text-red-600 transition max-lg:portrait:hidden"
             >
                 <Inbox className="w-5 h-5" />
                 {hasUnread && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-black"></span>}

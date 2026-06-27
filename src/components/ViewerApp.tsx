@@ -135,7 +135,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     }, [films, searchQuery, selectedGenre, activeUser.myList]);
 
     return (
-        <div className="p-6 md:p-12 pb-24 max-w-[1600px] mx-auto space-y-8 md:space-y-10">
+        <div className="p-6 lg:p-12 pb-24 max-w-[1600px] mx-auto space-y-8 lg:space-y-10">
             {/* Corps de l'interface */}
             {(searchQuery || selectedGenre) ? (
                 <div>
@@ -181,14 +181,14 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                     )}
                 </div>
             ) : (
-                <div className="space-y-8 md:space-y-10">
+                <div className="space-y-8 lg:space-y-10">
                     {lists.map((list, idx) => {
                         if (list.films.length === 0 && !list.alwaysShow) return null;
                         
                         return (
-                            <div key={idx} className="space-y-4 md:space-y-6">
+                            <div key={idx} className="space-y-4 lg:space-y-6">
                                 <div className="flex items-center justify-between px-2">
-                                    <h3 className="text-xl md:text-2xl font-medium text-zinc-900 dark:text-white">{list.title}</h3>
+                                    <h3 className="text-xl lg:text-2xl font-medium text-zinc-900 dark:text-white">{list.title}</h3>
                                     {list.isCategory && (
                                         <button 
                                             onClick={() => setSelectedGenre(list.title)}

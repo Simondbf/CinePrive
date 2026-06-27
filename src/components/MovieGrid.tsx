@@ -77,9 +77,9 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
         {!isCompleteGrid && (
             <button 
                 onClick={(e) => { e.preventDefault(); scroll('left'); }}
-                className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-20 items-center justify-center bg-black/40 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-md rounded-r hover:bg-black/60 shadow-lg"
+                className="hidden lg:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center bg-black/30 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-sm rounded-full hover:bg-black/60 shadow-md"
             >
-                <ChevronLeft className="w-6 h-6 text-white" />
+                <ChevronLeft className="w-5 h-5 text-white" />
             </button>
         )}
 
@@ -223,9 +223,9 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
         {!isCompleteGrid && (
             <button 
                 onClick={(e) => { e.preventDefault(); scroll('right'); }}
-                className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-20 items-center justify-center bg-black/40 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-md rounded-l hover:bg-black/60 shadow-lg"
+                className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center bg-black/30 opacity-0 group-hover/grid:opacity-100 transition-opacity backdrop-blur-sm rounded-full hover:bg-black/60 shadow-md"
             >
-                <ChevronRight className="w-6 h-6 text-white" />
+                <ChevronRight className="w-5 h-5 text-white" />
             </button>
         )}
 

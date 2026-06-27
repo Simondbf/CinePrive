@@ -580,7 +580,7 @@ export default function ContributeApp({
       );
 
       if (isDuplicate) {
-          notify(`Fichier déjà existant : ${f.name}`, "Refusé");
+          notify("Les films déjà présents sur le serveur ont été automatiquement supprimés de la file d'attente.", "Refusé");
           continue;
       }
 
@@ -1114,6 +1114,9 @@ export default function ContributeApp({
         ) : (
           <>
             <div className="flex flex-col gap-6">
+              <div className="lg:hidden p-8 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                  <p className="text-zinc-400">L'ajout de films nécessite un ordinateur (drag & drop).</p>
+              </div>
               {/* Zone de Drop / Selection Multiple */}
               <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <label
