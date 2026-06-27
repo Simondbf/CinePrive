@@ -328,7 +328,7 @@ export default function App() {
 
   // Navbar shared between Viewer and Admin
   const navbarContent = (
-      <nav className={`sticky top-0 w-full z-50 ${amoledActive ? 'bg-white/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 lg:px-12 py-4 transition-colors`}>
+      <nav className={`sticky top-0 w-full z-50 ${amoledActive ? 'bg-white/90 dark:bg-black/90' : 'bg-zinc-50/90 dark:bg-[#16181c]/90'} backdrop-blur border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 xl:px-12 py-4 transition-colors`}>
         <div className="flex items-center gap-4 shrink-0">
             {viewMode !== 'viewer' && (
                 <button 
@@ -340,14 +340,14 @@ export default function App() {
                 </button>
             )}
             <div 
-               className="text-xl font-bold tracking-tight mr-2 lg:mr-10 flex items-center gap-2 text-red-600 cursor-pointer select-none"
+               className="text-xl font-bold tracking-tight mr-2 xl:mr-10 flex items-center gap-2 text-red-600 cursor-pointer select-none"
                onClick={handleLogoClick}
             >
                 <Monitor className="w-6 h-6 shrink-0" /> <span className="hidden sm:inline">CinéPrivé</span>
             </div>
         </div>
         
-        <div className="flex items-center gap-2 lg:gap-4 ml-auto pb-1 pr-1 flex-1 justify-end">
+        <div className="flex items-center gap-2 xl:gap-4 ml-auto pb-1 pr-1 flex-1 justify-end">
             {viewMode === 'viewer' && (
                 <div className="flex relative items-center max-lg:portrait:flex-1 max-lg:portrait:mx-2 max-lg:portrait:w-full">
                     <Search className="w-4 h-4 absolute left-3 text-zinc-500" />
@@ -356,7 +356,7 @@ export default function App() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Rechercher..."
-                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-32 lg:w-48 focus:w-48 lg:focus:w-64 max-lg:portrait:w-full max-lg:portrait:focus:w-full"
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all w-32 xl:w-48 focus:w-48 xl:focus:w-64 max-lg:portrait:w-full max-lg:portrait:focus:w-full"
                     />
                 </div>
             )}
@@ -415,7 +415,7 @@ export default function App() {
 
             <button 
                 onClick={() => setShowPolls(true)}
-                className={`hidden lg:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition ${showPolls ? 'text-red-600 bg-red-50 dark:bg-red-500/10 border border-red-500/20' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Sondages"
             >
                 <ListChecks className="w-4 h-4" /> <span>Sondages</span>
@@ -423,7 +423,7 @@ export default function App() {
 
             <button 
                 onClick={() => setShowFunding(true)}
-                className="hidden lg:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20"
+                className="hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20"
                 title="Soutenir"
             >
                 <Heart className="w-4 h-4" /> <span>Soutenir</span>
@@ -432,7 +432,7 @@ export default function App() {
             {activeUser.role === 'owner' && (
                 <button 
                     onClick={() => setViewMode('admin')}
-                    className={`hidden lg:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                     title="Salle des Serveurs"
                 >
                     <Shield className="w-4 h-4"/> <span>Salle des Serveurs</span>
@@ -441,15 +441,15 @@ export default function App() {
 
             <button 
                 onClick={() => setViewMode('upload')}
-                className={`hidden lg:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                 title="Ajouter un film"
             >
-                <UploadCloud className="w-4 h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
+                <UploadCloud className="w-4 h-4"/> <span className="hidden xl:inline">Ajouter un film</span>
             </button>
 
             <div ref={userMenuRef} className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
                 {activeUser.status === 'pending' && (
-                    <span className="hidden lg:inline text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-500 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-700/50 mr-2">
+                    <span className="hidden xl:inline text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-500 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-700/50 mr-2">
                         Compte en attente
                     </span>
                 )}
@@ -471,7 +471,7 @@ export default function App() {
                             </div>
                             
                             {/* Navigation menu items */}
-                            <div className="lg:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
+                            <div className="xl:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
                                 <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
                                 </button>
