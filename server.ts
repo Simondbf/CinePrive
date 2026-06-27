@@ -1171,17 +1171,20 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
 
   // Masquer la clé JELLYFIN_API_KEY des posterUrls pour les films existants
   const sanitizedFilms = filmsList.map((f: any) => {
-    if (f.posterUrl && f.posterUrl.includes('?api_key=')) {
-      const parts = f.posterUrl.split('/Items/');
+    let sanitizedF = { ...f };
+    const creator = db.users.find((u: any) => u.id === f.addedBy);
+    if (creator) {
+        sanitizedF.addedBy = creator.name || creator.username;
+    }
+
+    if (sanitizedF.posterUrl && sanitizedF.posterUrl.includes('?api_key=')) {
+      const parts = sanitizedF.posterUrl.split('/Items/');
       if (parts.length > 1) {
         const itemId = parts[1].split('/')[0];
-        return {
-          ...f,
-          posterUrl: `/api/jellyfin/image/${itemId}`
-        };
+        sanitizedF.posterUrl = `/api/jellyfin/image/${itemId}`;
       }
     }
-    return f;
+    return sanitizedF;
   });
   res.json(sanitizedFilms);
 });
@@ -1767,6 +1770,72 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     } catch (e) {
         console.error("Upload finalize error", e);
         res.status(500).json({ error: 'Internal upload finalize error' });
+    }
+});
+
+app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', 'admin', 'technician']), express.json(), async (req: any, res) => {
+    const { uploadId, filename, originalName, totalChunks } = req.body;
+    const filmId = req.params.id;
+
+    if (!uploadId || !filename || !totalChunks) {
+        return res.status(400).json({ error: 'Données manquantes' });
+    }
+
+    const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const safeName = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const finalFilename = `${Date.now()}_${safeName}`;
+    const finalPath = path.join(UPLOADS_DIR, finalFilename);
+
+    const filmIndex = db.films.findIndex((f: any) => f.id === filmId);
+    if (filmIndex === -1) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+    const oldFilm = db.films[filmIndex];
+
+    try {
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}_${i}`);
+            if (!fs.existsSync(chunkPath)) {
+                 if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+                 return res.status(400).json({ error: `Chunk ${i} introuvable` });
+            }
+            await new Promise((resolve, reject) => {
+                const rs = fs.createReadStream(chunkPath);
+                const ws = fs.createWriteStream(finalPath, { flags: 'a' });
+                rs.pipe(ws);
+                rs.on('error', reject);
+                ws.on('error', reject);
+                ws.on('finish', () => resolve(null));
+            });
+            fs.unlinkSync(chunkPath);
+        }
+
+        const isMp4 = finalFilename.toLowerCase().endsWith('.mp4');
+
+        if (oldFilm.filename) {
+            const oldPath = path.join(UPLOADS_DIR, oldFilm.filename);
+            if (fs.existsSync(oldPath)) {
+                try { fs.unlinkSync(oldPath); } catch (e) {}
+            }
+        }
+
+        oldFilm.filename = finalFilename;
+        oldFilm.originalName = originalName || filename;
+        oldFilm.status = isMp4 ? 'AVAILABLE' : 'PROCESSING';
+        oldFilm.modifiedBy = req.user.name || req.user.username;
+        oldFilm.modifiedById = req.user.id;
+        oldFilm.modifiedAt = new Date().toISOString();
+
+        saveDb();
+        
+        if (!isMp4) {
+            transcodeQueue.add({ filmId: oldFilm.id, filename: finalFilename });
+        }
+
+        res.json({ success: true, film: oldFilm });
+    } catch (e) {
+        console.error("Erreur replace-finalize:", e);
+        res.status(500).json({ error: 'Erreur interne' });
     }
 });
 

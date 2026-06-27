@@ -300,6 +300,10 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                 {infoFilm.synopsis || "Aucun synopsis disponible pour ce film."}
                             </p>
                         </div>
+                        <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500">
+                            Ajouté par {infoFilm.addedBy} 
+                            {(infoFilm as any).modifiedBy && ` (Mis à jour par ${(infoFilm as any).modifiedBy})`}
+                        </div>
                     </div>
                 </motion.div>
             </div>

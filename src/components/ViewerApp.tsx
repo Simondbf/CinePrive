@@ -65,9 +65,17 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     const lists = useMemo(() => {
         if (searchQuery || selectedGenre) return []; // En mode recherche/genre on n'affiche que les resultats
 
+        const isProcessing = (f: Film) => f.status === 'PROCESSING' || (!f.jellyfinId && (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv')));
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const bientotDisponibleFilms = films
+            .filter(f => isProcessing(f))
+            .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+
         const nouveautes = films
+            .filter(f => !isProcessing(f))
             .filter(f => new Date(f.addedAt) >= thirtyDaysAgo)
             .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
             .slice(0, 12);
@@ -99,7 +107,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
 
         // Grouping genres
         const categories = new Map<string, Film[]>();
-        films.forEach(f => {
+        films.filter(f => !isProcessing(f)).forEach(f => {
             if (!categories.has(f.genre)) categories.set(f.genre, []);
             categories.get(f.genre)!.push(f);
         });
@@ -108,6 +116,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         const blocs = [
             { title: "🎬 Reprendre la lecture", films: reprendreFilms, alwaysShow: false, isContinueWatching: true },
             { title: "🎬 Nouveautés", films: nouveautes, alwaysShow: false, isCategory: true },
+            { title: "⏳ Bientôt disponible", films: bientotDisponibleFilms, alwaysShow: false, isCategory: true },
             { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: false, isCategory: true }
         ];
 
@@ -121,15 +130,20 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     }, [films, activeUser.myList, searchQuery, selectedGenre, progress]);
 
     const displayedFilms = useMemo(() => {
+        const isProcessing = (f: Film) => f.status === 'PROCESSING' || (!f.jellyfinId && (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv')));
+        
         if (searchQuery) return films.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
         if (selectedGenre) {
             if (selectedGenre === "📌 Ma Liste") return films.filter(f => activeUser.myList?.includes(f.id));
             if (selectedGenre === "🎬 Nouveautés") {
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                return films.filter(f => new Date(f.addedAt) >= thirtyDaysAgo).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+                return films.filter(f => !isProcessing(f) && new Date(f.addedAt) >= thirtyDaysAgo).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
             }
-            return films.filter(f => f.genre === selectedGenre);
+            if (selectedGenre === "⏳ Bientôt disponible") {
+                return films.filter(f => isProcessing(f)).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+            }
+            return films.filter(f => !isProcessing(f) && f.genre === selectedGenre);
         }
         return [];
     }, [films, searchQuery, selectedGenre, activeUser.myList]);

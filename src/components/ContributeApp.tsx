@@ -501,6 +501,8 @@ export default function ContributeApp({
     isSearching: boolean;
     etaSeconds?: number | null;
     versionType?: string;
+    replaceFilmId?: string;
+    replaceFilmTitle?: string;
   }
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
@@ -628,6 +630,34 @@ export default function ContributeApp({
     }
   };
 
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [replacingFilm, setReplacingFilm] = useState<{id: string, title: string, tmdbId?: number} | null>(null);
+
+  const handleReplaceFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!replacingFilm) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    const file = files[0];
+    const task: UploadTask = {
+        id: Math.random().toString(36).substr(2, 9),
+        file,
+        tmdbQuery: replacingFilm.title,
+        tmdbResults: [],
+        selectedMeta: { id: replacingFilm.tmdbId, title: replacingFilm.title },
+        status: "waiting",
+        progress: 0,
+        isSearching: false,
+        replaceFilmId: replacingFilm.id,
+        replaceFilmTitle: replacingFilm.title
+    };
+    
+    setTasks(prev => [...prev, task]);
+    setTab('upload');
+    setReplacingFilm(null);
+    e.target.value = '';
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
     processFiles(selectedFiles);
@@ -743,7 +773,7 @@ export default function ContributeApp({
 
     try {
         const res = await fetch('/api/films');
-        if (res.ok) {
+        if (res.ok && !task.replaceFilmId) {
             const data = await res.json();
             const existing = data.films.find((f: any) => f.tmdbId === task.selectedMeta.id);
             if (existing) {
@@ -830,7 +860,11 @@ export default function ContributeApp({
 
       if (failed) throw new Error("Chunk upload failed");
 
-      const finRes = await fetch("/api/films/upload-finalize", {
+      const finalizeUrl = task.replaceFilmId 
+        ? `/api/films/${task.replaceFilmId}/replace-finalize`
+        : "/api/films/upload-finalize";
+
+      const finRes = await fetch(finalizeUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -853,8 +887,8 @@ export default function ContributeApp({
         );
         onRefresh(true);
         notify(
-          "Les projectionnistes préparent les bobines pour le web. Ce processus d'optimisation intensif s'exécute en tâche de fond et peut prendre plusieurs dizaines de minutes.",
-          "🎬 En salle de montage..."
+          task.replaceFilmId ? "Le fichier a été remplacé avec succès." : "Les projectionnistes préparent les bobines pour le web. Ce processus d'optimisation intensif s'exécute en tâche de fond et peut prendre plusieurs dizaines de minutes.",
+          task.replaceFilmId ? "Remplacement terminé" : "🎬 En salle de montage..."
         );
       } else {
         setTasks((prev) =>
@@ -1115,6 +1149,13 @@ export default function ContributeApp({
 
   return (
     <div className="p-6 lg:p-12 pb-24 max-w-[1200px] mx-auto">
+      <input 
+          type="file" 
+          ref={replaceInputRef} 
+          className="hidden" 
+          accept="video/*,.mkv" 
+          onChange={handleReplaceFile} 
+      />
       <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-red-600 rounded-r shadow-sm">
         <div>
           <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">
@@ -1283,6 +1324,11 @@ export default function ContributeApp({
                       </td>
                       <td className="px-6 py-4">
                         {uploader?.name || f.addedBy}
+                        {(f as any).modifiedBy && (
+                            <span className="block text-[10px] text-zinc-500 mt-0.5">
+                                (Mis à jour par {(f as any).modifiedBy})
+                            </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {(() => {
@@ -1336,6 +1382,16 @@ export default function ContributeApp({
                             </div>
                           ) : (
                             <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                    setReplacingFilm({ id: f.id, title: f.title, tmdbId: f.tmdbId });
+                                    replaceInputRef.current?.click();
+                                }}
+                                className="text-zinc-500 hover:text-green-600 transition-all font-medium text-xs px-2.5 py-1.5 rounded flex items-center justify-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                                title="Remplacer la vidéo"
+                              >
+                                <Video className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={async () => {
                                   try {
