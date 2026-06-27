@@ -77,7 +77,7 @@ export default function AuthScreen({ onLogin }: Props) {
         }
 
         const endpoint = isLogin ? '/api/login' : '/api/register';
-        const body = isLogin ? { username, password } : { username, password, name: username, inviteCode, email };
+        const body = isLogin ? { username, password, rememberMe } : { username, password, name: username, inviteCode, email, rememberMe };
 
         try {
           const res = await fetch(endpoint, {

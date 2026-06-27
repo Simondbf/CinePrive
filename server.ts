@@ -852,7 +852,7 @@ app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) =
 });
 
 app.post('/api/register', async (req, res) => {
-    const { username, password, email, name, inviteCode } = req.body;
+    const { username, password, email, name, inviteCode, rememberMe } = req.body;
     
     let bypassWithCode = false;
     if (inviteCode && db.invites) {
@@ -918,6 +918,14 @@ app.post('/api/register', async (req, res) => {
     
     saveDb();
 
+    const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '1d' });
+    res.cookie('token', token, { 
+        httpOnly: true, 
+        secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'lax',
+        maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined 
+    });
+
     // Renvoyer l'utilisateur sans le mdp
     res.json({ ...newUser, password: '' });
 });
@@ -925,7 +933,7 @@ app.post('/api/register', async (req, res) => {
 const loginAttempts: Record<string, { count: number, lockedUntil: number }> = {};
 
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, rememberMe } = req.body;
     let ipStr = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
     if (Array.isArray(ipStr)) ipStr = ipStr[0];
     const ip = typeof ipStr === 'string' ? ipStr.split(',')[0].trim() : 'unknown';
@@ -964,8 +972,13 @@ app.post('/api/login', async (req, res) => {
             if (user.status === 'pending_ban') {
                 return res.status(403).json({ error: "Votre compte est temporairement suspendu en attente de la validation finale du Patron." });
             }
-            const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
-            res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
+            const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '1d' });
+            res.cookie('token', token, { 
+                httpOnly: true, 
+                secure: process.env.NODE_ENV === 'production', 
+                sameSite: 'lax',
+                maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined 
+            });
             return res.json({ ...user, password: '' });
         }
     }

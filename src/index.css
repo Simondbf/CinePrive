@@ -34,3 +34,8 @@ html.amoled .dark\:bg-zinc-950:where(.dark, .dark *) {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+/* Prevent auto-zoom on iOS for inputs */
+input, textarea, select {
+  font-size: 16px !important;
+}
