@@ -14,7 +14,9 @@ import {
   Trash2,
   Edit2,
   LogOut,
-  Settings
+  Settings,
+  AlertTriangle,
+  Video
 } from "lucide-react";
 
 interface Props {
@@ -33,7 +35,7 @@ export default function ContributeApp({
   onUploadStateChange,
 }: Props) {
   const [tab, setTab] = useState<
-    "upload" | "library" | "users" | "requests" | "polls" | "funding" | "security"
+    "upload" | "library" | "users" | "requests" | "polls" | "funding" | "security" | "quarantine"
   >(mode === "upload" ? "upload" : "users");
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
@@ -71,6 +73,7 @@ export default function ContributeApp({
 
   const [pollsConfig, setPollsConfig] = useState<any[]>([]);
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
+  const [previewVideo, setPreviewVideo] = useState<{ url: string, timecode: number } | null>(null);
 
   const fetchData = React.useCallback(() => {
     fetch("/api/users")
@@ -643,6 +646,10 @@ export default function ContributeApp({
 
   const updateTaskMeta = async (taskId: string, meta: any) => {
     if (meta) {
+        if (meta.adult) {
+            notify("Le contenu pour adultes est strictement interdit sur ce serveur.", "Importation bloquée");
+            return;
+        }
         try {
             const res = await fetch('/api/films');
             if (res.ok) {
@@ -898,6 +905,15 @@ export default function ContributeApp({
           </button>
           {(activeUser.role === "owner" || activeUser.role === "admin") && (
             <>
+                <button
+                  className={`px-4 py-2 font-medium rounded transition-colors flex items-center gap-2 ${tab === "quarantine" ? "bg-red-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+                  onClick={() => setTab("quarantine")}
+                >
+                  <AlertTriangle className="w-4 h-4" /> Quarantaine
+                  {films.filter(f => (f as any).isQuarantined).length > 0 && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{films.filter(f => (f as any).isQuarantined).length}</span>
+                  )}
+                </button>
                 <button
                   className={`px-4 py-2 font-medium rounded transition-colors ${tab === "funding" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
                   onClick={() => setTab("funding")}
@@ -1665,6 +1681,91 @@ export default function ContributeApp({
             </div>
           </div>
         )}
+
+      {tab === "quarantine" && (activeUser.role === "owner" || activeUser.role === "admin") && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+            <h3 className="text-lg font-medium text-red-600 dark:text-red-500 mb-6 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" /> Films en Quarantaine
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-sm text-zinc-500">
+                    <th className="px-6 py-4 font-medium">Film</th>
+                    <th className="px-6 py-4 font-medium">Signalements</th>
+                    <th className="px-6 py-4 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {films.filter((f: any) => f.isQuarantined).length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-12 text-center text-zinc-500">
+                        Aucun film en quarantaine.
+                      </td>
+                    </tr>
+                  ) : (
+                    films.filter((f: any) => f.isQuarantined).map((f: any) => (
+                      <tr key={f.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                        <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                                {f.posterUrl ? (
+                                    <img src={f.posterUrl} alt={f.title} className="w-10 h-14 object-cover rounded shadow" />
+                                ) : (
+                                    <div className="w-10 h-14 bg-zinc-200 dark:bg-zinc-800 rounded flex items-center justify-center">
+                                        <Video className="w-4 h-4 text-zinc-500" />
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="font-medium text-zinc-900 dark:text-white">{f.title}</p>
+                                    <p className="text-xs text-zinc-500">{f.year} • {f.originalName}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td className="px-6 py-4">
+                            <div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700">
+                                {f.reports && f.reports.map((r: any) => (
+                                    <div key={r.id} className="bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-100 dark:border-red-900/50 flex justify-between items-center gap-2">
+                                        <div>
+                                            <p className="text-xs text-red-800 dark:text-red-400 font-medium">Par {r.userName}</p>
+                                            <p className="text-xs text-red-600 dark:text-red-500 mt-1">Timecode: <span className="font-mono bg-red-100 dark:bg-red-900/50 px-1 py-0.5 rounded">{new Date(r.timecode * 1000).toISOString().substr(11, 8)}</span></p>
+                                        </div>
+                                        <button
+                                            onClick={() => setPreviewVideo({ url: f.jellyfinId ? `/api/stream/${f.jellyfinId}` : `/videos/${f.filename}`, timecode: r.timecode })}
+                                            className="text-xs font-medium bg-red-200 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-3 py-1.5 rounded hover:bg-red-300 dark:hover:bg-red-900/60 transition-colors shrink-0 flex items-center gap-1"
+                                        >
+                                            <Video className="w-3 h-3" />
+                                            Aperçu
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleRestoreFilm(f.id)}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-950/60 font-medium text-xs bg-green-50 dark:bg-green-950/30 px-3 py-1.5 rounded transition-all"
+                              >
+                                Lever la Quarantaine
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFilm(f.id, f.title)}
+                                disabled={activeUser.role !== "owner"}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 font-medium text-xs bg-red-50 dark:bg-red-950/30 px-3 py-1.5 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={activeUser.role !== "owner" ? "Seul le Patron peut détruire un fichier" : "Détruire définitivement"}
+                              >
+                                Détruire le Fichier
+                              </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+      )}
 
       {tab === "funding" &&
         (activeUser.role === "owner" || activeUser.role === "admin") && (
@@ -2446,6 +2547,39 @@ export default function ContributeApp({
           </div>
         </div>
       )}
+      {previewVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden w-full max-w-4xl shadow-2xl relative">
+            <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-black/50">
+              <h3 className="text-white font-medium flex items-center gap-2">
+                <Video className="w-5 h-5 text-red-500" />
+                Aperçu du Signalement
+              </h3>
+              <button
+                onClick={() => setPreviewVideo(null)}
+                className="text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 p-2 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="bg-black aspect-video relative">
+                <video
+                    controls
+                    autoPlay
+                    src={`${previewVideo.url}#t=${Math.max(0, previewVideo.timecode - 10)}`}
+                    className="w-full h-full"
+                    crossOrigin="anonymous"
+                >
+                    Votre navigateur ne supporte pas la lecture vidéo.
+                </video>
+            </div>
+            <div className="p-4 bg-zinc-900 flex justify-between items-center text-sm text-zinc-400">
+                <p>Lecture démarrée 10 secondes avant le timecode signalé (<span className="text-white font-mono">{new Date(previewVideo.timecode * 1000).toISOString().substr(11, 8)}</span>).</p>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

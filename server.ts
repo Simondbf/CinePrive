@@ -1164,9 +1164,9 @@ app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
 app.get('/api/films', requireAuth, async (req: any, res) => {
   let filmsList = db.films || [];
   
-  // Masquer les films en attente de suppression définitive pour les membres réguliers
+  // Masquer les films en attente de suppression définitive ou en quarantaine pour les membres réguliers
   if (req.user.role !== 'owner' && req.user.role !== 'admin') {
-      filmsList = filmsList.filter((f: any) => !f.pendingDeletion);
+      filmsList = filmsList.filter((f: any) => !f.pendingDeletion && !f.isQuarantined);
   }
 
   // Masquer la clé JELLYFIN_API_KEY des posterUrls pour les films existants
@@ -1196,9 +1196,38 @@ app.post('/api/films/:id/restore', requireAuth, requireRole(['owner', 'admin']),
     delete film.pendingDeletion;
     delete film.requestedDeletionBy;
     delete film.requestedDeletionAt;
+    delete film.isQuarantined;
+    delete film.reports;
     
     saveDb();
     res.json({ success: true, message: `Le film "${film.title}" a été restauré.` });
+});
+
+app.post('/api/films/:id/report', requireAuth, (req: any, res) => {
+    const { id } = req.params;
+    const { timecode } = req.body;
+    
+    const film = db.films.find((f: any) => f.id === id);
+    if (!film) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+
+    film.isQuarantined = true;
+    
+    if (!film.reports) {
+        film.reports = [];
+    }
+    
+    film.reports.push({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        userId: req.user.id,
+        userName: req.user.name || req.user.username,
+        timecode,
+        createdAt: new Date().toISOString()
+    });
+    
+    saveDb();
+    res.json({ success: true, message: "Film mis en quarantaine suite au signalement." });
 });
 
 app.put('/api/films/:id/genre', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
@@ -1470,8 +1499,13 @@ app.get('/api/tmdb/search', requireAuth, async (req, res) => {
     }
 
     try {
-        const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR`);
+        const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&include_adult=false`);
         const data = await response.json();
+        
+        if (data.results) {
+            data.results = data.results.filter((r: any) => !r.adult);
+        }
+        
         res.json(data);
     } catch (err: any) {
         console.error("Erreur TMDB:", err);

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { notify } from '../lib/notify';
 import { Film, User } from '../types';
-import { ArrowLeft, Settings, Users } from 'lucide-react';
+import { ArrowLeft, Settings, Users, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Plyr from 'plyr';
 import 'plyr/dist/plyr.css';
@@ -21,6 +21,8 @@ export default function Player({ film, activeUser, onClose }: Props) {
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tapsRef = useRef(0);
   const [doubleTapInfo, setDoubleTapInfo] = useState<{ side: 'left' | 'right', seconds: number, visible: boolean }>({ side: 'left', seconds: 0, visible: false });
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
 
   const handleClose = () => {
       try {
@@ -71,6 +73,30 @@ export default function Player({ film, activeUser, onClose }: Props) {
   };
 
   const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
+
+  const handleReport = async () => {
+      if (!playerRef.current) return;
+      setIsReporting(true);
+      try {
+          const timecode = Math.floor(playerRef.current.currentTime);
+          const res = await fetch(`/api/films/${film.id}/report`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ timecode })
+          });
+          if (res.ok) {
+              notify("Le signalement a été envoyé avec succès. Le film a été mis en quarantaine.", "Bouclier Communautaire");
+              handleClose();
+          } else {
+              notify("Erreur lors du signalement.", "Erreur");
+          }
+      } catch (e) {
+          notify("Erreur de connexion.", "Erreur");
+      } finally {
+          setIsReporting(false);
+          setShowReportModal(false);
+      }
+  };
 
   useEffect(() => {
     if (isMkv) {
@@ -254,16 +280,26 @@ export default function Player({ film, activeUser, onClose }: Props) {
                 <span className="text-lg font-medium hidden sm:inline">Retour</span>
             </button>
 
-            {film.cast && film.cast.length > 0 && (
+            <div className="flex items-center gap-3">
                 <button 
-                    onClick={(e) => { e.stopPropagation(); setShowCast(!showCast); }} 
-                    className={`pointer-events-auto flex items-center gap-2 px-4 py-2 transition-colors rounded-full backdrop-blur border border-white/10 ${showCast ? 'bg-gold-500 text-black border-gold-500' : 'bg-black/40 text-white hover:text-gold-500'}`}
-                    title="Voir le casting (TMDB)"
+                    onClick={(e) => { e.stopPropagation(); setShowReportModal(true); }} 
+                    className="pointer-events-auto flex items-center gap-2 px-4 py-2 transition-colors rounded-full backdrop-blur border border-white/10 bg-black/40 text-white hover:text-red-500 hover:border-red-500/50"
+                    title="Signaler un contenu inapproprié"
                 >
-                    <Users className="w-5 h-5" />
-                    <span className="font-medium">Casting</span>
+                    <AlertTriangle className="w-5 h-5" />
+                    <span className="font-medium hidden sm:inline">Signaler</span>
                 </button>
-            )}
+                {film.cast && film.cast.length > 0 && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setShowCast(!showCast); }} 
+                        className={`pointer-events-auto flex items-center gap-2 px-4 py-2 transition-colors rounded-full backdrop-blur border border-white/10 ${showCast ? 'bg-gold-500 text-black border-gold-500' : 'bg-black/40 text-white hover:text-gold-500'}`}
+                        title="Voir le casting (TMDB)"
+                    >
+                        <Users className="w-5 h-5" />
+                        <span className="font-medium">Casting</span>
+                    </button>
+                )}
+            </div>
         </div>
 
         {playbackError && (
@@ -327,6 +363,47 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             </div>
                         </div>
                     ))}
+                </motion.div>
+            )}
+        </AnimatePresence>
+
+        {/* Report Modal */}
+        <AnimatePresence>
+            {showReportModal && (
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto"
+                >
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+                        <div className="flex items-center gap-3 text-red-500 mb-4">
+                            <AlertTriangle className="w-8 h-8" />
+                            <h2 className="text-xl font-bold text-white">Signaler un abus</h2>
+                        </div>
+                        <p className="text-zinc-300 mb-4 text-sm leading-relaxed">
+                            Avez-vous repéré un contenu inapproprié (pornographie, violence extrême, ou non conforme aux règles) ? 
+                        </p>
+                        <p className="text-zinc-400 mb-6 text-sm">
+                            Le timecode actuel sera automatiquement capturé. Le film passera immédiatement en quarantaine et sera masqué jusqu'à vérification par un Administrateur.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowReportModal(false)}
+                                disabled={isReporting}
+                                className="px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button 
+                                onClick={handleReport}
+                                disabled={isReporting}
+                                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {isReporting ? 'Envoi...' : 'Confirmer le signalement'}
+                            </button>
+                        </div>
+                    </div>
                 </motion.div>
             )}
         </AnimatePresence>
