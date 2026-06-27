@@ -9,7 +9,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { exec, spawn } from 'child_process';
+import { exec, spawn, execFile } from 'child_process';
 import nodemailer from 'nodemailer';
 
 const app = express();
@@ -521,9 +521,11 @@ const connection = new IORedis({
 });
 
 export const transcodeQueue = new Queue('transcode', { connection: connection as any });
+export const transcodeFastQueue = new Queue('transcode-fast', { connection: connection as any });
 const transcodeEvents = new QueueEvents('transcode', { connection: connection as any });
+const transcodeFastEvents = new QueueEvents('transcode-fast', { connection: connection as any });
 
-transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
+const handleTranscodeCompleted = async ({ jobId, returnvalue }: any, queue: any) => {
     let parsedReturn: any = returnvalue;
     if (typeof returnvalue === 'string') {
         try { parsedReturn = JSON.parse(returnvalue); } catch(e) {}
@@ -531,7 +533,7 @@ transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
     
     if (!parsedReturn || typeof parsedReturn !== 'object') {
         try {
-            const job = await transcodeQueue.getJob(jobId);
+            const job = await queue.getJob(jobId);
             if (job && job.returnvalue) {
                 parsedReturn = typeof job.returnvalue === 'string' ? JSON.parse(job.returnvalue) : job.returnvalue;
             }
@@ -576,12 +578,12 @@ transcodeEvents.on('completed', async ({ jobId, returnvalue }) => {
             } catch (e) {}
         }
     }
-});
+};
 
-transcodeEvents.on('failed', async ({ jobId, failedReason }) => {
+const handleTranscodeFailed = async ({ jobId, failedReason }: any, queue: any) => {
     console.error(`[Queue] Échec du transcodage pour le job ${jobId}: ${failedReason}`);
     try {
-        const job = await transcodeQueue.getJob(jobId);
+        const job = await queue.getJob(jobId);
         if (job && job.data.filmId) {
             const film = db.films.find((f: any) => f.id === job.data.filmId);
             if (film) {
@@ -590,21 +592,53 @@ transcodeEvents.on('failed', async ({ jobId, failedReason }) => {
             }
         }
     } catch(e) {}
-});
+};
+
+transcodeEvents.on('completed', (args) => handleTranscodeCompleted(args, transcodeQueue));
+transcodeFastEvents.on('completed', (args) => handleTranscodeCompleted(args, transcodeFastQueue));
+transcodeEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeQueue));
+transcodeFastEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeFastQueue));
+
+const checkIsH264 = (inputPath: string): Promise<boolean> => {
+    return new Promise<boolean>((resolve) => {
+        execFile('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
+             resolve((stdout || '').trim().toLowerCase() === 'h264');
+        });
+    });
+};
 
 export const enqueueTranscode = async (filmId: string, inputFilename: string) => {
     try {
         await transcodeQueue.remove(filmId);
+        await transcodeFastQueue.remove(filmId);
     } catch(e) {}
-    await transcodeQueue.add(
-        'transcode-job', 
-        { filmId, inputFilename }, 
-        { 
-            jobId: `${filmId}_${Date.now()}`,
-            removeOnComplete: true,
-            removeOnFail: 50
-        }
-    );
+
+    const inputPath = path.join(UPLOADS_DIR, inputFilename);
+    const isH264 = await checkIsH264(inputPath);
+
+    if (isH264) {
+        console.log(`[Queue] Remuxing rapide détecté (H264). Ajout à la file rapide (qui n'est jamais en pause).`);
+        await transcodeFastQueue.add(
+            'transcode-job', 
+            { filmId, inputFilename }, 
+            { 
+                jobId: `${filmId}_${Date.now()}`,
+                removeOnComplete: true,
+                removeOnFail: 50
+            }
+        );
+    } else {
+        console.log(`[Queue] Encodage lourd requis. Ajout à la file nocturne.`);
+        await transcodeQueue.add(
+            'transcode-job', 
+            { filmId, inputFilename }, 
+            { 
+                jobId: `${filmId}_${Date.now()}`,
+                removeOnComplete: true,
+                removeOnFail: 50
+            }
+        );
+    }
     console.log(`[Queue] Job ajouté à BullMQ pour le film ID: ${filmId}`);
 };
 
@@ -646,8 +680,9 @@ app.post('/api/polls/config', requireAuth, requireRole(['owner']), (req, res) =>
     res.json({ success: true, pollsConfig: db.pollsConfig });
 });
 
-app.post('/api/polls/vote', requireAuth, (req, res) => {
-    const { pollId, vote, customText, userId } = req.body;
+app.post('/api/polls/vote', requireAuth, (req: any, res) => {
+    const { pollId, vote, customText } = req.body;
+    const userId = req.user.id;
     if (!db.polls[pollId]) db.polls[pollId] = { options: {}, custom: [], votedUsers: [], userVotes: {} };
     if (!db.polls[pollId].votedUsers) db.polls[pollId].votedUsers = [];
     if (!db.polls[pollId].userVotes) db.polls[pollId].userVotes = {};
@@ -1829,7 +1864,7 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
         saveDb();
         
         if (!isMp4) {
-            transcodeQueue.add({ filmId: oldFilm.id, filename: finalFilename });
+            enqueueTranscode(oldFilm.id, finalFilename);
         }
 
         res.json({ success: true, film: oldFilm });
@@ -1857,14 +1892,17 @@ app.get('/api/films/transcoding-status', requireAuth, async (req, res) => {
     try {
         const activeJobs = await transcodeQueue.getActive();
         const waitingJobs = await transcodeQueue.getWaiting();
+        const fastActiveJobs = await transcodeFastQueue.getActive();
+        const fastWaitingJobs = await transcodeFastQueue.getWaiting();
+        
         const tasks: Record<string, any> = {};
         
-        for (const job of activeJobs) {
+        for (const job of [...activeJobs, ...fastActiveJobs]) {
             tasks[job.data.filmId] = job.progress !== undefined && job.progress !== null && typeof job.progress === 'object' 
                 ? { ...job.progress, state: 'active' } 
                 : { progress: 0, etaSeconds: null, state: 'active' };
         }
-        for (const job of waitingJobs) {
+        for (const job of [...waitingJobs, ...fastWaitingJobs]) {
             tasks[job.data.filmId] = { progress: 0, etaSeconds: null, state: 'waiting' };
         }
         res.json(tasks);

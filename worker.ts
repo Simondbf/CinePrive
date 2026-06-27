@@ -20,7 +20,7 @@ const parseTimeToSeconds = (timeStr: string) => {
     return 0;
 };
 
-const worker = new Worker('transcode', async (job) => {
+const processJob = async (job: any) => {
     const { filmId, inputFilename } = job.data;
     const inputPath = path.join(UPLOADS_DIR, inputFilename);
     const ext = path.extname(inputFilename);
@@ -151,10 +151,16 @@ const worker = new Worker('transcode', async (job) => {
         }
         throw err;
     }
-}, { connection: connection as any });
+};
+
+const worker = new Worker('transcode', processJob, { connection: connection as any });
+const fastWorker = new Worker('transcode-fast', processJob, { connection: connection as any });
 
 worker.on('failed', (job, err) => {
     console.error(`[Worker] Le job ${job?.id} a échoué:`, err);
 });
+fastWorker.on('failed', (job, err) => {
+    console.error(`[FastWorker] Le job ${job?.id} a échoué:`, err);
+});
 
-console.log('[Worker] Démarré et en écoute sur la file BullMQ "transcode"...');
+console.log('[Worker] Démarré et en écoute sur les files BullMQ "transcode" et "transcode-fast"...');
