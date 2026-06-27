@@ -1280,6 +1280,7 @@ app.put('/api/films/:id/genre', requireAuth, requireRole(['owner', 'admin']), (r
     }
 
     db.films[filmIndex].genre = genre;
+    db.films[filmIndex].genres = [genre];
     db.films[filmIndex].genreOverride = genre;
     saveDb();
 
@@ -1581,6 +1582,10 @@ app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', '
         }
         if (fullMeta.overview) film.synopsis = fullMeta.overview;
         if (fullMeta.release_date) film.year = parseInt(fullMeta.release_date.split('-')[0]);
+        if (fullMeta.genres && Array.isArray(fullMeta.genres)) {
+            film.genres = fullMeta.genres.map((g: any) => g.name);
+            if (film.genres.length > 0) film.genre = film.genres[0]; // Rétrocompatibilité
+        }
 
         if (fullMeta.credits && fullMeta.credits.cast) {
             film.cast = fullMeta.credits.cast.slice(0, 10).map((c: any) => ({
@@ -1697,10 +1702,12 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         const metadata = typeof body.metadata === 'string' ? JSON.parse(body.metadata || '{}') : (body.metadata || {});
         const genreIds = metadata.genre_ids || [];
         const mainGenre = genreIds.length > 0 ? (TMDB_GENRES[genreIds[0]] || 'Autre') : 'Autre';
+        const allGenres = genreIds.map((id: number) => TMDB_GENRES[id] || 'Autre').filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
 
         let castData: any[] = [];
         let directorData = 'Vérifié par TMDB';
         let runtimeData: number | undefined = undefined;
+        let finalGenres = allGenres;
 
         if (metadata.id && process.env.TMDB_API_KEY) {
             try {
@@ -1709,6 +1716,10 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
                 
                 if (fullMeta.runtime) {
                     runtimeData = fullMeta.runtime;
+                }
+                
+                if (fullMeta.genres && Array.isArray(fullMeta.genres)) {
+                    finalGenres = fullMeta.genres.map((g: any) => g.name);
                 }
 
                 if (fullMeta.credits && fullMeta.credits.cast) {
@@ -1736,6 +1747,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             synopsis: metadata.overview || '',
             year: metadata.release_date ? parseInt(metadata.release_date.split('-')[0]) : new Date().getFullYear(),
             genre: mainGenre,
+            genres: finalGenres.length > 0 ? finalGenres : [mainGenre],
             director: directorData,
             cast: castData,
             duration: runtimeData ? `${runtimeData}m` : '~120m',

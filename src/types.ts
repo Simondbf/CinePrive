@@ -35,6 +35,7 @@ export interface Film {
     synopsis: string;
     year: number;
     genre: string;
+    genres?: string[];
     director: string;
     cast?: Cast[];
     duration: string;

@@ -108,8 +108,11 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         // Grouping genres
         const categories = new Map<string, Film[]>();
         films.filter(f => !isProcessing(f)).forEach(f => {
-            if (!categories.has(f.genre)) categories.set(f.genre, []);
-            categories.get(f.genre)!.push(f);
+            const filmGenres = f.genres || [f.genre];
+            filmGenres.forEach((g: string) => {
+                if (!categories.has(g)) categories.set(g, []);
+                categories.get(g)!.push(f);
+            });
         });
 
         // Structure d'affichage pour iterer facilement (Structural prototype)
@@ -143,7 +146,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             if (selectedGenre === "⏳ Bientôt disponible") {
                 return films.filter(f => isProcessing(f)).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
             }
-            return films.filter(f => !isProcessing(f) && f.genre === selectedGenre);
+            return films.filter(f => !isProcessing(f) && (f.genres || [f.genre]).includes(selectedGenre));
         }
         return [];
     }, [films, searchQuery, selectedGenre, activeUser.myList]);

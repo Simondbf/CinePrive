@@ -169,7 +169,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 {/* Meta details (Classic prototype structurally organized data) */}
                 <div>
                    <div className="flex items-start justify-between gap-1">
-                       <h4 className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate pr-2 grow" title={film.title}>
+                       <h4 className="font-medium text-zinc-900 dark:text-zinc-100 text-sm line-clamp-2 leading-tight pr-2 grow" title={film.title}>
                            {film.title}
                        </h4>
                        <div className="flex items-center gap-2 shrink-0">
@@ -205,7 +205,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-900 dark:text-zinc-400 mt-1 font-medium">
                        <span>{film.year}</span>
                        <span className="w-1 h-1 bg-zinc-400 dark:bg-zinc-600 rounded-full" />
-                       <span className="truncate">{film.genre}</span>
+                       <span className="truncate">{(film.genres || [film.genre]).join(', ')}</span>
                        {film.duration && film.duration !== '~120m' && (
                            <>
                                <span className="w-1 h-1 bg-zinc-400 dark:bg-zinc-600 rounded-full" />
@@ -271,8 +271,8 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-1">
-                                            <span>{infoFilm.genre}</span>
+                                        <div className="flex flex-wrap items-center gap-1">
+                                            <span>{(infoFilm.genres || [infoFilm.genre]).join(', ')}</span>
                                             {(activeUser.role === 'admin' || activeUser.role === 'owner') && (
                                                 <button onClick={() => { setEditingGenre(true); setNewGenre(infoFilm.genre); }} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
                                                     <Edit2 className="w-3 h-3" />
