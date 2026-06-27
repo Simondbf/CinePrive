@@ -1114,6 +1114,14 @@ export default function ContributeApp({
         ) : (
           <>
             <div className="flex flex-col gap-6">
+              <div className="hidden lg:block bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                  <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-2">Guide d'optimisation</h4>
+                  <ul className="text-sm text-blue-700 dark:text-blue-300 list-disc pl-5 space-y-1">
+                      <li>Le format <strong>.mp4</strong> est fortement recommandé pour un traitement instantané sans surcharger le serveur.</li>
+                      <li>Pour extraire un DVD : utilisez <strong>MakeMKV</strong>, puis convertissez avec <strong>HandBrake</strong>.</li>
+                      <li>Dans HandBrake : Cochez l'option <strong>"Web Optimized"</strong> et assurez-vous de conserver les pistes audio et sous-titres dans l'onglet "Audio".</li>
+                  </ul>
+              </div>
               <div className="lg:hidden p-8 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
                   <p className="text-zinc-400">L'ajout de films nécessite un ordinateur (drag & drop).</p>
               </div>
@@ -1408,7 +1416,7 @@ export default function ContributeApp({
               </div>
             </div>
 
-            {activeUser.role === "owner" && (
+            {activeUser.role === "owner" && !settings.allowRegistrations && (
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                 <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-4">
                   <h3 className="text-lg font-medium text-zinc-900 dark:text-white">

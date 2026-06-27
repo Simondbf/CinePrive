@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
 import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
@@ -20,23 +21,25 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [adminNotifs, setAdminNotifs] = useState<any[]>([]);
 
-  // Routing Local Mode: 'viewer', 'upload', 'admin'
-  const [rawViewMode, setRawViewMode] = useState<'viewer' | 'upload' | 'admin'>('viewer');
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [isUploading, setIsUploading] = useState(false);
   const [transcodingStatuses, setTranscodingStatuses] = useState<Record<string, any>>({});
   
+  const viewMode = location.pathname === '/serveurs' ? 'admin' : location.pathname === '/upload' ? 'upload' : 'viewer';
+
   const setViewMode = (mode: 'viewer' | 'upload' | 'admin') => {
-      if (isUploading && rawViewMode !== 'viewer') {
+      if (isUploading && viewMode !== 'viewer') {
           if (!window.confirm("Un téléchargement est en cours. Si vous quittez la page, il sera annulé ! Êtes-vous sûr ?")) {
               return;
           }
       }
-      setRawViewMode(mode);
+      if (mode === 'admin') navigate('/serveurs');
+      else if (mode === 'upload') navigate('/upload');
+      else navigate('/');
   };
 
-  const viewMode = rawViewMode;
-
-  const [playingFilm, setPlayingFilm] = useState<Film | null>(null);
   const [showFunding, setShowFunding] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -312,14 +315,20 @@ export default function App() {
       </AnimatePresence>
   );
 
-  if (playingFilm) {
-    return (
+  const FilmPlayerRoute = () => {
+      const { id } = useParams();
+      const film = films.find(f => f.id === id);
+      if (!film) {
+          useEffect(() => { navigate('/', { replace: true }) }, []);
+          return null;
+      }
+      return (
         <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
-           <Player film={playingFilm} activeUser={activeUser} onClose={() => setPlayingFilm(null)} />
+           <Player film={film} activeUser={activeUser} onClose={() => navigate(-1)} />
            {globalModals}
         </div>
-    );
-  }
+      );
+  };
 
   // Auth Screen
   if (!activeUser) {
@@ -515,27 +524,56 @@ export default function App() {
       </nav>
   );
 
+  const isPlayerRoute = location.pathname.startsWith('/film/');
+
+  if (isPlayerRoute) {
+      return (
+          <>
+            <Routes>
+                <Route path="/film/:id" element={<FilmPlayerRoute />} />
+            </Routes>
+            {globalModals}
+          </>
+      );
+  }
+
   return (
     <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-red-500/30 transition-colors`}>
       {navbarContent}
       
       <main>
-        {viewMode === 'viewer' ? (
-           <ViewerApp 
+        <Routes>
+          <Route path="/" element={
+            <ViewerApp 
                activeUser={activeUser} 
                films={films} 
-               onPlay={(f) => setPlayingFilm(f)} 
+               onPlay={(f) => navigate('/film/' + f.id)} 
                onUpdateUser={setActiveUser}
                searchQuery={searchQuery}
                setSearchQuery={setSearchQuery}
                selectedGenre={selectedGenre}
                setSelectedGenre={setSelectedGenre}
-           />
-        ) : viewMode === 'admin' ? (
-           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />
-        ) : (
-           <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" onUploadStateChange={setIsUploading} />
-        )}
+            />
+          } />
+          <Route path="/serveurs" element={
+            <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />
+          } />
+          <Route path="/upload" element={
+            <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" onUploadStateChange={setIsUploading} />
+          } />
+          <Route path="*" element={
+            <ViewerApp 
+               activeUser={activeUser} 
+               films={films} 
+               onPlay={(f) => navigate('/film/' + f.id)} 
+               onUpdateUser={setActiveUser}
+               searchQuery={searchQuery}
+               setSearchQuery={setSearchQuery}
+               selectedGenre={selectedGenre}
+               setSelectedGenre={setSelectedGenre}
+            />
+          } />
+        </Routes>
       </main>
 
       <AnimatePresence>
