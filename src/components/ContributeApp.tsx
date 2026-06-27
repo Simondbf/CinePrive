@@ -470,7 +470,7 @@ export default function ContributeApp({
     tmdbQuery: string;
     tmdbResults: any[];
     selectedMeta: any | null;
-    status: "waiting" | "uploading" | "success" | "error";
+    status: "waiting" | "uploading" | "success" | "error" | "duplicate";
     progress: number;
     isSearching: boolean;
     etaSeconds?: number | null;
@@ -479,6 +479,8 @@ export default function ContributeApp({
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
   const isUploadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentUploadIdRef = useRef<string | null>(null);
 
   const [duplicateState, setDuplicateState] = useState<{
     isOpen: boolean;
@@ -550,8 +552,7 @@ export default function ContributeApp({
     searchTMDBForTask(taskId, query);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || []);
+  const processFiles = (selectedFiles: File[]) => {
     const newTasks: UploadTask[] = [];
 
     for (const f of selectedFiles) {
@@ -570,6 +571,19 @@ export default function ContributeApp({
       if (cleanName.toUpperCase().includes("HP AND THE")) {
         cleanName = cleanName.replace(/HP/i, "Harry Potter");
       }
+
+      // VÉRIFICATION ANTI-DOUBLON INSTANTANÉE (par nom)
+      const isDuplicate = films.some(film => 
+          film.title.toLowerCase() === cleanName.toLowerCase() ||
+          film.originalName?.toLowerCase() === f.name.toLowerCase() ||
+          film.filename?.toLowerCase() === f.name.toLowerCase()
+      );
+
+      if (isDuplicate) {
+          notify(`Fichier déjà existant : ${f.name}`, "Refusé");
+          continue;
+      }
+
       newTasks.push({
         id: Date.now().toString() + Math.random().toString().slice(2),
         file: f,
@@ -586,7 +600,22 @@ export default function ContributeApp({
       setTasks((prev) => [...prev, ...newTasks]);
       newTasks.forEach((task) => searchTMDBForTask(task.id, task.tmdbQuery));
     }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    processFiles(selectedFiles);
     e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    const droppedFiles = Array.from(e.dataTransfer.files || []);
+    processFiles(droppedFiles);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
   };
 
   const updateTaskMeta = async (taskId: string, meta: any) => {
@@ -634,12 +663,38 @@ export default function ContributeApp({
       onConfirm: () => {
         isUploadingRef.current = false;
         setIsUploadingGlobal(false);
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        if (currentUploadIdRef.current) {
+            fetch('/api/films/upload-cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uploadId: currentUploadIdRef.current })
+            }).catch(console.error);
+            currentUploadIdRef.current = null;
+        }
         setTasks((prev) => prev.filter((t) => t.id !== taskId));
       }
     });
   };
 
-  const resetUpload = () => {
+  const abortUploads = () => {
+    isUploadingRef.current = false;
+    setIsUploadingGlobal(false);
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+    }
+    if (currentUploadIdRef.current) {
+        fetch('/api/films/upload-cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uploadId: currentUploadIdRef.current })
+        }).catch(console.error);
+        currentUploadIdRef.current = null;
+    }
     setTasks(prev => prev.filter(t => t.status !== "waiting" && t.status !== "error" && t.status !== "duplicate"));
   };
 
@@ -686,6 +741,9 @@ export default function ContributeApp({
 
     try {
       const uploadId = Date.now().toString() + Math.random().toString().slice(2);
+      currentUploadIdRef.current = uploadId;
+      abortControllerRef.current = new AbortController();
+      
       const chunkSize = 2 * 1024 * 1024;
       const totalChunks = Math.ceil(task.file.size / chunkSize);
       let failed = false;
@@ -706,14 +764,23 @@ export default function ContributeApp({
         formData.append("chunkIndex", i.toString());
         formData.append("totalChunks", totalChunks.toString());
 
-        const res = await fetch("/api/films/upload-chunk", {
-          method: "POST",
-          body: formData,
-        });
+        try {
+            const res = await fetch("/api/films/upload-chunk", {
+              method: "POST",
+              body: formData,
+              signal: abortControllerRef.current.signal
+            });
 
-        if (!res.ok) {
-          failed = true;
-          break;
+            if (!res.ok) {
+              failed = true;
+              break;
+            }
+        } catch (e: any) {
+            if (e.name === 'AbortError') {
+                failed = true;
+                break;
+            }
+            throw e;
         }
 
         const progress = Math.round(((i + 1) / totalChunks) * 100);
@@ -745,6 +812,7 @@ export default function ContributeApp({
           versionType: task.versionType,
           totalChunks
         }),
+        signal: abortControllerRef.current.signal
       });
 
       if (finRes.ok) {
@@ -1049,6 +1117,8 @@ export default function ContributeApp({
               {/* Zone de Drop / Selection Multiple */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <label
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
                   className={`block border-2 border-dashed border-zinc-700 bg-zinc-950 rounded-lg p-8 relative cursor-pointer hover:border-zinc-500 transition text-center`}
                 >
                   <input
@@ -1092,10 +1162,10 @@ export default function ContributeApp({
                       <Database className="w-4 h-4 text-zinc-400" /> File d'attente ({tasks.filter(t => t.status === "waiting" || t.status === "error" || t.status === "duplicate").length})
                     </h3>
                     <button
-                      onClick={resetUpload}
-                      className="text-xs text-zinc-400 hover:text-white transition"
+                      onClick={abortUploads}
+                      className="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1"
                     >
-                      Tout vider
+                      <X className="w-3 h-3" /> Vider et forcer l'arrêt
                     </button>
                   </div>
                   <div className="divide-y divide-zinc-800">

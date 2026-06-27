@@ -1555,6 +1555,26 @@ app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (
     }
 });
 
+app.post('/api/films/upload-cancel', requireAuth, express.json(), (req: any, res) => {
+    const { uploadId } = req.body;
+    if (!uploadId) return res.status(400).json({ error: 'ID manquant' });
+    const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
+    
+    console.log(`[Upload] Annulation de l'upload ${safeUploadId}`);
+    try {
+        const files = fs.readdirSync(UPLOADS_DIR);
+        for (const file of files) {
+            if (file.startsWith(`temp_${safeUploadId}`)) {
+                fs.unlinkSync(path.join(UPLOADS_DIR, file));
+            }
+        }
+        res.json({ success: true });
+    } catch (e) {
+        console.error("Erreur nettoyage upload:", e);
+        res.status(500).json({ error: 'Erreur nettoyage' });
+    }
+});
+
 app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: any, res) => {
     const body = req.body;
     const { uploadId, filename, originalName, totalChunks } = body;
