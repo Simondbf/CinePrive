@@ -598,7 +598,9 @@ export default function ContributeApp({
                 const existing = data.films.find((f: any) => f.tmdbId === meta.id);
                 if (existing) {
                     notify("Film déjà présent dans le catalogue", "Upload bloqué");
-                    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+                    setTasks((prev) =>
+                      prev.map((t) => (t.id === taskId ? { ...t, selectedMeta: meta, status: "duplicate" } : t))
+                    );
                     return;
                 }
             }
@@ -607,7 +609,7 @@ export default function ContributeApp({
         }
     }
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, selectedMeta: meta, versionType: undefined } : t)),
+      prev.map((t) => (t.id === taskId ? { ...t, selectedMeta: meta, versionType: undefined, status: "waiting" } : t)),
     );
   };
 
@@ -638,7 +640,7 @@ export default function ContributeApp({
   };
 
   const resetUpload = () => {
-    setTasks(prev => prev.filter(t => t.status !== "waiting" && t.status !== "error"));
+    setTasks(prev => prev.filter(t => t.status !== "waiting" && t.status !== "error" && t.status !== "duplicate"));
   };
 
   const processUploadQueue = async () => {
@@ -846,7 +848,7 @@ export default function ContributeApp({
           >
             {task.file.name}
           </p>
-          {task.status === "waiting" && (
+          {(task.status === "waiting" || task.status === "duplicate") && (
             <button
               onClick={() => removeTask(task.id)}
               className="text-zinc-600 hover:text-red-500 transition ml-2"
@@ -898,10 +900,15 @@ export default function ContributeApp({
             <X className="w-3 h-3" /> Erreur lors de l'envoi
           </p>
         )}
+        {task.status === "duplicate" && (
+          <p className="text-xs text-orange-500 mt-2 flex items-center gap-1">
+            <X className="w-3 h-3" /> Film déjà présent
+          </p>
+        )}
       </div>
 
       <div className="md:w-2/3">
-        {task.status === "waiting" && !task.selectedMeta ? (
+        {(task.status === "waiting" || task.status === "duplicate") && !task.selectedMeta ? (
           <div className="space-y-3">
             <div className="flex gap-2">
               <input
@@ -985,7 +992,7 @@ export default function ContributeApp({
                 {task.selectedMeta.overview}
               </p>
             </div>
-            {task.status === "waiting" && (
+            {(task.status === "waiting" || task.status === "duplicate") && (
               <button
                 onClick={() => updateTaskMeta(task.id, null)}
                 className="text-[10px] font-medium text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 hover:bg-zinc-700 rounded transition shrink-0"
@@ -1078,11 +1085,11 @@ export default function ContributeApp({
               )}
 
               {/* File d'attente */}
-              {tasks.some(t => t.status === "waiting" || t.status === "error") && (
+              {tasks.some(t => t.status === "waiting" || t.status === "error" || t.status === "duplicate") && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
                   <div className="p-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
                     <h3 className="font-medium text-white flex items-center gap-2">
-                      <Database className="w-4 h-4 text-zinc-400" /> File d'attente ({tasks.filter(t => t.status === "waiting" || t.status === "error").length})
+                      <Database className="w-4 h-4 text-zinc-400" /> File d'attente ({tasks.filter(t => t.status === "waiting" || t.status === "error" || t.status === "duplicate").length})
                     </h3>
                     <button
                       onClick={resetUpload}
@@ -1092,7 +1099,7 @@ export default function ContributeApp({
                     </button>
                   </div>
                   <div className="divide-y divide-zinc-800">
-                    {tasks.filter(t => t.status === "waiting" || t.status === "error").map(renderTask)}
+                    {tasks.filter(t => t.status === "waiting" || t.status === "error" || t.status === "duplicate").map(renderTask)}
                   </div>
                 </div>
               )}
@@ -1323,65 +1330,6 @@ export default function ContributeApp({
                     <span
                       className={`${settings.allowRegistrations ? "translate-x-6" : "translate-x-1"} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
                     />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between pb-6 border-b border-zinc-100 dark:border-zinc-800">
-                  <div>
-                    <p className="font-medium text-zinc-800 dark:text-zinc-200">
-                      Synchronisation du Serveur Local
-                    </p>
-                    <p className="text-sm text-zinc-500">
-                      Recherche automatiquement les nouveaux ajouts locaux
-                      (films, séries, parodies) présents sur le serveur
-                      multimédia pour les importer à la bibliothèque de
-                      CinéPrivé.
-                    </p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      setDialogState({
-                        isOpen: true,
-                        title: "Synchronisation du Serveur Local",
-                        message:
-                          "Voulez-vous synchroniser le catalogue du serveur multimédia ?",
-                        onConfirm: async () => {
-                          try {
-                            const res = await fetch("/api/jellyfin/sync", {
-                              method: "POST",
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                              setDialogState((prev) => ({
-                                ...prev,
-                                isOpen: true,
-                                title: "Synchronisation terminée",
-                                message: `${data.count} nouveautés importées !`,
-                                isAlert: true,
-                              }));
-                            } else {
-                              setDialogState((prev) => ({
-                                ...prev,
-                                isOpen: true,
-                                title: "Erreur",
-                                message: data.error,
-                                isAlert: true,
-                              }));
-                            }
-                          } catch (e) {
-                            setDialogState((prev) => ({
-                              ...prev,
-                              isOpen: true,
-                              title: "Erreur",
-                              message: "Erreur de requête",
-                              isAlert: true,
-                            }));
-                          }
-                        },
-                      });
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium text-sm transition"
-                  >
-                    Forcer la synchro
                   </button>
                 </div>
               </div>

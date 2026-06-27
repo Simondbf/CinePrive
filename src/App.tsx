@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
 import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
@@ -55,6 +55,18 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [notification, setNotification] = useState<{title: string, message: string, action?: {label: string, onClick: () => void}} | null>(null);
+
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+     const handleClickOutside = (event: MouseEvent) => {
+         if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+             setShowUserMenu(false);
+         }
+     };
+     document.addEventListener('mousedown', handleClickOutside);
+     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
      const handleNotify = (e: Event) => {
@@ -435,7 +447,7 @@ export default function App() {
                 <UploadCloud className="w-4 h-4"/> <span className="hidden lg:inline">Ajouter un film</span>
             </button>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
+            <div ref={userMenuRef} className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
                 {activeUser.status === 'pending' && (
                     <span className="hidden md:inline text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-500 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-700/50 mr-2">
                         Compte en attente
