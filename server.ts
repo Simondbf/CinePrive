@@ -1071,7 +1071,7 @@ app.post('/api/users/:id/restore', requireAuth, requireRole(['owner', 'admin']),
     res.json({ success: true, message: `Le compte de "${targetUser.username}" a été réactivé.` });
 });
 
-app.delete('/api/users/:id', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res) => {
     const { id } = req.params;
     const targetUser = db.users.find((u: any) => u.id === id);
     if (!targetUser) {
@@ -1084,15 +1084,6 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner', 'admin']), (req:
     
     if (targetUser.id === req.user.id) {
         return res.status(403).json({ error: "Vous ne pouvez pas effectuer cette action sur vous-même." });
-    }
-
-    // Un simple admin fait une suspension temporaire en attente du Patron
-    if (req.user.role === 'admin') {
-        targetUser.status = 'pending_ban';
-        targetUser.requestedBanBy = req.user.name || req.user.username;
-        targetUser.requestedBanAt = Date.now();
-        saveDb();
-        return res.json({ success: true, pendingApproval: true, message: `L'utilisateur "${targetUser.username}" a été suspendu par l'administrateur.` });
     }
 
     // Le Patron (owner) valide avec le code pour supprimer définitivement
@@ -1228,22 +1219,13 @@ app.put('/api/films/:id/genre', requireAuth, requireRole(['owner', 'admin']), (r
     res.json({ success: true, film: db.films[filmIndex] });
 });
 
-app.delete('/api/films/:id', requireAuth, requireRole(['owner', 'admin', 'technician']), (req: any, res) => {
+app.delete('/api/films/:id', requireAuth, requireRole(['owner']), (req: any, res) => {
     const { id } = req.params;
     const filmIndex = db.films.findIndex((f: any) => f.id === id);
     if (filmIndex === -1) {
         return res.status(404).json({ error: "Film non trouvé" });
     }
     const film = db.films[filmIndex];
-
-    // Si l'utilisateur est un simple admin ou technicien, il ne fait qu'une suppression temporaire (mise en attente)
-    if (req.user.role === 'admin' || req.user.role === 'technician') {
-        film.pendingDeletion = true;
-        film.requestedDeletionBy = req.user.name || req.user.username;
-        film.requestedDeletionAt = Date.now();
-        saveDb();
-        return res.json({ success: true, pendingApproval: true, message: `Le film "${film.title}" a été placé en attente de suppression définitive.` });
-    }
 
     // Si c'est le Patron (owner), il faut valider avec le code de sécurité pour supprimer définitivement
     const code = req.query.code || req.headers['x-security-code'];

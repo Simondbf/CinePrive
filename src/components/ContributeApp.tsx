@@ -67,6 +67,7 @@ export default function ContributeApp({
   // Nouveaux états locaux pour les super-codes
   const [customCodeInput, setCustomCodeInput] = useState("");
   const [maxUsesInput, setMaxUsesInput] = useState("");
+  const [pendingRoleChanges, setPendingRoleChanges] = useState<Record<string, string>>({});
 
   const [pollsConfig, setPollsConfig] = useState<any[]>([]);
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
@@ -139,10 +140,19 @@ export default function ContributeApp({
 
   const handleChangeRole = async (userId: string, newRole: string) => {
     try {
-      await fetch(`/api/users/${userId}/role`, {
+      const res = await fetch(`/api/users/${userId}/role`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRole }),
+      });
+      if (res.status === 403) {
+          notify("Vous ne passerez pas !", "Accès Interdit");
+          return;
+      }
+      setPendingRoleChanges((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
       });
       fetchData();
     } catch (e) {
@@ -271,6 +281,11 @@ export default function ContributeApp({
           : `/api/users/${securityModal.targetId}?code=${securityModal.code}`;
 
       const res = await fetch(url, { method });
+      if (res.status === 403) {
+          setSecurityModal((prev) => ({ ...prev, isOpen: false }));
+          notify("Vous ne passerez pas !", "Accès Interdit");
+          return;
+      }
       if (res.ok) {
         setSecurityModal((prev) => ({ ...prev, isOpen: false }));
         await securityModal.onSuccess();
@@ -348,6 +363,10 @@ export default function ContributeApp({
             const res = await fetch(`/api/users/${userId}`, {
               method: "DELETE",
             });
+            if (res.status === 403) {
+                notify("Vous ne passerez pas !", "Accès Interdit");
+                return;
+            }
             if (res.ok) {
               notify(
                 `La suspension de ${targetName} a été enregistrée.`,
@@ -394,6 +413,10 @@ export default function ContributeApp({
             const res = await fetch(`/api/films/${filmId}`, {
               method: "DELETE",
             });
+            if (res.status === 403) {
+                notify("Vous ne passerez pas !", "Accès Interdit");
+                return;
+            }
             if (res.ok) {
               notify(
                 `Le film "${filmTitle}" a été suspendu temporairement.`,
@@ -1319,7 +1342,8 @@ export default function ContributeApp({
                               </button>
                               <button
                                 onClick={() => handleDeleteFilm(f.id, f.title)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded"
+                                disabled={activeUser.role !== "owner"}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950/60 transition-all font-medium text-xs bg-red-50 dark:bg-red-950/30 px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Supprimer
                               </button>
@@ -1524,39 +1548,35 @@ export default function ContributeApp({
                       <td className="px-6 py-4">{u.username}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-2">
-                          <span className="uppercase text-xs font-semibold">
-                            {u.role === "owner"
-                              ? "Patron"
-                              : u.role === "admin"
-                                ? "Admin"
-                                : u.role === "technician"
-                                  ? "Technicien"
-                                  : "Membre"}
-                          </span>
-                          {u.role === "technician" && (
-                              <span className="text-[10px] text-zinc-500 block max-w-[150px] leading-tight">Peut lancer des transcodages et remplacer des fichiers vidéo</span>
-                          )}
-                          {activeUser.role === "owner" &&
-                            u.id !== activeUser.id && (
-                              <div className="flex flex-col gap-1 items-start mt-1">
-                                {u.role === "admin" ? (
-                                  <>
-                                    <button onClick={() => handleChangeRole(u.id, "technician")} className="text-[10px] sm:text-xs text-red-500 hover:underline">Rétrograder à Technicien</button>
-                                    <button onClick={() => handleChangeRole(u.id, "user")} className="text-[10px] sm:text-xs text-red-500 hover:underline">Rétrograder à User</button>
-                                  </>
-                                ) : u.role === "technician" ? (
-                                  <>
-                                    <button onClick={() => setDialogState({ isOpen: true, title: "Promouvoir Admin", message: `Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`, onConfirm: () => handleChangeRole(u.id, "admin") })} className="text-[10px] sm:text-xs text-purple-600 hover:underline">Promouvoir Admin</button>
-                                    <button onClick={() => handleChangeRole(u.id, "user")} className="text-[10px] sm:text-xs text-red-500 hover:underline">Rétrograder à User</button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button onClick={() => handleChangeRole(u.id, "technician")} className="text-[10px] sm:text-xs text-blue-500 hover:underline">Promouvoir Technicien</button>
-                                    <button onClick={() => setDialogState({ isOpen: true, title: "Promouvoir Admin", message: `Voulez-vous vraiment donner les droits d'administration à ${u.username} ?`, onConfirm: () => handleChangeRole(u.id, "admin") })} className="text-[10px] sm:text-xs text-purple-600 hover:underline">Promouvoir Admin</button>
-                                  </>
+                          {u.role === "owner" ? (
+                              <span className="uppercase text-xs font-semibold">Patron</span>
+                          ) : (
+                              <div className="flex items-center gap-2">
+                                <select
+                                    disabled={activeUser.role !== "owner"}
+                                    value={pendingRoleChanges[u.id] || u.role}
+                                    onChange={(e) => setPendingRoleChanges((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                                    className="text-xs border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <option value="user">Spectateur</option>
+                                    <option value="technician">Technicien</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                                {pendingRoleChanges[u.id] && pendingRoleChanges[u.id] !== u.role && (
+                                    <button
+                                        onClick={() => handleChangeRole(u.id, pendingRoleChanges[u.id])}
+                                        disabled={activeUser.role !== "owner"}
+                                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                        title="Valider le changement"
+                                    >
+                                        <Check className="w-3 h-3" /> Valider
+                                    </button>
                                 )}
                               </div>
-                            )}
+                          )}
+                          {u.role === "technician" && !pendingRoleChanges[u.id] && (
+                              <span className="text-[10px] text-zinc-500 block max-w-[150px] leading-tight">Peut lancer des transcodages et remplacer des fichiers vidéo</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -1579,7 +1599,8 @@ export default function ContributeApp({
                                         u.name || u.username,
                                       )
                                     }
-                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
+                                    disabled={activeUser.role !== "owner"}
+                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Refuser
                                   </button>
@@ -1627,7 +1648,8 @@ export default function ContributeApp({
                                         u.name || u.username,
                                       )
                                     }
-                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2"
+                                    disabled={activeUser.role !== "owner"}
+                                    className="px-3 py-1 bg-red-500/10 text-red-600 font-medium rounded hover:bg-red-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Bannir
                                   </button>
