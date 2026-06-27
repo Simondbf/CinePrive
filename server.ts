@@ -379,7 +379,7 @@ if (fs.existsSync(dbFile)) {
         db = JSON.parse(fs.readFileSync(dbFile, 'utf-8'));
     } catch (e) {
         console.error("FATAL ERROR: Failed to parse db.json. Halting startup to prevent data corruption.", e);
-        process.exit(1);
+        throw e;
     }
         
     // Migration of old statuses to new statuses
@@ -485,7 +485,17 @@ defaultPolls.forEach(defaultPoll => {
 
 const saveDb = () => {
     const tmpFile = dbFile + '.tmp';
+    const bakFile = dbFile + '.bak';
+    
+    // 1. Ecrire dans le fichier temporaire (atomique)
     fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2));
+    
+    // 2. Si un fichier db existe déjà, on en fait une copie .bak par sécurité
+    if (fs.existsSync(dbFile)) {
+        fs.copyFileSync(dbFile, bakFile);
+    }
+    
+    // 3. Renommer le tmp pour remplacer le fichier actuel
     fs.renameSync(tmpFile, dbFile);
 };
 
