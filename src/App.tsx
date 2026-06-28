@@ -14,6 +14,7 @@ import SettingsModal from './components/SettingsModal';
 import BugReportModal from './components/BugReportModal';
 import Polls from './components/Polls';
 import Loader from './components/Loader';
+import NotFoundPage from './components/NotFoundPage';
 import { ArrowUp } from 'lucide-react';
 
 const ScrollToTop = () => {
@@ -609,18 +610,7 @@ export default function App() {
           <Route path="/upload" element={
             <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" onUploadStateChange={setIsUploading} />
           } />
-          <Route path="*" element={
-            <ViewerApp 
-               activeUser={activeUser} 
-               films={films} 
-               onPlay={(f) => navigate('/film/' + f.id)} 
-               onUpdateUser={setActiveUser}
-               searchQuery={searchQuery}
-               setSearchQuery={setSearchQuery}
-               selectedGenre={selectedGenre}
-               setSelectedGenre={setSelectedGenre}
-            />
-          } />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
 
