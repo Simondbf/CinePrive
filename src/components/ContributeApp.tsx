@@ -404,6 +404,35 @@ export default function ContributeApp({
     }
   };
 
+  const handleRefreshAllMetadata = async () => {
+    setIsRefreshingAll(true);
+    notify("Rafraîchissement global des métadonnées en cours...", "Info");
+    try {
+        let successCount = 0;
+        let failCount = 0;
+        for (const film of films) {
+            try {
+                const res = await fetch(`/api/films/${film.id}/refresh-metadata`, { method: 'POST' });
+                if (res.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (e) {
+                failCount++;
+            }
+            // Délai de 300ms entre chaque requête pour ne pas spammer TMDB
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        notify(`Terminé : ${successCount} succès, ${failCount} échecs.`, "Succès");
+        fetchData();
+    } catch (e) {
+        notify("Erreur lors du rafraîchissement global", "Erreur");
+    } finally {
+        setIsRefreshingAll(false);
+    }
+  };
+
   const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
     if (activeUser.role === "admin" || activeUser.role === "technician") {
       // Si simple admin/technician -> suppression temporaire sans code
@@ -506,6 +535,7 @@ export default function ContributeApp({
   }
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const isUploadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentUploadIdRef = useRef<string | null>(null);
@@ -1283,8 +1313,21 @@ export default function ContributeApp({
         ))}
 
       {tab === "library" && (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="flex flex-col gap-4">
+          {(activeUser.role === "owner" || activeUser.role === "admin" || activeUser.role === "technician") && (
+              <div className="flex justify-end">
+                <button
+                   onClick={handleRefreshAllMetadata}
+                   disabled={isRefreshingAll}
+                   className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                   {isRefreshingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                   {isRefreshingAll ? "Rafraîchissement en cours..." : "Rafraîchir tout le catalogue"}
+                </button>
+              </div>
+          )}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
             <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <th className="px-6 py-4 font-medium">Titre (TMDB)</th>
@@ -1423,6 +1466,7 @@ export default function ContributeApp({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

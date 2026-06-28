@@ -254,7 +254,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
 
                 </div>
 
-                <div className="p-4 bg-white dark:bg-zinc-900 flex justify-between items-center relative">
+                <div className="p-4 bg-transparent flex justify-between items-center relative">
                     <button 
                         onClick={() => {
                             if (onTriggerEasterEgg) {
