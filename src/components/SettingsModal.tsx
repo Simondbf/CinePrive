@@ -244,7 +244,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                             <button 
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full bg-zinc-900 dark:bg-white text-white dark:text-black py-2 rounded font-medium text-sm transition hover:opacity-90 flex justify-center items-center"
+                                className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded font-medium text-sm transition-colors flex justify-center items-center"
                             >
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Changer le mot de passe"}
                             </button>

@@ -776,7 +776,7 @@ app.get('/api/public/settings', (req, res) => {
 // Settings
 app.get('/api/settings', requireAuth, (req: any, res) => {
     const settings: any = { 
-        allowRegistrations: true, // Bypass temporaire
+        allowRegistrations: db.settings?.allowRegistrations ?? true,
         fundingCurrent: db.settings?.fundingCurrent ?? 0,
         fundingGoal: db.settings?.fundingGoal ?? 12
     };

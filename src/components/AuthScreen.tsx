@@ -173,6 +173,7 @@ export default function AuthScreen({ onLogin }: Props) {
                                               <input 
                                                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                                                   placeholder="Ex: XYZ-123"
+                                                  required
                                                   className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
                                               />
                                           </div>
