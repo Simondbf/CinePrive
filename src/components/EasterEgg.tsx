@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Film } from 'lucide-react';
 
 interface Props {
     onClose: () => void;
@@ -39,24 +38,19 @@ export default function EasterEgg({ onClose }: Props) {
     }, []);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden">
-            <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white z-50 transition p-2 rounded-full hover:bg-white/10">
-                <X className="w-8 h-8" />
-            </button>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                <div className="w-[100vw] h-[100vw] sm:w-[50vw] sm:h-[50vw] border-[1px] border-primary-500/30 rounded-full animate-[spin_10s_linear_infinite]" />
-                <div className="absolute w-[80vw] h-[80vw] sm:w-[40vw] sm:h-[40vw] border-[1px] border-primary-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]" />
-            </div>
-            <div className="relative z-10 p-8 flex flex-col items-center max-w-2xl text-center">
-                <Film className="w-16 h-16 text-primary-600 mb-8 animate-pulse" />
+        <div 
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden cursor-pointer"
+            onClick={onClose}
+        >
+            <div className="relative z-10 p-8 flex flex-col items-center max-w-4xl text-center">
                 <AnimatePresence mode="wait">
                     <motion.h2 
                         key={currentIndex}
-                        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                        exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
-                        transition={{ duration: 0.8 }}
-                        className="text-4xl md:text-5xl lg:text-7xl font-bold text-white tracking-tight italic"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.02 }}
+                        transition={{ duration: 1.2, ease: "easeInOut" }}
+                        className="text-3xl md:text-5xl lg:text-6xl font-serif text-white tracking-widest leading-relaxed uppercase"
                     >
                         "{quotes[currentIndex]}"
                     </motion.h2>

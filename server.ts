@@ -31,7 +31,10 @@ app.use('/api', (req, res, next) => {
 let JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
 
 const requireAuth = (req: any, res: any, next: any) => {
-    const token = req.cookies.token;
+    let token = req.cookies.token;
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
     if (!token) return res.status(401).json({ error: 'Non autorisé' });
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -972,7 +975,7 @@ app.post('/api/register', async (req, res) => {
     });
 
     // Renvoyer l'utilisateur sans le mdp
-    res.json({ ...newUser, password: '' });
+    res.json({ ...newUser, password: '', token });
 });
 
 const loginAttempts: Record<string, { count: number, lockedUntil: number }> = {};
@@ -1024,7 +1027,7 @@ app.post('/api/login', async (req, res) => {
                 sameSite: 'lax',
                 maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined 
             });
-            return res.json({ ...user, password: '' });
+            return res.json({ ...user, password: '', token });
         }
     }
     

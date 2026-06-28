@@ -14,6 +14,47 @@ import SettingsModal from './components/SettingsModal';
 import BugReportModal from './components/BugReportModal';
 import Polls from './components/Polls';
 import Loader from './components/Loader';
+import { ArrowUp } from 'lucide-react';
+
+const ScrollToTop = () => {
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const toggleVisibility = () => {
+            if (window.scrollY > 300) {
+                setIsVisible(true);
+            } else {
+                setIsVisible(false);
+            }
+        };
+        window.addEventListener('scroll', toggleVisibility);
+        return () => window.removeEventListener('scroll', toggleVisibility);
+    }, []);
+
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
+
+    return (
+        <AnimatePresence>
+            {isVisible && (
+                <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    onClick={scrollToTop}
+                    className="fixed bottom-6 right-6 p-3 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 hover:shadow-xl transition-all z-40"
+                    title="Remonter en haut"
+                >
+                    <ArrowUp className="w-5 h-5" />
+                </motion.button>
+            )}
+        </AnimatePresence>
+    );
+};
 
 export default function App() {
   const [activeUser, setActiveUser] = useState<User | null>(null);
@@ -131,6 +172,7 @@ export default function App() {
   }, [themeMode, amoledActive, amoledUnlocked]);
 
   const handleLogoClick = () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       if (viewMode !== 'viewer') {
           setViewMode('viewer');
           setLogoTaps(0);
@@ -508,6 +550,8 @@ export default function App() {
                             <button 
                                 onClick={async () => { 
                                     await fetch('/api/logout', { method: 'POST' });
+                                    localStorage.removeItem('cine_auth');
+                                    sessionStorage.removeItem('cine_auth');
                                     localStorage.removeItem('cine_remember');
                                     localStorage.removeItem('cine_remember_username');
                                     sessionStorage.removeItem('cine_session');
@@ -543,6 +587,7 @@ export default function App() {
   return (
     <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-primary-500/30 transition-colors`}>
       {navbarContent}
+      <ScrollToTop />
       
       <main>
         <Routes>

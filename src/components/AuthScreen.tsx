@@ -22,17 +22,31 @@ export default function AuthScreen({ onLogin }: Props) {
 
     useEffect(() => {
         // Clear insecure storages if they exist (cleanup legacy)
-        sessionStorage.removeItem('cine_session');
         localStorage.removeItem('cine_remember_password');
         
-        // Auto login attempt using HttpOnly cookie session
-        fetch('/api/me')
+        let storedAuth = localStorage.getItem('cine_auth') || sessionStorage.getItem('cine_auth');
+        let token = '';
+        if (storedAuth) {
+            try {
+                const parsed = JSON.parse(storedAuth);
+                token = parsed.token;
+            } catch (e) {}
+        } else {
+            // Fix for mobile session cookies persisting: if no token in storage, force logout
+            fetch('/api/logout', { method: 'POST' }).catch(() => {});
+        }
+        
+        // Auto login attempt using explicit Bearer or HttpOnly cookie session
+        fetch('/api/me', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
             .then(res => {
                 if (res.ok) return res.json();
                 throw new Error('Not logged in');
             })
             .then(data => {
-                if (data.id) onLogin(data);
+                if (data.id) {
+                    if (token) data.token = token;
+                    onLogin(data);
+                }
             })
             .catch(() => {
                 // Not logged in via cookie, fallback to remembering username visually if checked
@@ -88,10 +102,15 @@ export default function AuthScreen({ onLogin }: Props) {
           const data = await res.json();
 
           if (res.ok) {
+              const authData = JSON.stringify(data);
               if (rememberMe) {
+                  localStorage.setItem('cine_auth', authData);
                   localStorage.setItem('cine_remember', 'true');
                   localStorage.setItem('cine_remember_username', username);
+                  sessionStorage.removeItem('cine_auth');
               } else {
+                  sessionStorage.setItem('cine_auth', authData);
+                  localStorage.removeItem('cine_auth');
                   localStorage.removeItem('cine_remember');
                   localStorage.removeItem('cine_remember_username');
               }
