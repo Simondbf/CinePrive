@@ -647,9 +647,9 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
 
 import cron from 'node-cron';
 
-// Tâche planifiée : Mettre en pause à 07h00
-cron.schedule('0 7 * * *', async () => {
-    console.log('[Cron] 07h00 : Mise en pause de la file de transcodage.');
+// Tâche planifiée : Mettre en pause à 06h45
+cron.schedule('45 6 * * *', async () => {
+    console.log('[Cron] 06h45 : Mise en pause de la file de transcodage.');
     await transcodeQueue.pause();
 });
 
@@ -661,12 +661,18 @@ cron.schedule('0 1 * * *', async () => {
 
 // État initial au démarrage du serveur
 const initQueueState = async () => {
-    const hour = new Date().getHours();
-    if (hour >= 7 || hour < 1) {
-        console.log('[Cron] Démarrage hors du créneau 01h-07h. Mise en pause initiale de la file.');
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    
+    // File active de 01:00 à 06:44
+    const isActive = (hour >= 1 && hour < 6) || (hour === 6 && minute < 45);
+    
+    if (!isActive) {
+        console.log('[Cron] Démarrage hors du créneau 01h00-06h45. Mise en pause initiale de la file.');
         await transcodeQueue.pause();
     } else {
-        console.log('[Cron] Démarrage dans le créneau 01h-07h. File active.');
+        console.log('[Cron] Démarrage dans le créneau 01h00-06h45. File active.');
         await transcodeQueue.resume();
     }
 };
