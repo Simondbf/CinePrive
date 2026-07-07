@@ -12,6 +12,7 @@ services:
       - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
       - ./data:/app/data
+      - /mnt/uploads_tmp:/app/data/uploads
     depends_on:
       - redis
 
@@ -27,6 +28,7 @@ services:
       - TMDB_API_KEY=${TMDB_API_KEY}
     volumes:
       - ./data:/app/data
+      - /mnt/uploads_tmp:/app/data/uploads
     depends_on:
       - redis
 
