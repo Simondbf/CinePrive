@@ -1,6 +1,59 @@
 export interface User {
     id: string;
     username: string;
+    password?: string;
+    email?: string;
+    name: string;
+    color: string;
+    roles: string[]; // <-- Le gros changement se trouve ici (les rôles s'accumulent !)
+    internalNote?: string; // <-- La fameuse note pour les Admins
+    status?: 'pending' | 'active' | 'pending_ban';
+    requestedBanBy?: string;
+    requestedBanAt?: number;
+    myList: string[]; // Liste des IDs de films à voir
+}
+
+export interface MovieRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    tmdbId?: number;
+    title: string;
+    createdAt: number;
+}
+
+export interface Cast {
+    name: string;
+    character: string;
+    profilePath: string | null;
+}
+
+export interface Film {
+    id: string;
+    tmdbId?: number;
+    jellyfinId?: string;
+    title: string;
+    synopsis: string;
+    year: number;
+    genre: string;
+    genres?: string[];
+    director: string;
+    cast?: Cast[];
+    duration: string;
+    runtime?: number;
+    versionType?: string;
+    posterUrl?: string;
+    addedBy: string;
+    addedAt: string;
+    filename: string;
+    originalName: string;
+    status: 'AVAILABLE' | 'PROCESSING' | 'ERROR';
+    pendingDeletion?: boolean;
+    requestedDeletionBy?: string;
+    requestedDeletionAt?: number;
+}export interface User {
+    id: string;
+    username: string;
     password?: string; // Simplifié pour le prototype
     email?: string;
     name: string;
