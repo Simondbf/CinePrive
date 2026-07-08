@@ -430,62 +430,6 @@ if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};
 if (!db.pollsConfig) db.pollsConfig = [];
 
-const defaultPolls = [
-    {
-        id: 'p1',
-        title: 'Identité Visuelle & Logo',
-        desc: "Quel emblème me représenterait le mieux selon vous ?",
-        allowMultiple: true,
-        options: [
-            { id: 'o1', label: 'La pellicule classique' },
-            { id: 'o2', label: "L'ordinateur/moniteur" },
-            { id: 'o3', label: 'Une forme géométrique abstraite neutre' }
-        ]
-    },
-    {
-        id: 'p2',
-        title: 'Couleur de Marque',
-        desc: "Quelle couleur d'accent préférez-vous ?",
-        allowMultiple: true,
-        options: [
-            { id: 'o1', label: 'Rouge Cinéma' },
-            { id: 'o2', label: 'Bleu Profond' },
-            { id: 'o3', label: 'Or / Jaune' },
-            { id: 'o4', label: 'Violet Électrique' }
-        ]
-    },
-    {
-        id: 'p3',
-        title: 'Membres Bêta',
-        desc: "Souhaitez-vous devenir membre bêta pour tester les nouveautés en avant-première ?",
-        allowMultiple: false,
-        allowCustom: false,
-        options: [
-            { id: 'o1', label: 'Oui, je veux bien !' },
-            { id: 'o2', label: 'Non, je préfère la version stable.' }
-        ]
-    },
-    {
-        id: 'p4',
-        title: 'Nom de Domaine',
-        desc: "Que pensez-vous du nom de domaine actuel ?",
-        allowMultiple: false,
-        allowCustom: true,
-        options: [
-            { id: 'o1', label: 'cineprive.rpisimon.uk me convient très bien' },
-            { id: 'o2', label: 'Je préfèrerais un format plus court (ex: film.rpisimon.uk)' },
-            { id: 'o3', label: 'Il faudrait un vrai domaine professionnel (.com, .fr)' }
-        ]
-    }
-];
-
-// Fusionner les sondages par défaut s'ils manquent (ex: nouveau sondage ajouté dans le code)
-defaultPolls.forEach(defaultPoll => {
-    if (!db.pollsConfig.find((p: any) => p.id === defaultPoll.id)) {
-        db.pollsConfig.push(defaultPoll);
-    }
-});
-
 const saveDb = () => {
     const tmpFile = dbFile + '.tmp';
     const bakFile = dbFile + '.bak';
@@ -761,12 +705,12 @@ const upload = multer({
     limits: { fileSize: 15000 * 1024 * 1024 } // 15GB
 });
 
-// Mapping simplifié des genres TMDB
+// Mapping simplifié des genres TMDB (sans Téléfilm)
 const TMDB_GENRES: Record<number, string> = {
     28: "Action", 12: "Aventure", 16: "Animation", 35: "Comédie", 80: "Crime", 
     99: "Documentaire", 18: "Drame", 10751: "Familial", 14: "Fantastique",
     36: "Histoire", 27: "Horreur", 10402: "Musique", 9648: "Mystère", 
-    10749: "Romance", 878: "Science-Fiction", 10770: "Téléfilm", 
+    10749: "Romance", 878: "Science-Fiction", 
     53: "Thriller", 10752: "Guerre", 37: "Western"
 };
 
@@ -1560,6 +1504,49 @@ app.get('/api/tmdb/search', requireAuth, async (req, res) => {
         res.status(500).json({ error: 'Échec de la recherche TMDB', details: err.message });
     }
 });
+
+// --- NOUVELLE ROUTE TMDB PAR ID ---
+app.get('/api/tmdb/movie/:id', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const apiKey = process.env.TMDB_API_KEY;
+
+    if (!/^\d+$/.test(id)) {
+        return res.status(400).json({ error: "Ce n'est pas un identifiant valide. Il ne doit contenir que des chiffres." });
+    }
+
+    if (!apiKey) {
+        return res.status(400).json({ error: "Le serveur a perdu sa connexion avec TheMovieDB." });
+    }
+
+    try {
+        const response = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${apiKey}&language=fr-FR`);
+
+        if (response.status === 404) {
+            return res.status(404).json({ error: "Oups, impossible de trouver un film avec ce numéro précis." });
+        }
+
+        const data = await response.json();
+
+        if (data.adult) {
+            return res.status(403).json({ error: "Désolé, les contenus pour adultes sont strictement bloqués sur ce serveur." });
+        }
+
+        // Reformaté pour avoir exactement la forme d'un résultat de /api/tmdb/search
+        res.json({
+            id: data.id,
+            title: data.title,
+            release_date: data.release_date,
+            overview: data.overview,
+            poster_path: data.poster_path,
+            genre_ids: (data.genres || []).map((g: any) => g.id),
+            adult: data.adult
+        });
+    } catch (err: any) {
+        console.error("Erreur TMDB (recherche par ID):", err);
+        res.status(500).json({ error: "Le serveur TheMovieDB ne répond pas pour le moment. Réessayez plus tard." });
+    }
+});
+// ----------------------------------
 
 app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', 'admin', 'technician']), async (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
