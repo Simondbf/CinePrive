@@ -895,7 +895,7 @@ app.post('/api/register', async (req, res) => {
         name,
         color: colors[db.users.length % colors.length],
         role: isFirstUser ? 'owner' : 'user', // Le 1er est propriétaire !
-        status: isFirstUser ? 'active' : 'pending',
+        status: (isFirstUser || bypassWithCode) ? 'active' : 'pending',
         myList: []
     };
 
