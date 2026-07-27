@@ -143,13 +143,17 @@ export default function ContributeApp({
 
   const handleChangeRole = async (userId: string, newRole: string) => {
     try {
-      const res = await fetch(`/api/users/${userId}/role`, {
+      const res = await fetch(`/api/users/${userId}/update-profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
+        body: JSON.stringify({ roles: [newRole] }),
       });
       if (res.status === 403) {
           notify("Vous ne passerez pas !", "Accès Interdit");
+          return;
+      }
+      if (!res.ok) {
+          notify("Erreur serveur lors du changement de rôle.", "Erreur");
           return;
       }
       setPendingRoleChanges((prev) => {
