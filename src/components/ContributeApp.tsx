@@ -2189,7 +2189,7 @@ export default function ContributeApp({
                   </div>
               </div>
 
-              {activeUser.role === 'owner' && (
+              {hasRole(activeUser, 'owner') && (
                   <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                       <h3 className="text-lg font-medium text-primary-600 mb-6 flex items-center gap-2">
                           Sécurité du Studio (Code de Validation)
