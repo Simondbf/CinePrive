@@ -42,8 +42,8 @@ const requireAuth = (req: any, res: any, next: any) => {
         if (!req.user) throw new Error();
         
         // Sécurité : Bloquer l'utilisateur s'il est banni temporairement ou suspendu par l'admin
-        if (req.user.status === 'pending_ban' || (req.user.roles && req.user.roles.includes('banned'))) {
-            return res.status(403).json({ error: 'Votre compte est suspendu ou banni définitivement.' });
+        if (req.user.status === 'pending_ban') {
+            return res.status(403).json({ error: 'Votre compte est temporairement suspendu en attente de la validation finale du Patron.' });
         }
         next();
     } catch {
@@ -51,8 +51,8 @@ const requireAuth = (req: any, res: any, next: any) => {
     }
 };
 
-const requireRole = (allowedRoles: string[]) => (req: any, res: any, next: any) => {
-    if (!req.user || !req.user.roles || !req.user.roles.some((r: string) => allowedRoles.includes(r))) {
+const requireRole = (roles: string[]) => (req: any, res: any, next: any) => {
+    if (!req.user || !roles.includes(req.user.role)) {
         return res.status(403).json({ error: 'Accès interdit' });
     }
     next();
@@ -110,6 +110,10 @@ async function sendSecurityCodeEmail(email: string, name: string, code: string, 
                             Ce code est à usage unique et expirera dans 5 minutes.<br/>
                             Si vous n'êtes pas à l'origine de cette action, ignorez cet e-mail.
                         </p>
+                    </div>
+                    
+                    <div style="text-align: center; font-size: 11px; color: #52525b;">
+                        &copy; 2026 CinéPrivé • Serveur multimédia autonome.
                     </div>
                 </div>
             `
@@ -174,14 +178,25 @@ async function sendNewPatronSecurityCodeEmail(email: string, name: string, code:
                         <div style="background-color: #0d0e12; border: 1px solid #3f3f46; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 20px;">
                             <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: bold; color: #ef4444; letter-spacing: 6px;">${code}</span>
                         </div>
+                        
+                        <p style="margin: 0; color: #71717a; font-size: 12px; line-height: 1.4; text-align: center;">
+                            Veuillez conserver ce code précieusement.<br/>
+                            Vous pouvez le modifier à tout moment depuis vos Paramètres.
+                        </p>
+                    </div>
+                    
+                    <div style="text-align: center; font-size: 11px; color: #52525b;">
+                        &copy; 2026 CinéPrivé • Serveur multimédia autonome.
                     </div>
                 </div>
             `
         };
 
         await transporter.sendMail(mailOptions);
+        console.log(`[Sécurité Mail] Code de sécurité envoyé avec succès au Patron à : ${email}`);
         return true;
     } catch (err) {
+        console.error('[Sécurité Mail] Erreur d\'envoi du code de sécurité au Patron :', err);
         return false;
     }
 }
@@ -231,7 +246,7 @@ function verifySecurityCode(userId: string, code: string, operation: string, tar
 
     attempts.count++;
     if (attempts.count >= 5) {
-        attempts.lockedUntil = Date.now() + 5 * 60 * 1000;
+        attempts.lockedUntil = Date.now() + 5 * 60 * 1000; // 5 min lockout
         attempts.count = 0;
     }
     securityAttempts[userId] = attempts;
@@ -256,7 +271,7 @@ app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin
 
     attempts.count++;
     if (attempts.count >= 3) {
-        attempts.lockedUntil = Date.now() + 2 * 60 * 1000;
+        attempts.lockedUntil = Date.now() + 2 * 60 * 1000; // 2 min lockout after 3 requests
         attempts.count = 0;
     }
     requestCodeAttempts[userId] = attempts;
@@ -280,7 +295,10 @@ app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin
     if (db.settings?.webhookUrl) {
         try {
             const opLabel = operation === 'delete_film' ? 'Suppression définitive du film' : 'Bannissement définitive de l\'utilisateur';
-            const discordMessage = `🔐 **[CinéPrivé Sécurité]** Validation requise par **${req.user.name || req.user.username}** pour l'action :\n👉 **${label || opLabel}**\n🔑 **Code temporaire** : \`${code}\`\n⏱️ *Valable pendant 5 minutes.*`;
+            const discordMessage = `🔐 **[CinéPrivé Sécurité]** Validation requise par **${req.user.name || req.user.username}** pour l'action :\n` +
+                `👉 **${label || opLabel}**\n` +
+                `🔑 **Code temporaire** : \`${code}\`\n` +
+                `⏱️ *Valable pendant 5 minutes. Saisissez ce code dans l'application pour valider.*`;
             
             await fetch(db.settings.webhookUrl, {
                 method: 'POST',
@@ -289,7 +307,7 @@ app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin
             });
             sentToDiscord = true;
         } catch (e) {
-            console.error("Erreur d'envoi discord", e);
+            console.error("Erreur d'envoi du code sécurité sur Discord Webhook", e);
         }
     }
 
@@ -302,10 +320,18 @@ app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin
     });
 });
 
+// Sécurité : Bloquer l'IP nue (Autoriser uniquement via Cloudflare avec le bon nom de domaine)
 app.use((req, res, next) => {
+    // Si l'application tourne derrière un proxy (Cloudflare), 
+    // le header 'x-forwarded-host' ou 'host' contiendra le domaine d'origine
     const host = req.headers['x-forwarded-host'] || req.headers.host;
+    
+    // Si nous ne sommes pas en dev et si le host pointe vers l'IP pure au lieu du nom de domaine
     if (process.env.NODE_ENV === 'production' && typeof host === 'string') {
         const isIp = /^[0-9.]+(:[0-9]+)?$/.test(host);
+        
+        // Bloquer si le host est l'IP directe
+        // On permet 'localhost' pour le développement interne
         if (isIp && !host.startsWith('127.0.0.1') && !host.startsWith('localhost')) {
             return res.status(403).send("Accès direct par IP bloqué. Veuillez utiliser CinePrive.rpisimon.uk");
         }
@@ -313,37 +339,37 @@ app.use((req, res, next) => {
     next();
 });
 
+// Configuration des téléchargements Chunkés
 const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
-const FILMS_DIR = path.join(process.cwd(), 'data', 'Films');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-if (!fs.existsSync(FILMS_DIR)) fs.mkdirSync(FILMS_DIR, { recursive: true });
-
-const resolveVideoPath = (safeName: string): string | null => {
-    for (const dir of [UPLOADS_DIR, FILMS_DIR]) {
-        const p = path.join(dir, safeName);
-        if (fs.existsSync(p)) return p;
-    }
-    return null;
-};
-
+// Nettoyage automatique des chunks fantômes (> 12 heures)
 setInterval(() => {
     try {
         const files = fs.readdirSync(UPLOADS_DIR);
         const now = Date.now();
-        const MAX_AGE = 12 * 60 * 60 * 1000;
+        const MAX_AGE = 12 * 60 * 60 * 1000; // 12 heures
+        
+        let cleaned = 0;
         files.forEach(file => {
             if (file.startsWith('temp_')) {
                 const filePath = path.join(UPLOADS_DIR, file);
                 const stats = fs.statSync(filePath);
                 if (now - stats.mtimeMs > MAX_AGE) {
                     fs.unlinkSync(filePath);
+                    cleaned++;
                 }
             }
         });
-    } catch (e) {}
-}, 60 * 60 * 1000);
+        if (cleaned > 0) console.log(`[Nettoyage] ${cleaned} chunk(s) fantôme(s) supprimé(s).`);
+    } catch (e) {
+        console.error('[Nettoyage] Erreur lors du nettoyage des chunks:', e);
+    }
+}, 60 * 60 * 1000); // Exécuter toutes les heures
 
+// BDD JSON locale
 const DATA_DIR = path.join(process.cwd(), 'data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -355,51 +381,124 @@ if (fs.existsSync(dbFile)) {
     try {
         db = JSON.parse(fs.readFileSync(dbFile, 'utf-8'));
     } catch (e) {
+        console.error("FATAL ERROR: Failed to parse db.json. Halting startup to prevent data corruption.", e);
         throw e;
     }
-    
-    // MIGRATION AUTOMATIQUE VERS LES MULTI-RÔLES (RBAC)
-    let rolesMigrated = false;
-    if (db.users && Array.isArray(db.users)) {
-        db.users.forEach((u: any) => {
-            if (typeof u.role === 'string') {
-                u.roles = [u.role];
-                delete u.role;
-                rolesMigrated = true;
+        
+    // Migration of old statuses to new statuses
+    let migrated = false;
+    if (db.films && Array.isArray(db.films)) {
+        db.films.forEach((film: any) => {
+            if (film.status === 'ready') {
+                film.status = 'AVAILABLE';
+                migrated = true;
+            } else if (film.status === 'transcoding') {
+                film.status = 'PROCESSING';
+                migrated = true;
+            } else if (film.status === 'error') {
+                film.status = 'ERROR';
+                migrated = true;
             }
         });
     }
-    if (rolesMigrated) {
-        console.log('[DB] Migration vers le système multi-rôles (RBAC) appliquée avec succès.');
+    if (migrated) {
         const tmpFile = dbFile + '.tmp';
         fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2));
         fs.renameSync(tmpFile, dbFile);
+        console.log('[DB] Migration des statuts de films appliquée.');
     }
 }
 
+// Initialisation simple
 if (!db.users) db.users = [];
 if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
 if (!db.settings.securityCode) db.settings.securityCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+// Sécurisation automatique de JWT_SECRET
 if (process.env.JWT_SECRET) {
     JWT_SECRET = process.env.JWT_SECRET;
 } else if (db.settings && db.settings.jwtSecret) {
     JWT_SECRET = db.settings.jwtSecret;
+    console.log('[Sécurité] JWT_SECRET chargé depuis le fichier de configuration persistent (db.settings.jwtSecret).');
 } else if (process.env.NODE_ENV !== 'development') {
-    throw new Error("ERREUR CRITIQUE: Aucun JWT_SECRET n'est défini.");
+    throw new Error("ERREUR CRITIQUE: Démarrage refusé. Aucun JWT_SECRET n'est défini en variable d'environnement (recommandé) ni dans db.json.");
 }
 if (!db.invites) db.invites = [];
 if (!db.notifications) db.notifications = [];
 if (!db.polls) db.polls = {};
 if (!db.pollsConfig) db.pollsConfig = [];
 
+const defaultPolls = [
+    {
+        id: 'p1',
+        title: 'Identité Visuelle & Logo',
+        desc: "Quel emblème me représenterait le mieux selon vous ?",
+        allowMultiple: true,
+        options: [
+            { id: 'o1', label: 'La pellicule classique' },
+            { id: 'o2', label: "L'ordinateur/moniteur" },
+            { id: 'o3', label: 'Une forme géométrique abstraite neutre' }
+        ]
+    },
+    {
+        id: 'p2',
+        title: 'Couleur de Marque',
+        desc: "Quelle couleur d'accent préférez-vous ?",
+        allowMultiple: true,
+        options: [
+            { id: 'o1', label: 'Rouge Cinéma' },
+            { id: 'o2', label: 'Bleu Profond' },
+            { id: 'o3', label: 'Or / Jaune' },
+            { id: 'o4', label: 'Violet Électrique' }
+        ]
+    },
+    {
+        id: 'p3',
+        title: 'Membres Bêta',
+        desc: "Souhaitez-vous devenir membre bêta pour tester les nouveautés en avant-première ?",
+        allowMultiple: false,
+        allowCustom: false,
+        options: [
+            { id: 'o1', label: 'Oui, je veux bien !' },
+            { id: 'o2', label: 'Non, je préfère la version stable.' }
+        ]
+    },
+    {
+        id: 'p4',
+        title: 'Nom de Domaine',
+        desc: "Que pensez-vous du nom de domaine actuel ?",
+        allowMultiple: false,
+        allowCustom: true,
+        options: [
+            { id: 'o1', label: 'cineprive.rpisimon.uk me convient très bien' },
+            { id: 'o2', label: 'Je préfèrerais un format plus court (ex: film.rpisimon.uk)' },
+            { id: 'o3', label: 'Il faudrait un vrai domaine professionnel (.com, .fr)' }
+        ]
+    }
+];
+
+// Fusionner les sondages par défaut s'ils manquent (ex: nouveau sondage ajouté dans le code)
+defaultPolls.forEach(defaultPoll => {
+    if (!db.pollsConfig.find((p: any) => p.id === defaultPoll.id)) {
+        db.pollsConfig.push(defaultPoll);
+    }
+});
+
 const saveDb = () => {
     const tmpFile = dbFile + '.tmp';
     const bakFile = dbFile + '.bak';
+    
+    // 1. Ecrire dans le fichier temporaire (atomique)
     fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2));
-    if (fs.existsSync(dbFile)) fs.copyFileSync(dbFile, bakFile);
+    
+    // 2. Si un fichier db existe déjà, on en fait une copie .bak par sécurité
+    if (fs.existsSync(dbFile)) {
+        fs.copyFileSync(dbFile, bakFile);
+    }
+    
+    // 3. Renommer le tmp pour remplacer le fichier actuel
     fs.renameSync(tmpFile, dbFile);
 };
 
@@ -409,12 +508,15 @@ const debouncedSaveDb = () => {
     saveDbTimeout = setTimeout(() => {
         saveDb();
         saveDbTimeout = null;
-    }, 5000);
+    }, 5000); // 5 sec debounce
 };
 
 import { Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
 
+// Optional: Graceful fallback for Redis connection 
+// If Redis isn't up (like in a sandbox environment), BullMQ will keep trying, which is fine, 
+// but we only want strict BullMQ here.
 const connection = new IORedis({
     host: process.env.REDIS_HOST || '127.0.0.1',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
@@ -444,14 +546,19 @@ const handleTranscodeCompleted = async ({ jobId, returnvalue }: any, queue: any)
     const filmId = parsedReturn?.filmId;
     const newFilename = parsedReturn?.newFilename || parsedReturn?.outputFilename;
 
-    if (!filmId || !newFilename) return;
+    if (!filmId || !newFilename) {
+        console.error(`[Queue] Impossible de parser returnvalue pour la db:`, returnvalue);
+        return;
+    }
 
     const film = db.films.find((f: any) => f.id === filmId);
     if (film) {
         film.filename = newFilename;
         film.status = 'AVAILABLE';
         saveDb();
+        console.log(`[Queue] Film ${filmId} marqué comme prêt. Fichier: ${newFilename}`);
         
+        // Notifications
         if (!db.notifications) db.notifications = [];
         const notifMessage = `🎬 Nouveau film disponible : ${film.title} est prêt !`;
         const { v4: uuidv4 } = require('uuid');
@@ -463,19 +570,21 @@ const handleTranscodeCompleted = async ({ jobId, returnvalue }: any, queue: any)
             readBy: []
         });
 
+        // Webhook Discord
         if (db.settings && db.settings.webhookUrl) {
             try {
                 fetch(db.settings.webhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: notifMessage })
-                }).catch(() => {});
+                }).catch(e => console.error("Discord webhook failed", e));
             } catch (e) {}
         }
     }
 };
 
-const handleTranscodeFailed = async ({ jobId }: any, queue: any) => {
+const handleTranscodeFailed = async ({ jobId, failedReason }: any, queue: any) => {
+    console.error(`[Queue] Échec du transcodage pour le job ${jobId}: ${failedReason}`);
     try {
         const job = await queue.getJob(jobId);
         if (job && job.data.filmId) {
@@ -511,28 +620,68 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
     const isH264 = await checkIsH264(inputPath);
 
     if (isH264) {
-        await transcodeFastQueue.add('transcode-job', { filmId, inputFilename }, { jobId: `${filmId}_${Date.now()}`, removeOnComplete: true, removeOnFail: 50 });
+        console.log(`[Queue] Remuxing rapide détecté (H264). Ajout à la file rapide (qui n'est jamais en pause).`);
+        await transcodeFastQueue.add(
+            'transcode-job', 
+            { filmId, inputFilename }, 
+            { 
+                jobId: `${filmId}_${Date.now()}`,
+                removeOnComplete: { age: 3600 },
+                removeOnFail: 50
+            }
+        );
     } else {
-        await transcodeQueue.add('transcode-job', { filmId, inputFilename }, { jobId: `${filmId}_${Date.now()}`, removeOnComplete: true, removeOnFail: 50 });
+        console.log(`[Queue] Encodage lourd requis. Ajout à la file nocturne.`);
+        await transcodeQueue.add(
+            'transcode-job', 
+            { filmId, inputFilename }, 
+            { 
+                jobId: `${filmId}_${Date.now()}`,
+                removeOnComplete: { age: 3600 },
+                removeOnFail: 50
+            }
+        );
     }
+    console.log(`[Queue] Job ajouté à BullMQ pour le film ID: ${filmId}`);
 };
 
 import cron from 'node-cron';
-cron.schedule('45 6 * * *', async () => await transcodeQueue.pause());
-cron.schedule('0 1 * * *', async () => await transcodeQueue.resume());
 
+// Tâche planifiée : Mettre en pause à 06h45
+cron.schedule('45 6 * * *', async () => {
+    console.log('[Cron] 06h45 : Mise en pause de la file de transcodage.');
+    await transcodeQueue.pause();
+});
+
+// Tâche planifiée : Relancer à 01h00
+cron.schedule('0 1 * * *', async () => {
+    console.log('[Cron] 01h00 : Reprise de la file de transcodage.');
+    await transcodeQueue.resume();
+});
+
+// État initial au démarrage du serveur
 const initQueueState = async () => {
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
+    
+    // File active de 01:00 à 06:44
     const isActive = (hour >= 1 && hour < 6) || (hour === 6 && minute < 45);
     
-    if (!isActive) await transcodeQueue.pause();
-    else await transcodeQueue.resume();
+    if (!isActive) {
+        console.log('[Cron] Démarrage hors du créneau 01h00-06h45. Mise en pause initiale de la file.');
+        await transcodeQueue.pause();
+    } else {
+        console.log('[Cron] Démarrage dans le créneau 01h00-06h45. File active.');
+        await transcodeQueue.resume();
+    }
 };
 initQueueState();
 
-app.get('/api/polls/config', (req, res) => res.json(db.pollsConfig));
+// --- API POLLS ---
+app.get('/api/polls/config', (req, res) => {
+    res.json(db.pollsConfig);
+});
 
 app.post('/api/polls/config', requireAuth, requireRole(['owner']), (req, res) => {
     db.pollsConfig = req.body;
@@ -553,7 +702,9 @@ app.post('/api/polls/vote', requireAuth, (req: any, res) => {
     
     if (userId) {
         db.polls[pollId].votedUsers.push(userId);
-        if (vote) db.polls[pollId].userVotes[userId] = vote;
+        if (vote) {
+             db.polls[pollId].userVotes[userId] = vote;
+        }
     }
 
     const voteArray = Array.isArray(vote) ? vote : [vote];
@@ -566,6 +717,7 @@ app.post('/api/polls/vote', requireAuth, (req: any, res) => {
         }
     });
     
+    // Notification for admins
     if (!db.notifications) db.notifications = [];
     db.notifications.push({
         id: Date.now().toString() + Math.random().toString(36).substring(7),
@@ -579,12 +731,18 @@ app.post('/api/polls/vote', requireAuth, (req: any, res) => {
     res.json({ success: true, pollData: db.polls[pollId] });
 });
 
-app.get('/api/polls/results', requireAuth, (req, res) => res.json(db.polls));
+app.get('/api/polls/results', requireAuth, (req, res) => {
+    res.json(db.polls);
+});
 
 app.delete('/api/polls/:pollId', requireAuth, requireRole(['owner']), (req, res) => {
     const { pollId } = req.params;
-    if (db.pollsConfig) db.pollsConfig = db.pollsConfig.filter((p: any) => p.id !== pollId);
-    if (db.polls && db.polls[pollId]) delete db.polls[pollId];
+    if (db.pollsConfig) {
+        db.pollsConfig = db.pollsConfig.filter((p: any) => p.id !== pollId);
+    }
+    if (db.polls && db.polls[pollId]) {
+        delete db.polls[pollId];
+    }
     saveDb();
     res.json({ success: true, pollsConfig: db.pollsConfig });
 });
@@ -600,57 +758,75 @@ app.delete('/api/polls/reset/:pollId', requireAuth, requireRole(['owner']), (req
 
 const upload = multer({ 
     dest: UPLOADS_DIR,
-    limits: { fileSize: 15000 * 1024 * 1024 }
+    limits: { fileSize: 15000 * 1024 * 1024 } // 15GB
 });
 
+// Mapping simplifié des genres TMDB
 const TMDB_GENRES: Record<number, string> = {
     28: "Action", 12: "Aventure", 16: "Animation", 35: "Comédie", 80: "Crime", 
     99: "Documentaire", 18: "Drame", 10751: "Familial", 14: "Fantastique",
     36: "Histoire", 27: "Horreur", 10402: "Musique", 9648: "Mystère", 
-    10749: "Romance", 878: "Science-Fiction", 
+    10749: "Romance", 878: "Science-Fiction", 10770: "Téléfilm", 
     53: "Thriller", 10752: "Guerre", 37: "Western"
 };
 
+// ======================= API ROUTES =======================
+
+// Public Settings
 app.get('/api/public/settings', (req, res) => {
-    res.json({ allowRegistrations: db.settings?.allowRegistrations ?? true });
+    res.json({
+        allowRegistrations: db.settings?.allowRegistrations ?? true
+    });
 });
 
+// Settings
 app.get('/api/settings', requireAuth, (req: any, res) => {
     const settings: any = { 
         allowRegistrations: db.settings?.allowRegistrations ?? true,
         fundingCurrent: db.settings?.fundingCurrent ?? 0,
         fundingGoal: db.settings?.fundingGoal ?? 12
     };
-    if (req.user.roles.includes('owner')) {
+    if (req.user.role === 'owner') {
         settings.webhookUrl = db.settings?.webhookUrl || '';
         settings.securityCode = db.settings?.securityCode || '000000';
-    } else if (req.user.roles.includes('admin')) {
+    } else if (req.user.role === 'admin') {
         settings.webhookUrl = db.settings?.webhookUrl || '';
     }
     res.json(settings);
 });
 
 app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
-    if (req.body.allowRegistrations !== undefined) db.settings.allowRegistrations = req.body.allowRegistrations;
-    if (req.body.fundingCurrent !== undefined) db.settings.fundingCurrent = parseFloat(req.body.fundingCurrent);
-    if (req.body.fundingGoal !== undefined) db.settings.fundingGoal = parseFloat(req.body.fundingGoal);
-    
-    if (req.body.webhookUrl !== undefined) db.settings.webhookUrl = req.body.webhookUrl;
-    
-    if (req.user.roles.includes('owner') && req.body.securityCode !== undefined) {
-        db.settings.securityCode = req.body.securityCode;
+    if (req.body.allowRegistrations !== undefined) {
+        db.settings.allowRegistrations = req.body.allowRegistrations;
+    }
+    if (req.body.fundingCurrent !== undefined) {
+        db.settings.fundingCurrent = parseFloat(req.body.fundingCurrent);
+    }
+    if (req.body.fundingGoal !== undefined) {
+        db.settings.fundingGoal = parseFloat(req.body.fundingGoal);
+    }
+    if (req.user.role === 'owner' || req.user.role === 'admin') {
+        if (req.body.webhookUrl !== undefined) {
+            db.settings.webhookUrl = req.body.webhookUrl;
+        }
+    }
+    if (req.user.role === 'owner') {
+        if (req.body.securityCode !== undefined) {
+            db.settings.securityCode = req.body.securityCode;
+        }
     }
     saveDb();
     
+    // Pour la réponse, renvoyer de manière sécurisée
     const responseSettings: any = {
         allowRegistrations: db.settings.allowRegistrations,
         fundingCurrent: db.settings.fundingCurrent,
         fundingGoal: db.settings.fundingGoal
     };
-    if (req.user.roles.includes('owner')) {
+    if (req.user.role === 'owner') {
         responseSettings.webhookUrl = db.settings.webhookUrl || '';
         responseSettings.securityCode = db.settings.securityCode || '';
-    } else if (req.user.roles.includes('admin')) {
+    } else if (req.user.role === 'admin') {
         responseSettings.webhookUrl = db.settings.webhookUrl || '';
     }
     res.json(responseSettings);
@@ -665,9 +841,10 @@ app.post('/api/settings/security/regenerate', requireAuth, requireRole(['owner']
     let sentToDiscord = false;
     let sentToEmail = false;
 
+    // 1. Envoyer à Discord si configuré
     if (db.settings.webhookUrl) {
         try {
-            const discordMessage = `🔔 **[CinéPrivé Sécurité]** Un nouveau code de sécurité Patron a été régénéré : \`${newCode}\`.`;
+            const discordMessage = `🔔 **[CinéPrivé Sécurité]** Un nouveau code de sécurité Patron a été régénéré : \`${newCode}\`.\nCe code est désormais requis pour toutes les suppressions définitives de films ou bannissements d'utilisateurs.`;
             await fetch(db.settings.webhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -675,9 +852,12 @@ app.post('/api/settings/security/regenerate', requireAuth, requireRole(['owner']
             });
             sentToDiscord = true;
             notificationSent = true;
-        } catch (e) {}
+        } catch (e) {
+            console.error("Erreur envoi webhook sécurité Discord", e);
+        }
     }
 
+    // 2. Envoyer par e-mail si SMTP et adresse configurés
     const hasSmtp = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
     if (hasSmtp && req.user.email) {
         const sent = await sendNewPatronSecurityCodeEmail(req.user.email, req.user.name || req.user.username, newCode, 'regenerate');
@@ -697,6 +877,7 @@ app.post('/api/settings/security/regenerate', requireAuth, requireRole(['owner']
     });
 });
 
+// Invites
 app.get('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => res.json(db.invites || []));
 app.post('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     let newCode = req.body.customCode || Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -704,7 +885,7 @@ app.post('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res
     db.invites.push({ 
         code: newCode, 
         used: false, 
-        maxUses: req.body.maxUses || 1,
+        maxUses: req.body.maxUses || 1, // Default to 1 instead of unlimited
         currentUses: 0,
         createdAt: Date.now() 
     });
@@ -718,7 +899,9 @@ app.delete('/api/invites/:code', requireAuth, requireRole(['owner', 'admin']), (
     res.json({ success: true });
 });
 
+// Auth & Utilisateurs
 app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+    // Ne renvoyer que les données non sensibles (pas le mot de passe)
   res.json(db.users.map((u: any) => ({ ...u, password: '' })));
 });
 
@@ -730,12 +913,13 @@ app.post('/api/register', async (req, res) => {
         const inviteIndex = db.invites.findIndex((i: any) => i.code.toLowerCase() === inviteCode.toLowerCase() && !i.used);
         if (inviteIndex >= 0) {
             bypassWithCode = true;
+            // Gérer les tickets multi-uses
             const currentUses = db.invites[inviteIndex].currentUses || 0;
             const maxUses = db.invites[inviteIndex].maxUses || 1;
             
             db.invites[inviteIndex].currentUses = currentUses + 1;
             if (db.invites[inviteIndex].currentUses >= maxUses) {
-                db.invites[inviteIndex].used = true;
+                db.invites[inviteIndex].used = true; // Consommer le code s'il a atteint la limite
             }
         } else {
             return res.status(400).json({ error: "Code d'invitation invalide ou épuisé." });
@@ -753,7 +937,10 @@ app.post('/api/register', async (req, res) => {
     }
 
     const isFirstUser = db.users.length === 0;
+    
+    // Attribuer des couleurs aléatoires
     const colors = ['bg-amber-600', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-orange-600'];
+    
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const newUser = {
@@ -763,13 +950,14 @@ app.post('/api/register', async (req, res) => {
         email: email || '',
         name,
         color: colors[db.users.length % colors.length],
-        roles: isFirstUser ? ['owner'] : ['user'],
-        status: (isFirstUser || bypassWithCode) ? 'active' : 'pending',
+        role: isFirstUser ? 'owner' : 'user', // Le 1er est propriétaire !
+        status: isFirstUser ? 'active' : 'pending',
         myList: []
     };
 
     db.users.push(newUser);
     
+    // Notification for admins
     if (newUser.status === 'pending') {
         if (!db.notifications) db.notifications = [];
         db.notifications.push({
@@ -792,6 +980,7 @@ app.post('/api/register', async (req, res) => {
         maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined 
     });
 
+    // Renvoyer l'utilisateur sans le mdp
     res.json({ ...newUser, password: '', token });
 });
 
@@ -834,8 +1023,8 @@ app.post('/api/login', async (req, res) => {
             if (user.status === 'pending') {
                 return res.status(403).json({ error: "Votre compte est en attente d'approbation par le Patron." });
             }
-            if (user.status === 'pending_ban' || (user.roles && user.roles.includes('banned'))) {
-                return res.status(403).json({ error: "Votre compte est suspendu ou banni définitivement." });
+            if (user.status === 'pending_ban') {
+                return res.status(403).json({ error: "Votre compte est temporairement suspendu en attente de la validation finale du Patron." });
             }
             const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '1d' });
             res.cookie('token', token, { 
@@ -867,10 +1056,14 @@ app.get('/api/me', requireAuth, (req: any, res) => {
     res.json({ ...req.user, password: '' });
 });
 
+// Auth : Réinitialisation de mot de passe (Simulation)
 app.post('/api/auth/reset-password', (req, res) => {
+    const { email } = req.body;
+    // On simule l'envoi d'un email (Toujours renvoyer un succès pour ne pas fuiter l'existence d'une adresse)
     res.json({ success: true, dummyMessage: "Email de réinitialisation envoyé si le compte existe." });
 });
 
+// Auth : Changement de mot de passe
 app.post('/api/auth/change-password', requireAuth, async (req: any, res) => {
     const { oldPassword, newPassword } = req.body;
     const user = db.users.find((u: any) => u.id === req.user.id);
@@ -888,23 +1081,21 @@ app.post('/api/auth/change-password', requireAuth, async (req: any, res) => {
     res.json({ success: true });
 });
 
-// NOUVELLE ROUTE : Mise à jour globale du profil (Rôles RBAC et Note Interne)
-app.post('/api/users/:id/update-profile', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
-    const { roles, internalNote } = req.body;
+// Admin : Promouvoir un utilisateur
+app.post('/api/users/:id/upgrade', requireAuth, requireRole(['owner']), (req, res) => {
+    const userToUpgrade = db.users.find((u: any) => u.id === req.params.id);
+    if (!userToUpgrade) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+    userToUpgrade.role = 'admin';
+    saveDb();
+    res.json({ success: true });
+});
+
+app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) => {
+    const { role } = req.body;
     const userToEdit = db.users.find((u: any) => u.id === req.params.id);
-    
     if (!userToEdit) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    
-    // Seul le Patron peut modifier les étiquettes de rôles
-    if (req.user.roles.includes('owner') && roles !== undefined) {
-        userToEdit.roles = roles;
-    }
-    
-    // Les Admins et le Patron peuvent modifier la note interne (Casier)
-    if (internalNote !== undefined) {
-        userToEdit.internalNote = internalNote;
-    }
-    
+    userToEdit.role = role;
     saveDb();
     res.json({ success: true });
 });
@@ -920,11 +1111,6 @@ app.post('/api/users/:id/restore', requireAuth, requireRole(['owner', 'admin']),
     delete targetUser.requestedBanBy;
     delete targetUser.requestedBanAt;
     
-    // On retire l'étiquette 'banned' si elle est présente
-    if (targetUser.roles) {
-        targetUser.roles = targetUser.roles.filter((r: string) => r !== 'banned');
-    }
-    
     saveDb();
     res.json({ success: true, message: `Le compte de "${targetUser.username}" a été réactivé.` });
 });
@@ -936,7 +1122,7 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res
         return res.status(404).json({ error: "Utilisateur non trouvé" });
     }
     
-    if (targetUser.roles.includes('owner')) {
+    if (targetUser.role === 'owner') {
         return res.status(403).json({ error: "Impossible de modifier le compte Patron." });
     }
     
@@ -944,6 +1130,7 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res
         return res.status(403).json({ error: "Vous ne pouvez pas effectuer cette action sur vous-même." });
     }
 
+    // Le Patron (owner) valide avec le code pour supprimer définitivement
     const code = req.query.code || req.headers['x-security-code'];
     if (!code) {
         return res.status(400).json({ error: "Code de validation de sécurité requis." });
@@ -958,6 +1145,7 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res
     res.json({ success: true, deleted: true, message: `L'utilisateur "${targetUser.username}" a été banni définitivement.` });
 });
 
+// Admin : Approuver un utilisateur
 app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
     const adminUser = req.user;
 
@@ -968,6 +1156,7 @@ app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']),
     userToApprove.validatedBy = adminUser.username;
     userToApprove.validatedAt = Date.now();
     
+    // Phase 3: Sync to Jellyfin if configured
     if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
         try {
             const tempPassword = Math.random().toString(36).slice(-8);
@@ -983,8 +1172,12 @@ app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']),
             if (jellyfinResponse.ok) {
                 const jellyfinUser = await jellyfinResponse.json();
                 userToApprove.jellyfinId = jellyfinUser.Id;
+            } else {
+                console.error("Erreur lors de la création de l'utilisateur Jellyfin:", await jellyfinResponse.text());
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error("Échec de la communication avec Jellyfin", e);
+        }
     }
 
     saveDb();
@@ -995,6 +1188,7 @@ app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
     const user = db.users.find((u: any) => u.id === req.params.id);
     if (!user) return res.status(404).json({error: 'Utilisateur non trouvé'});
     
+    // Check if the user is modifying their own list
     if ((req as any).user.id !== user.id) return res.status(403).json({error: 'Accès interdit'});
 
     const { filmId, action } = req.body;
@@ -1012,18 +1206,14 @@ app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
 
 // Films
 app.get('/api/films', requireAuth, async (req: any, res) => {
-  // SÉCURITÉ : Si l'utilisateur n'est pas encore validé, on lui cache tout le catalogue.
-  if (req.user.status === 'pending') {
-      return res.json([]);
-  }
-
   let filmsList = db.films || [];
   
-  // Masquer les films en quarantaine pour les membres réguliers
-  if (!req.user.roles.includes('owner') && !req.user.roles.includes('admin')) {
+  // Masquer les films en attente de suppression définitive ou en quarantaine pour les membres réguliers
+  if (req.user.role !== 'owner' && req.user.role !== 'admin') {
       filmsList = filmsList.filter((f: any) => !f.pendingDeletion && !f.isQuarantined);
   }
 
+  // Masquer la clé JELLYFIN_API_KEY des posterUrls pour les films existants
   const sanitizedFilms = filmsList.map((f: any) => {
     let sanitizedF = { ...f };
     const creator = db.users.find((u: any) => u.id === f.addedBy);
@@ -1038,6 +1228,12 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
         sanitizedF.posterUrl = `/api/jellyfin/image/${itemId}`;
       }
     }
+
+    if (req.user.role !== 'owner' && req.user.role !== 'admin' && req.user.role !== 'technician') {
+        delete sanitizedF.originalName;
+        delete sanitizedF.jellyfinId;
+    }
+
     return sanitizedF;
   });
   res.json(sanitizedFilms);
@@ -1114,6 +1310,7 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner']), (req: any, res
     }
     const film = db.films[filmIndex];
 
+    // Si c'est le Patron (owner), il faut valider avec le code de sécurité pour supprimer définitivement
     const code = req.query.code || req.headers['x-security-code'];
     if (!code) {
         return res.status(400).json({ error: "Code de validation de sécurité requis." });
@@ -1123,12 +1320,16 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner']), (req: any, res
         return res.status(403).json({ error: verification.error });
     }
     
+    // Si c'est un film local de type upload, on supprime le fichier physique
     if (film.filename && !film.jellyfinId) {
         const filePath = path.join(UPLOADS_DIR, film.filename);
         if (fs.existsSync(filePath)) {
             try {
                 fs.unlinkSync(filePath);
-            } catch (err) {}
+                console.log(`[Delete] Fichier vidéo supprimé du serveur : ${film.filename}`);
+            } catch (err) {
+                console.error(`[Delete] Erreur de suppression du fichier ${film.filename}:`, err);
+            }
         }
     }
     
@@ -1148,6 +1349,7 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
     }
     
     try {
+        // 1. Récupérer les utilisateurs pour trouver l'admin (les clés API globales sont souvent rattachées à un utilisateur)
         const usersResp = await fetch(`${process.env.JELLYFIN_URL}/Users`, {
             headers: { 'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"` }
         });
@@ -1156,6 +1358,7 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
         
         if (!admin) return res.status(500).json({ error: "Administrateur Jellyfin introuvable" });
 
+        // 2. Fetch les items récursivement
         const itemsResp = await fetch(`${process.env.JELLYFIN_URL}/Users/${admin.Id}/Items?Recursive=true&IncludeItemTypes=Movie,Series,Video&Fields=Path,Overview,PremiereDate,Genres,Studios`, {
             headers: { 'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"` }
         });
@@ -1164,6 +1367,7 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
         let addedCount = 0;
         
         itemsData.Items.forEach((item: any) => {
+            // Check si on a déjà ce film
             const existing = db.films.find((f: any) => f.jellyfinId === item.Id);
             if (!existing) {
                 const isSeries = item.Type === "Series";
@@ -1190,10 +1394,12 @@ app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, 
         saveDb();
         res.json({ success: true, count: addedCount, films: db.films });
     } catch (e) {
+        console.error(e);
         res.status(500).json({ error: "Erreur lors de la synchronisation Jellyfin" });
     }
 });
 
+// Progression de lecture
 app.post('/api/progress', requireAuth, (req: any, res) => {
     const { filmId, time } = req.body;
     db.progress[`${req.user.id}_${filmId}`] = time;
@@ -1223,6 +1429,7 @@ app.delete('/api/progress/:filmId', requireAuth, (req: any, res) => {
     res.json({ success: true });
 });
 
+// Demandes (Requests)
 app.get('/api/requests', requireAuth, (req, res) => {
     res.json(db.requests || []);
 });
@@ -1238,12 +1445,13 @@ app.post('/api/requests', requireAuth, (req, res) => {
         title,
         tmdbId,
         createdAt: Date.now(),
-        status: 'pending'
+        status: 'pending' // pending or fulfilled
     };
 
     if (!db.requests) db.requests = [];
     db.requests.push(newRequest);
     
+    // Notification for admins
     if (!db.notifications) db.notifications = [];
     db.notifications.push({
         id: Date.now().toString(),
@@ -1255,6 +1463,7 @@ app.post('/api/requests', requireAuth, (req, res) => {
     });
     
     saveDb();
+    
     res.json({ success: true, request: newRequest });
 });
 
@@ -1265,6 +1474,7 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
     res.json({ success: true });
 });
 
+// Notifications
 app.get('/api/notifications', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     res.json(db.notifications || []);
 });
@@ -1313,6 +1523,7 @@ app.post('/api/bugs', requireAuth, async (req: any, res) => {
     
     saveDb();
     
+    // Envoyer au webhook Discord si configuré
     if (db.settings && db.settings.webhookUrl) {
         try {
             await fetch(db.settings.webhookUrl, {
@@ -1320,60 +1531,39 @@ app.post('/api/bugs', requireAuth, async (req: any, res) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: message })
             });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Erreur d'envoi webhook", e);
+        }
     }
+    
     res.json({ success: true });
 });
 
+// Recherche TMDB
 app.get('/api/tmdb/search', requireAuth, async (req, res) => {
     const query = req.query.query as string;
     const apiKey = process.env.TMDB_API_KEY;
     
     if (!apiKey) {
+        // Mode simulation si pas de clé API (pour ne pas bloquer le prototype)
         return res.json({ results: [
-            { id: 9991, title: query, release_date: "2024-01-01", overview: "[Simulation TheMovieDB]", poster_path: null, genre_ids: [28, 878] }
+            { id: 9991, title: query, release_date: "2024-01-01", overview: "[Simulation TheMovieDB] - Veuillez configurer la clé API TMDB_API_KEY dans les variables d'environnement.", poster_path: null, genre_ids: [28, 878] },
+            { id: 9992, title: query + " 2", release_date: "2025-01-01", overview: "Une suite simulée.", poster_path: null, genre_ids: [35] }
         ]});
     }
 
     try {
         const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&include_adult=false`);
         const data = await response.json();
-        if (data.results) data.results = data.results.filter((r: any) => !r.adult);
+        
+        if (data.results) {
+            data.results = data.results.filter((r: any) => !r.adult);
+        }
+        
         res.json(data);
     } catch (err: any) {
+        console.error("Erreur TMDB:", err);
         res.status(500).json({ error: 'Échec de la recherche TMDB', details: err.message });
-    }
-});
-
-app.get('/api/tmdb/movie/:id', requireAuth, async (req, res) => {
-    const { id } = req.params;
-    const apiKey = process.env.TMDB_API_KEY;
-
-    if (!/^\d+$/.test(id)) {
-        return res.status(400).json({ error: "Ce n'est pas un identifiant valide. Il ne doit contenir que des chiffres." });
-    }
-    if (!apiKey) {
-        return res.status(400).json({ error: "Le serveur a perdu sa connexion avec TheMovieDB." });
-    }
-
-    try {
-        const response = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${apiKey}&language=fr-FR`);
-        if (response.status === 404) return res.status(404).json({ error: "Oups, impossible de trouver un film avec ce numéro précis." });
-
-        const data = await response.json();
-        if (data.adult) return res.status(403).json({ error: "Désolé, les contenus pour adultes sont strictement bloqués sur ce serveur." });
-
-        res.json({
-            id: data.id,
-            title: data.title,
-            release_date: data.release_date,
-            overview: data.overview,
-            poster_path: data.poster_path,
-            genre_ids: (data.genres || []).map((g: any) => g.id),
-            adult: data.adult
-        });
-    } catch (err: any) {
-        res.status(500).json({ error: "Le serveur TheMovieDB ne répond pas pour le moment. Réessayez plus tard." });
     }
 });
 
@@ -1386,6 +1576,8 @@ app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', '
 
     try {
         let metaId = film.tmdbId;
+        
+        // Si on n'a pas de tmdbId, on tente de le trouver via le titre
         if (!metaId) {
             const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(film.title)}&language=fr-FR`);
             const searchData = await searchRes.json();
@@ -1400,12 +1592,14 @@ app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', '
         const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${metaId}?api_key=${apiKey}&language=fr-FR&append_to_response=credits`);
         const fullMeta = await creditsRes.json();
         
-        if (fullMeta.poster_path) film.posterUrl = `https://image.tmdb.org/t/p/w500${fullMeta.poster_path}`;
+        if (fullMeta.poster_path) {
+            film.posterUrl = `https://image.tmdb.org/t/p/w500${fullMeta.poster_path}`;
+        }
         if (fullMeta.overview) film.synopsis = fullMeta.overview;
         if (fullMeta.release_date) film.year = parseInt(fullMeta.release_date.split('-')[0]);
         if (fullMeta.genres && Array.isArray(fullMeta.genres)) {
             film.genres = fullMeta.genres.map((g: any) => g.name);
-            if (film.genres.length > 0) film.genre = film.genres[0];
+            if (film.genres.length > 0) film.genre = film.genres[0]; // Rétrocompatibilité
         }
 
         if (fullMeta.credits && fullMeta.credits.cast) {
@@ -1423,25 +1617,37 @@ app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', '
         saveDb();
         res.json({ success: true, film });
     } catch (err) {
+        console.error("TMDB Refresh error", err);
         res.status(500).json({ error: "Erreur lors de la mise à jour des métadonnées" });
     }
 });
 
+// Upload Video par paquets (Chunking pour contourner Cloudflare)
 app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (req: any, res) => {
     const { uploadId, chunkIndex } = req.body;
     const chunkFile = req.file;
 
-    if (!uploadId || !chunkFile || chunkIndex === undefined) return res.status(400).json({ error: 'Données manquantes' });
+    console.log(`[Upload] Réception d'un chunk pour l'upload ${uploadId}...`);
+
+    if (!uploadId || !chunkFile || chunkIndex === undefined) {
+        console.error(`[Upload] Données manquantes pour le chunk de ${uploadId}`);
+        return res.status(400).json({ error: 'Données manquantes' });
+    }
 
     const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
-    if (!safeUploadId) return res.status(400).json({ error: 'ID invalide' });
+    if (!safeUploadId) {
+        console.error(`[Upload] ID invalide : ${uploadId}`);
+        return res.status(400).json({ error: 'ID invalide' });
+    }
 
     const targetPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}_${chunkIndex}`);
 
     try {
         fs.renameSync(chunkFile.path, targetPath);
+        console.log(`[Upload] Chunk sauvegardé à ${targetPath}`);
         res.json({ success: true });
     } catch (e) {
+        console.error("[Upload] Erreur de chunk:", e);
         if (req.file) fs.unlinkSync(req.file.path);
         res.status(500).json({ error: 'Erreur écriture chunk' });
     }
@@ -1452,13 +1658,17 @@ app.post('/api/films/upload-cancel', requireAuth, express.json(), (req: any, res
     if (!uploadId) return res.status(400).json({ error: 'ID manquant' });
     const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
     
+    console.log(`[Upload] Annulation de l'upload ${safeUploadId}`);
     try {
         const files = fs.readdirSync(UPLOADS_DIR);
         for (const file of files) {
-            if (file.startsWith(`temp_${safeUploadId}`)) fs.unlinkSync(path.join(UPLOADS_DIR, file));
+            if (file.startsWith(`temp_${safeUploadId}`)) {
+                fs.unlinkSync(path.join(UPLOADS_DIR, file));
+            }
         }
         res.json({ success: true });
     } catch (e) {
+        console.error("Erreur nettoyage upload:", e);
         res.status(500).json({ error: 'Erreur nettoyage' });
     }
 });
@@ -1467,7 +1677,12 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     const body = req.body;
     const { uploadId, filename, originalName, totalChunks } = body;
 
-    if (!uploadId || !filename || !totalChunks) return res.status(400).json({ error: 'Données manquantes' });
+    console.log(`[Upload] Requête finalize reçue pour uploadId: ${uploadId}`);
+
+    if (!uploadId || !filename || !totalChunks) {
+        console.error(`[Upload] Échec finalize: données manquantes pour ${uploadId}`);
+        return res.status(400).json({ error: 'Données manquantes' });
+    }
 
     const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
     if (!safeUploadId) return res.status(400).json({ error: 'ID invalide' });
@@ -1476,12 +1691,16 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
     const finalFilename = `${Date.now()}_${safeName}`;
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
+    console.log(`[Upload] Construction du fichier final: ${finalPath}`);
+
     try {
+        // Assembler les chunks
         for (let i = 0; i < totalChunks; i++) {
             const chunkPath = path.join(UPLOADS_DIR, `temp_${safeUploadId}_${i}`);
             if (!fs.existsSync(chunkPath)) {
-                 if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
-                 return res.status(400).json({ error: `Fichier temporaire introuvable` });
+                 console.error(`[Upload] Chunk introuvable: ${chunkPath}`);
+                 if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); // Nettoyer
+                 return res.status(400).json({ error: `Fichier temporaire (chunk ${i}) introuvable` });
             }
             await new Promise((resolve, reject) => {
                 const rs = fs.createReadStream(chunkPath);
@@ -1491,8 +1710,9 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
                 ws.on('error', reject);
                 ws.on('finish', () => resolve(null));
             });
-            fs.unlinkSync(chunkPath);
+            fs.unlinkSync(chunkPath); // Nettoyer le chunk une fois écrit
         }
+        console.log(`[Upload] Fichier final généré avec succès: ${finalFilename}`);
 
         const metadata = typeof body.metadata === 'string' ? JSON.parse(body.metadata || '{}') : (body.metadata || {});
         const genreIds = metadata.genre_ids || [];
@@ -1509,8 +1729,13 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
                 const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${metadata.id}?api_key=${process.env.TMDB_API_KEY}&language=fr-FR&append_to_response=credits`);
                 const fullMeta = await creditsRes.json();
                 
-                if (fullMeta.runtime) runtimeData = fullMeta.runtime;
-                if (fullMeta.genres && Array.isArray(fullMeta.genres)) finalGenres = fullMeta.genres.map((g: any) => g.name);
+                if (fullMeta.runtime) {
+                    runtimeData = fullMeta.runtime;
+                }
+                
+                if (fullMeta.genres && Array.isArray(fullMeta.genres)) {
+                    finalGenres = fullMeta.genres.map((g: any) => g.name);
+                }
 
                 if (fullMeta.credits && fullMeta.credits.cast) {
                     castData = fullMeta.credits.cast.slice(0, 10).map((c: any) => ({
@@ -1523,7 +1748,9 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
                     const dir = fullMeta.credits.crew.find((c: any) => c.job === 'Director');
                     if (dir) directorData = dir.name;
                 }
-            } catch (err) {}
+            } catch (err) {
+                console.error("TMDB Credits fetch error", err);
+            }
         }
 
         const isMp4 = finalFilename.toLowerCase().endsWith('.mp4');
@@ -1549,10 +1776,11 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             status: isMp4 ? 'AVAILABLE' : 'PROCESSING'
         };
 
-        const existingFilmIndex = db.films.findIndex((f: any) => f.tmdbId && f.tmdbId === metadata.id);
+        const existingFilmIndex = db.films.findIndex(f => f.tmdbId && f.tmdbId === metadata.id);
         
         let film: any = null;
         if (existingFilmIndex !== -1) {
+            // Update existant
             const oldFilm = db.films[existingFilmIndex];
             if (oldFilm.filename) {
                 const oldPath = path.join(UPLOADS_DIR, oldFilm.filename);
@@ -1566,6 +1794,7 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             }
             db.films[existingFilmIndex] = filmData;
             film = filmData;
+            console.log(`[Upload] Film mis à jour : ${film.title}`);
         } else {
             film = filmData;
             db.films.push(film);
@@ -1586,19 +1815,23 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ content: notifMessage })
-                    }).catch(() => {});
+                    }).catch(e => console.error("Discord webhook failed", e));
                 } catch (e) {}
             }
         }
         
         saveDb();
 
-        if (!isMp4) enqueueTranscode(film.id, finalFilename);
+        if (!isMp4) {
+            // Ajout à la file d'attente
+            enqueueTranscode(film.id, finalFilename);
+        }
 
         const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
         res.json({ success: true, film: reloadedFilm });
     } catch (e) {
-        res.status(500).json({ error: 'Erreur interne de finalisation' });
+        console.error("Upload finalize error", e);
+        res.status(500).json({ error: 'Internal upload finalize error' });
     }
 });
 
@@ -1606,7 +1839,9 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
     const { uploadId, filename, originalName, totalChunks } = req.body;
     const filmId = req.params.id;
 
-    if (!uploadId || !filename || !totalChunks) return res.status(400).json({ error: 'Données manquantes' });
+    if (!uploadId || !filename || !totalChunks) {
+        return res.status(400).json({ error: 'Données manquantes' });
+    }
 
     const safeUploadId = uploadId.replace(/[^a-zA-Z0-9_-]/g, '');
     const safeName = filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
@@ -1614,7 +1849,9 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
     const filmIndex = db.films.findIndex((f: any) => f.id === filmId);
-    if (filmIndex === -1) return res.status(404).json({ error: "Film non trouvé" });
+    if (filmIndex === -1) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
     const oldFilm = db.films[filmIndex];
 
     try {
@@ -1652,20 +1889,26 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
         oldFilm.modifiedAt = new Date().toISOString();
 
         saveDb();
-        if (!isMp4) enqueueTranscode(oldFilm.id, finalFilename);
+        
+        if (!isMp4) {
+            enqueueTranscode(oldFilm.id, finalFilename);
+        }
 
         res.json({ success: true, film: oldFilm });
     } catch (e) {
+        console.error("Erreur replace-finalize:", e);
         res.status(500).json({ error: 'Erreur interne' });
     }
 });
 
-app.post('/api/films/:id/remux', requireAuth, requireRole(['owner', 'admin', 'technician']), (req: any, res) => {
+app.post('/api/films/:id/remux', requireRole(['owner', 'admin', 'technician']), (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
     
+    // Only transcode if it's an MKV and not already MP4
     if (film.filename && film.filename.toLowerCase().endsWith('.mkv')) {
         res.json({ success: true, message: 'Fichier ajouté à la file de transcodage' });
+        // Enqueue the task
         enqueueTranscode(film.id, film.filename);
     } else {
         res.json({ success: false, message: 'Ce format n\'a pas besoin de conversion ou est déjà en MP4' });
@@ -1691,17 +1934,19 @@ app.get('/api/films/transcoding-status', requireAuth, async (req, res) => {
         }
         res.json(tasks);
     } catch (e) {
+        // Fallback for dev mode without redis
         res.json({});
     }
 });
 
+// Distribution Vidéos Static & Proxy Jellyfin
 app.get('/videos/:filename', requireAuth, (req, res) => {
     const safeName = path.basename(req.params.filename);
-    const videoPath = resolveVideoPath(safeName);
+    const videoPath = path.join(UPLOADS_DIR, safeName);
 
-    console.log(`[VIDEO] Demande: ${safeName} | chemin: ${videoPath} | existe: ${!!videoPath}`);
-
-    if (!videoPath) return res.status(404).send('Playable video not found.');
+    if (!fs.existsSync(videoPath)) {
+        return res.status(404).send('Playable video not found.');
+    }
 
     const stat = fs.statSync(videoPath);
     const fileSize = stat.size;
@@ -1736,9 +1981,14 @@ app.get('/videos/:filename', requireAuth, (req, res) => {
     }
 });
 
+// Phase 3: Route /api/stream/:filmId via Jellyfin API
 app.get('/api/stream/:filmId', requireAuth, async (req: any, res, next) => {
+    const user = req.user;
     const filmId = req.params.filmId;
+    
+    // Find film
     const films = db.films || [];
+    
     const film = films.find((f: any) => f.id === filmId || (f as any).jellyfinId === filmId);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
@@ -1755,11 +2005,13 @@ app.get('/api/stream/:filmId', requireAuth, async (req: any, res, next) => {
             }
         })(req, res, next);
     } else {
+        // Fallback local
         const filename = film.filename || film.id;
         return res.redirect(`/videos/${filename}`);
     }
 });
 
+// Proxy d'images Jellyfin pour masquer la clé d'API
 app.get('/api/jellyfin/image/:itemId', requireAuth, (req: any, res, next) => {
     if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
         return createProxyMiddleware({
@@ -1777,24 +2029,27 @@ app.get('/api/jellyfin/image/:itemId', requireAuth, (req: any, res, next) => {
     }
 });
 
+// Force Download Route
 app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     const filmId = req.params.filmId;
+    
     const films = db.films || [];
+    
     const film = films.find((f: any) => f.id === filmId || (f as any).jellyfinId === filmId);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     const safeName = path.basename(film.filename || '');
-    // On utilise notre nouvelle fonction ici :
-    const filePath = resolveVideoPath(safeName);
+    const filePath = path.join(UPLOADS_DIR, safeName);
     
-    // On vérifie si filePath a bien trouvé quelque chose
-    if (filePath) {
+    if (fs.existsSync(filePath)) {
         res.download(filePath, film.originalName || safeName);
     } else {
         res.status(404).json({ error: 'Fichier source introuvable' });
     }
 });
 
+
+// ======================= VITE MIDDLEWARE =======================
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -1813,6 +2068,8 @@ async function startServer() {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Serveur CinéPrivé lancé sur le port ${PORT}`);
   });
+  
+  // Désactive les timeouts pour les gros uploads
   server.setTimeout(0);
 }
 

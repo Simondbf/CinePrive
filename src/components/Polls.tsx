@@ -70,6 +70,16 @@ export default function Polls({ activeUser }: { activeUser: User }) {
 
     return (
         <div className="max-w-[800px] mx-auto pb-4">
+            <div className="mb-8 p-6 bg-primary-600 border border-primary-500 rounded-xl shadow-lg">
+                <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                    <BarChart3 className="w-6 h-6" />
+                    Sondages du Patron
+                </h2>
+                <p className="text-primary-100 text-sm max-w-xl">
+                    Participez à la construction de la plateforme. En tant qu'utilisateur de la première heure, votre avis compte sur la Direction Artistique et les prochaines fonctionnalités.
+                </p>
+            </div>
+
             <div className="space-y-6">
                 {pollsConfig.length === 0 ? (
                     <div className="text-center p-12 text-zinc-500">Chargement...</div>

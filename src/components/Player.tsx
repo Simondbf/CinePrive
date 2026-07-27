@@ -5,6 +5,7 @@ import { ArrowLeft, Settings, Users, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Plyr from 'plyr';
 import 'plyr/dist/plyr.css';
+import { hasRole } from '../lib/roles';
 
 interface Props {
   film: Film;
@@ -122,6 +123,12 @@ export default function Player({ film, activeUser, onClose }: Props) {
     
     playerRef.current = player;
 
+    const readyTimeout = setTimeout(() => {
+        if (playerRef.current && (playerRef.current as any).media && (playerRef.current as any).media.readyState === 0) {
+            setPlaybackError(true);
+        }
+    }, 8000);
+
     // Handle global keyboard shortcuts for closing the player
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape' || e.key === 'Backspace') {
@@ -212,6 +219,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
     }, 10000); // save every 10 seconds
 
     return () => {
+        if (readyTimeout) clearTimeout(readyTimeout);
         window.removeEventListener('keydown', handleKeyDown);
         if (saveProgressIntervalRef.current) clearInterval(saveProgressIntervalRef.current);
         if (playerRef.current) {
@@ -313,7 +321,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
                         Retour
                     </button>
-                    {!film.jellyfinId && (activeUser?.role === 'owner' || activeUser?.role === 'admin' || activeUser?.role === 'technician') && (
+                    {!film.jellyfinId && activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin') || hasRole(activeUser, 'technician')) && (
                         <button onClick={(e) => { 
                             e.stopPropagation();
                             fetch(`/api/films/${film.id}/remux`, { method: 'POST' })
@@ -334,7 +342,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     playsInline
                     crossOrigin="anonymous"
                 >
-                    <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} />
+                    <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} type="video/mp4" />
                 </video>
             </div>
         </div>

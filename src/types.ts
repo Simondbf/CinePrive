@@ -1,16 +1,15 @@
 export interface User {
     id: string;
     username: string;
-    password?: string;
+    password?: string; // Simplifié pour le prototype
     email?: string;
     name: string;
     color: string;
-    roles: string[];
-    internalNote?: string;
+    role: 'owner' | 'admin' | 'technician' | 'user';
     status?: 'pending' | 'active' | 'pending_ban';
     requestedBanBy?: string;
     requestedBanAt?: number;
-    myList: string[];
+    myList: string[]; // Liste des IDs de films à voir
 }
 
 export interface MovieRequest {
@@ -43,7 +42,7 @@ export interface Film {
     runtime?: number;
     versionType?: string;
     posterUrl?: string;
-    addedBy: string;
+    addedBy: string; // ID de l'utilisateur ayant uploadé
     addedAt: string;
     filename: string;
     originalName: string;

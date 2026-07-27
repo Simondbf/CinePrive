@@ -1,3 +1,4 @@
+import { hasRole, primaryRole } from "../lib/roles";
 import React, { useState, useEffect, useRef } from "react";
 import { notify } from "../lib/notify";
 import { Film, User } from "../types";
@@ -143,17 +144,13 @@ export default function ContributeApp({
 
   const handleChangeRole = async (userId: string, newRole: string) => {
     try {
-      const res = await fetch(`/api/users/${userId}/update-profile`, {
+      const res = await fetch(`/api/users/${userId}/role`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roles: [newRole] }),
+        body: JSON.stringify({ role: newRole }),
       });
       if (res.status === 403) {
           notify("Vous ne passerez pas !", "Accès Interdit");
-          return;
-      }
-      if (!res.ok) {
-          notify("Erreur serveur lors du changement de rôle.", "Erreur");
           return;
       }
       setPendingRoleChanges((prev) => {
@@ -359,7 +356,7 @@ export default function ContributeApp({
   };
 
   const handleDeleteUser = async (userId: string, targetName: string) => {
-    if (activeUser.role === "admin") {
+    if (hasRole(activeUser, "admin")) {
       // Si simple admin -> suspension temporaire sans code
       setDialogState({
         isOpen: true,
@@ -438,7 +435,7 @@ export default function ContributeApp({
   };
 
   const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
-    if (activeUser.role === "admin" || activeUser.role === "technician") {
+    if (hasRole(activeUser, "admin") || hasRole(activeUser, "technician")) {
       // Si simple admin/technician -> suppression temporaire sans code
       setDialogState({
         isOpen: true,
@@ -956,7 +953,7 @@ export default function ContributeApp({
         </button>
       ) : (
         <>
-          {(activeUser.role === "owner" || activeUser.role === "admin") && (
+          {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
             <button
               className={`px-4 py-2 font-medium rounded transition-colors ${tab === "users" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
               onClick={() => setTab("users")}
@@ -965,7 +962,7 @@ export default function ContributeApp({
               en attente)
             </button>
           )}
-          {(activeUser.role === "owner" || activeUser.role === "admin") && (
+          {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
             <>
                 <button
                   className={`px-4 py-2 font-medium rounded transition-colors flex items-center gap-2 ${tab === "quarantine" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
@@ -1318,7 +1315,7 @@ export default function ContributeApp({
 
       {tab === "library" && (
         <div className="flex flex-col gap-4">
-          {(activeUser.role === "owner" || activeUser.role === "admin" || activeUser.role === "technician") && (
+          {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin") || hasRole(activeUser, "technician")) && (
               <div className="flex justify-end">
                 <button
                    onClick={handleRefreshAllMetadata}
@@ -1338,9 +1335,9 @@ export default function ContributeApp({
                 <th className="px-6 py-4 font-medium">Uploader</th>
                 <th className="px-6 py-4 font-medium">Date d'import</th>
                 <th className="px-6 py-4 font-medium">Fichier d'origine</th>
-                {(activeUser.role === "owner" ||
-                  activeUser.role === "admin" ||
-                  activeUser.role === "technician") && (
+                {(hasRole(activeUser, "owner") ||
+                  hasRole(activeUser, "admin") ||
+                  hasRole(activeUser, "technician")) && (
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 )}
               </tr>
@@ -1391,9 +1388,9 @@ export default function ContributeApp({
                           ? f.originalName.replace(/\.[^/.]+$/, "")
                           : ""}
                       </td>
-                      {(activeUser.role === "owner" ||
-                        activeUser.role === "admin" ||
-                        activeUser.role === "technician") && (
+                      {(hasRole(activeUser, "owner") ||
+                        hasRole(activeUser, "admin") ||
+                        hasRole(activeUser, "technician")) && (
                         <td className="px-6 py-4 text-right">
                           {f.pendingDeletion ? (
                             <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
@@ -1402,7 +1399,7 @@ export default function ContributeApp({
                                 {f.requestedDeletionBy || "Admin"}
                               </span>
                               <div className="flex gap-1.5 mt-1 sm:mt-0">
-                                {activeUser.role === "owner" && (
+                                {hasRole(activeUser, "owner") && (
                                   <button
                                     onClick={() =>
                                       handleDeleteFilm(f.id, f.title)
@@ -1455,7 +1452,7 @@ export default function ContributeApp({
                               </button>
                               <button
                                 onClick={() => handleDeleteFilm(f.id, f.title)}
-                                disabled={activeUser.role !== "owner"}
+                                disabled={!hasRole(activeUser, "owner")}
                                 className="text-primary-500 hover:text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-950/60 transition-all font-medium text-xs bg-primary-50 dark:bg-primary-950/30 px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Supprimer
@@ -1477,7 +1474,7 @@ export default function ContributeApp({
 
 
       {tab === "users" &&
-        (activeUser.role === "owner" || activeUser.role === "admin") && (
+        (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
           <div className="space-y-6">
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
               <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6">
@@ -1507,7 +1504,7 @@ export default function ContributeApp({
               </div>
             </div>
 
-            {activeUser.role === "owner" && !settings.allowRegistrations && (
+            {hasRole(activeUser, "owner") && !settings.allowRegistrations && (
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                 <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-4">
                   <h3 className="text-lg font-medium text-zinc-900 dark:text-white">
@@ -1613,13 +1610,13 @@ export default function ContributeApp({
                       <td className="px-6 py-4">{u.username}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-2">
-                          {u.role === "owner" ? (
+                          {hasRole(u, "owner") ? (
                               <span className="uppercase text-xs font-semibold">Patron</span>
                           ) : (
                               <div className="flex items-center gap-2">
                                 <select
-                                    disabled={activeUser.role !== "owner"}
-                                    value={pendingRoleChanges[u.id] || u.role}
+                                    disabled={!hasRole(activeUser, "owner")}
+                                    value={pendingRoleChanges[u.id] || primaryRole(u)}
                                     onChange={(e) => setPendingRoleChanges((prev) => ({ ...prev, [u.id]: e.target.value }))}
                                     className="text-xs border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white px-2 py-1 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -1627,10 +1624,10 @@ export default function ContributeApp({
                                     <option value="technician">Technicien</option>
                                     <option value="admin">Admin</option>
                                 </select>
-                                {pendingRoleChanges[u.id] && pendingRoleChanges[u.id] !== u.role && (
+                                {pendingRoleChanges[u.id] && pendingRoleChanges[u.id] !== primaryRole(u) && (
                                     <button
                                         onClick={() => handleChangeRole(u.id, pendingRoleChanges[u.id])}
-                                        disabled={activeUser.role !== "owner"}
+                                        disabled={!hasRole(activeUser, "owner")}
                                         className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                         title="Valider le changement"
                                     >
@@ -1639,7 +1636,7 @@ export default function ContributeApp({
                                 )}
                               </div>
                           )}
-                          {u.role === "technician" && !pendingRoleChanges[u.id] && (
+                          {hasRole(u, "technician") && !pendingRoleChanges[u.id] && (
                               <span className="text-[10px] text-zinc-500 block max-w-[150px] leading-tight">Peut lancer des transcodages et remplacer des fichiers vidéo</span>
                           )}
                         </div>
@@ -1654,8 +1651,8 @@ export default function ContributeApp({
                               >
                                 Approuver
                               </button>
-                              {(activeUser.role === "owner" ||
-                                activeUser.role === "admin") &&
+                              {(hasRole(activeUser, "owner") ||
+                                hasRole(activeUser, "admin")) &&
                                 u.id !== activeUser.id && (
                                   <button
                                     onClick={() =>
@@ -1664,7 +1661,7 @@ export default function ContributeApp({
                                         u.name || u.username,
                                       )
                                     }
-                                    disabled={activeUser.role !== "owner"}
+                                    disabled={!hasRole(activeUser, "owner")}
                                     className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Refuser
@@ -1677,7 +1674,7 @@ export default function ContributeApp({
                                 ⚠️ Suspendu par {u.requestedBanBy || "Admin"}
                               </span>
                               <div className="flex gap-1.5 mt-1 sm:mt-0">
-                                {activeUser.role === "owner" && (
+                                {hasRole(activeUser, "owner") && (
                                   <button
                                     onClick={() =>
                                       handleDeleteUser(
@@ -1703,8 +1700,8 @@ export default function ContributeApp({
                               <span className="text-zinc-400 cursor-default">
                                 Actif
                               </span>
-                              {(activeUser.role === "owner" ||
-                                activeUser.role === "admin") &&
+                              {(hasRole(activeUser, "owner") ||
+                                hasRole(activeUser, "admin")) &&
                                 u.id !== activeUser.id && (
                                   <button
                                     onClick={() =>
@@ -1713,7 +1710,7 @@ export default function ContributeApp({
                                         u.name || u.username,
                                       )
                                     }
-                                    disabled={activeUser.role !== "owner"}
+                                    disabled={!hasRole(activeUser, "owner")}
                                     className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Bannir
@@ -1731,7 +1728,7 @@ export default function ContributeApp({
           </div>
         )}
 
-      {tab === "quarantine" && (activeUser.role === "owner" || activeUser.role === "admin") && (
+      {tab === "quarantine" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
             <h3 className="text-lg font-medium text-primary-600 dark:text-primary-500 mb-6 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" /> Films en Quarantaine
@@ -1799,9 +1796,9 @@ export default function ContributeApp({
                               </button>
                               <button
                                 onClick={() => handleDeleteFilm(f.id, f.title)}
-                                disabled={activeUser.role !== "owner"}
+                                disabled={!hasRole(activeUser, "owner")}
                                 className="text-primary-600 hover:text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-950/60 font-medium text-xs bg-primary-50 dark:bg-primary-950/30 px-3 py-1.5 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={activeUser.role !== "owner" ? "Seul le Patron peut détruire un fichier" : "Détruire définitivement"}
+                                title={!hasRole(activeUser, "owner") ? "Seul le Patron peut détruire un fichier" : "Détruire définitivement"}
                               >
                                 Détruire le Fichier
                               </button>
@@ -1817,7 +1814,7 @@ export default function ContributeApp({
       )}
 
       {tab === "funding" &&
-        (activeUser.role === "owner" || activeUser.role === "admin") && (
+        (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
             <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6">
               Gestion Financière du Serveur
@@ -2018,8 +2015,8 @@ export default function ContributeApp({
                       <h4 className="font-medium text-zinc-900 dark:text-white capitalize">
                         {title} ({totalVotes} votes)
                       </h4>
-                      {(activeUser.role === "owner" ||
-                        activeUser.role === "admin") && (
+                      {(hasRole(activeUser, "owner") ||
+                        hasRole(activeUser, "admin")) && (
                         <div className="flex items-center gap-2">
                           {totalVotes === 0 && (
                             <button
@@ -2149,7 +2146,7 @@ export default function ContributeApp({
         </div>
       )}
 
-      {tab === "security" && (activeUser.role === "owner" || activeUser.role === "admin") && (
+      {tab === "security" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
           <div className="space-y-6">
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                   <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
@@ -2288,7 +2285,7 @@ export default function ContributeApp({
           </div>
       )}
 
-      {(activeUser.role === "owner" || activeUser.role === "admin") &&
+      {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) &&
         tab === "polls" && (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mx-auto shadow-sm mt-8">
             <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">

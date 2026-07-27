@@ -16,6 +16,7 @@ import Polls from './components/Polls';
 import Loader from './components/Loader';
 import NotFoundPage from './components/NotFoundPage';
 import { ArrowUp } from 'lucide-react';
+import { hasRole, primaryRole } from './lib/roles';
 
 const ScrollToTop = () => {
     const [isVisible, setIsVisible] = useState(false);
@@ -228,7 +229,7 @@ export default function App() {
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
-      if (activeUser && (hasRole(activeUser, 'owner') || activeUser.role === 'admin')) {
+      if (activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin'))) {
           const nres = await fetch('/api/notifications');
           if (nres.ok) {
               const ndata = await nres.json();
@@ -297,7 +298,7 @@ export default function App() {
                  setAmoledActive={setAmoledActive}
                  onTriggerEasterEgg={() => setShowEasterEgg(true)}
                  userId={activeUser.id}
-                 userRole={activeUser.role}
+                 userRole={primaryRole(activeUser)}
               />
           )}
           {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
@@ -492,7 +493,7 @@ export default function App() {
                 </button>
             )}
 
-            {(hasRole(activeUser, 'owner') || activeUser.role === 'admin' || activeUser.role === 'technician') && (
+            {(hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin') || hasRole(activeUser, 'technician')) && (
                 <button 
                     onClick={() => setViewMode('upload')}
                     className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
@@ -522,7 +523,7 @@ export default function App() {
                         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden flex flex-col">
                             <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
                                 <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{hasRole(activeUser, 'owner') ? 'Patron' : (activeUser.role === 'admin' ? 'Admin' : 'Membre')}</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{hasRole(activeUser, 'owner') ? 'Patron' : (hasRole(activeUser, 'admin') ? 'Admin' : 'Membre')}</p>
                             </div>
                             
                             {/* Navigation menu items */}
@@ -629,7 +630,7 @@ export default function App() {
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                           {(hasRole(activeUser, 'owner') || activeUser.role === 'admin') && adminNotifs.length > 0 ? (
+                           {(hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin')) && adminNotifs.length > 0 ? (
                                adminNotifs.map(n => (
                                    <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
                                        <div className="flex justify-between items-start mb-1">

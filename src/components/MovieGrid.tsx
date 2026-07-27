@@ -3,6 +3,7 @@ import { Film, User } from '../types';
 import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
+import { hasRole } from '../lib/roles';
 
 interface Props {
   films: Film[];
@@ -92,7 +93,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 {/* Poster Box */}
                 <div 
                     onClick={() => {
-                        if (film.status === 'PROCESSING') {
+                        if (film.status !== 'AVAILABLE') {
                             const status = transcodingStatuses?.[film.id];
                             let extraText = "Le fichier sera converti cette nuit pour être disponible demain matin.";
                             if (status && status.state === 'active') {
@@ -103,7 +104,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                             onPlay(film);
                         }
                     }}
-                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm ${film.status === 'PROCESSING' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-primary-500'}`}
+                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm ${film.status !== 'AVAILABLE' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-primary-500'}`}
                 >
                     {film.posterUrl ? (
                         <img src={film.posterUrl} alt={film.title} className="w-full h-full object-cover" />
@@ -273,7 +274,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                     ) : (
                                         <div className="flex flex-wrap items-center gap-1">
                                             <span>{(infoFilm.genres || [infoFilm.genre]).join(', ')}</span>
-                                            {(activeUser.role === 'admin' || activeUser.role === 'owner') && (
+                                            {(hasRole(activeUser, 'admin') || hasRole(activeUser, 'owner')) && (
                                                 <button onClick={() => { setEditingGenre(true); setNewGenre(infoFilm.genre); }} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
                                                     <Edit2 className="w-3 h-3" />
                                                 </button>
