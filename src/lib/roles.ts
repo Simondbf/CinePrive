@@ -1,15 +1,13 @@
-export function hasRole(user: any, role: string): boolean {
-    if (!user || !user.role) return false;
-    if (Array.isArray(user.role)) {
-        return user.role.includes(role);
-    }
-    return user.role === role;
-}
+import { User } from '../types';
 
-export function primaryRole(user: any): string {
-    if (!user || !user.role) return 'member';
-    if (Array.isArray(user.role)) {
-        return user.role.length > 0 ? user.role[0] : 'member';
-    }
-    return user.role;
-}
+export const hasRole = (user: Partial<User> | null | undefined, ...wanted: string[]): boolean => {
+  if (!user) return false;
+  const roles: string[] = (user as any).roles ?? ((user as any).role ? [(user as any).role] : []);
+  return wanted.some(r => roles.includes(r));
+};
+
+export const primaryRole = (user: Partial<User> | null | undefined): string => {
+  const roles: string[] = (user as any)?.roles ?? [];
+  for (const r of ['owner', 'admin', 'technician']) if (roles.includes(r)) return r;
+  return 'user';
+};
