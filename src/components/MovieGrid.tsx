@@ -3,7 +3,7 @@ import { Film, User } from '../types';
 import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
-import { hasRole } from '../lib/roles';
+import { hasRole, primaryRole } from '../lib/roles';
 
 interface Props {
   films: Film[];

@@ -1,4 +1,4 @@
-import { hasRole, primaryRole } from "../lib/roles";
+import { hasRole, primaryRole } from '../lib/roles';
 import React, { useState, useEffect, useRef } from "react";
 import { notify } from "../lib/notify";
 import { Film, User } from "../types";

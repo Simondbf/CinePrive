@@ -5,7 +5,7 @@ import { ArrowLeft, Settings, Users, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Plyr from 'plyr';
 import 'plyr/dist/plyr.css';
-import { hasRole } from '../lib/roles';
+import { hasRole, primaryRole } from '../lib/roles';
 
 interface Props {
   film: Film;
