@@ -228,7 +228,7 @@ export default function App() {
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
-      if (activeUser && (activeUser.role === 'owner' || activeUser.role === 'admin')) {
+      if (activeUser && (hasRole(activeUser, 'owner') || activeUser.role === 'admin')) {
           const nres = await fetch('/api/notifications');
           if (nres.ok) {
               const ndata = await nres.json();
@@ -482,7 +482,7 @@ export default function App() {
                 <Heart className="w-4 h-4" /> <span>Soutenir</span>
             </button>
 
-            {activeUser.role === 'owner' && (
+            {hasRole(activeUser, 'owner') && (
                 <button 
                     onClick={() => setViewMode('admin')}
                     className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
@@ -492,7 +492,7 @@ export default function App() {
                 </button>
             )}
 
-            {(activeUser.role === 'owner' || activeUser.role === 'admin' || activeUser.role === 'technician') && (
+            {(hasRole(activeUser, 'owner') || activeUser.role === 'admin' || activeUser.role === 'technician') && (
                 <button 
                     onClick={() => setViewMode('upload')}
                     className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'upload' ? 'text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
@@ -522,7 +522,7 @@ export default function App() {
                         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden flex flex-col">
                             <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
                                 <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{activeUser.username}</p>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{activeUser.role === 'owner' ? 'Patron' : (activeUser.role === 'admin' ? 'Admin' : 'Membre')}</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">{hasRole(activeUser, 'owner') ? 'Patron' : (activeUser.role === 'admin' ? 'Admin' : 'Membre')}</p>
                             </div>
                             
                             {/* Navigation menu items */}
@@ -533,7 +533,7 @@ export default function App() {
                                 <button onClick={() => { setShowFunding(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-500/10 transition flex items-center gap-3">
                                      <Heart className="w-4 h-4" /> Soutenir
                                 </button>
-                                {activeUser.role === 'owner' && (
+                                {hasRole(activeUser, 'owner') && (
                                      <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                          <Shield className="w-4 h-4" /> Salle des Serveurs
                                      </button>
@@ -629,7 +629,7 @@ export default function App() {
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                           {(activeUser.role === 'owner' || activeUser.role === 'admin') && adminNotifs.length > 0 ? (
+                           {(hasRole(activeUser, 'owner') || activeUser.role === 'admin') && adminNotifs.length > 0 ? (
                                adminNotifs.map(n => (
                                    <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
                                        <div className="flex justify-between items-start mb-1">
@@ -657,7 +657,7 @@ export default function App() {
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
                            <button onClick={async () => {
                                setShowInbox(false);
-                               if (activeUser.role === 'owner') {
+                               if (hasRole(activeUser, 'owner')) {
                                    await fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: activeUser.id}) });
                                    setHasUnread(false);
                                    fetchFilms(true);
