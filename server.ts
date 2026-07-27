@@ -1784,9 +1784,11 @@ app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     const safeName = path.basename(film.filename || '');
-    const filePath = path.join(UPLOADS_DIR, safeName);
+    // On utilise notre nouvelle fonction ici :
+    const filePath = resolveVideoPath(safeName);
     
-    if (fs.existsSync(filePath)) {
+    // On vérifie si filePath a bien trouvé quelque chose
+    if (filePath) {
         res.download(filePath, film.originalName || safeName);
     } else {
         res.status(404).json({ error: 'Fichier source introuvable' });
