@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN apk add --no-cache ffmpeg
 
 # Install node dependencies
-RUN npm install
+RUN npm ci
 
 # Copy the rest of the application code
 COPY . .

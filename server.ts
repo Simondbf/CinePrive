@@ -341,9 +341,18 @@ app.use((req, res, next) => {
 
 // Configuration des téléchargements Chunkés
 const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+const FILMS_DIR = path.join(process.cwd(), 'data', 'Films');
+
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+if (!fs.existsSync(FILMS_DIR)) fs.mkdirSync(FILMS_DIR, { recursive: true });
+
+const resolveVideoPath = (safeName: string): string | null => {
+    for (const dir of [UPLOADS_DIR, FILMS_DIR]) {
+        const p = path.join(dir, safeName);
+        if (fs.existsSync(p)) return p;
+    }
+    return null;
+};
 
 // Nettoyage automatique des chunks fantômes (> 12 heures)
 setInterval(() => {
@@ -1942,11 +1951,11 @@ app.get('/api/films/transcoding-status', requireAuth, async (req, res) => {
 // Distribution Vidéos Static & Proxy Jellyfin
 app.get('/videos/:filename', requireAuth, (req, res) => {
     const safeName = path.basename(req.params.filename);
-    const videoPath = path.join(UPLOADS_DIR, safeName);
+    const videoPath = resolveVideoPath(safeName);
 
-    if (!fs.existsSync(videoPath)) {
-        return res.status(404).send('Playable video not found.');
-    }
+    console.log(`[VIDEO] Demande: ${safeName} | chemin: ${videoPath} | existe: ${!!videoPath}`);
+
+    if (!videoPath) return res.status(404).send('Playable video not found.');
 
     const stat = fs.statSync(videoPath);
     const fileSize = stat.size;
@@ -2039,9 +2048,9 @@ app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     const safeName = path.basename(film.filename || '');
-    const filePath = path.join(UPLOADS_DIR, safeName);
+    const filePath = resolveVideoPath(safeName);
     
-    if (fs.existsSync(filePath)) {
+    if (filePath) {
         res.download(filePath, film.originalName || safeName);
     } else {
         res.status(404).json({ error: 'Fichier source introuvable' });
