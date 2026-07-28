@@ -1607,7 +1607,30 @@ app.get('/api/tmdb/search', requireAuth, async (req, res) => {
     }
 
     try {
-        const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&include_adult=false`);
+        const trimmedQuery = query.trim();
+        
+        // 1. Recherche par ID direct
+        if (/^\d+$/.test(trimmedQuery)) {
+            const response = await fetch(`https://api.themoviedb.org/3/movie/${trimmedQuery}?api_key=${apiKey}&language=fr-FR`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data && !data.adult) {
+                    return res.json({ results: [data] });
+                }
+            }
+        }
+        
+        // 2. Recherche par année
+        let searchQuery = trimmedQuery;
+        let yearParam = '';
+        const yearMatch = trimmedQuery.match(/^(.*?)\s+(19\d{2}|20\d{2})$/);
+        
+        if (yearMatch) {
+            searchQuery = yearMatch[1].trim();
+            yearParam = `&primary_release_year=${yearMatch[2]}`;
+        }
+
+        const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(searchQuery)}&language=fr-FR&include_adult=false${yearParam}`);
         const data = await response.json();
         
         if (data.results) {
