@@ -7,7 +7,7 @@ export const hasRole = (user: Partial<User> | null | undefined, ...wanted: strin
 };
 
 export const primaryRole = (user: Partial<User> | null | undefined): string => {
-  const roles: string[] = (user as any)?.roles ?? [];
+  const roles: string[] = (user as any)?.roles ?? ((user as any)?.role ? [(user as any).role] : []);
   for (const r of ['owner', 'admin', 'technician']) if (roles.includes(r)) return r;
   return 'user';
 };

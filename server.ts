@@ -30,6 +30,11 @@ app.use('/api', (req, res, next) => {
 
 let JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
 
+const userHasRole = (user: any, ...wanted: string[]) => {
+    const roles: string[] = user?.roles ?? (user?.role ? [user.role] : []);
+    return wanted.some(r => roles.includes(r));
+};
+
 const requireAuth = (req: any, res: any, next: any) => {
     let token = req.cookies.token;
     if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
@@ -52,7 +57,7 @@ const requireAuth = (req: any, res: any, next: any) => {
 };
 
 const requireRole = (roles: string[]) => (req: any, res: any, next: any) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !userHasRole(req.user, ...roles)) {
         return res.status(403).json({ error: 'Accès interdit' });
     }
     next();
@@ -394,8 +399,21 @@ if (fs.existsSync(dbFile)) {
         throw e;
     }
         
-    // Migration of old statuses to new statuses
+    // Migration of old statuses to new statuses and role -> roles migration
     let migrated = false;
+    
+    if (db.users && Array.isArray(db.users)) {
+        db.users.forEach((user: any) => {
+            if (user.role && !user.roles) {
+                user.roles = [user.role];
+                migrated = true;
+            } else if (user.roles && !user.role) {
+                user.role = user.roles.length > 0 ? user.roles[0] : 'member';
+                migrated = true;
+            }
+        });
+    }
+
     if (db.films && Array.isArray(db.films)) {
         db.films.forEach((film: any) => {
             if (film.status === 'ready') {
@@ -611,10 +629,23 @@ transcodeFastEvents.on('completed', (args) => handleTranscodeCompleted(args, tra
 transcodeEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeQueue));
 transcodeFastEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeFastQueue));
 
-const checkIsH264 = (inputPath: string): Promise<boolean> => {
-    return new Promise<boolean>((resolve) => {
-        execFile('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
-             resolve((stdout || '').trim().toLowerCase() === 'h264');
+const probeStreams = (inputPath: string): Promise<{ video: string, audio: string }> => {
+    return new Promise((resolve) => {
+        execFile('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'csv=p=0', inputPath], (err, stdout) => {
+            let video = '';
+            let audio = '';
+            if (stdout) {
+                const lines = stdout.trim().split('\n');
+                for (const line of lines) {
+                    const parts = line.split(',');
+                    if (parts.length === 2) {
+                        const [type, codec] = parts;
+                        if (type === 'video' && !video) video = (codec || '').trim().toLowerCase();
+                        if (type === 'audio' && !audio) audio = (codec || '').trim().toLowerCase();
+                    }
+                }
+            }
+            resolve({ video, audio });
         });
     });
 };
@@ -626,7 +657,21 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
     } catch(e) {}
 
     const inputPath = path.join(UPLOADS_DIR, inputFilename);
-    const isH264 = await checkIsH264(inputPath);
+    const { video, audio } = await probeStreams(inputPath);
+    
+    // Si c'est déjà un MP4 parfaitement compatible, on passe direct en AVAILABLE
+    if (inputFilename.toLowerCase().endsWith('.mp4') && video === 'h264' && (audio === 'aac' || audio === '')) {
+        console.log(`[Queue] Film ${filmId} déjà 100% compatible (MP4/H264/AAC). Transcodage annulé.`);
+        const film = db.films.find((f: any) => f.id === filmId);
+        if (film) {
+            film.status = 'AVAILABLE';
+            film.progress = 100;
+            saveDb();
+        }
+        return;
+    }
+
+    const isH264 = video === 'h264';
 
     if (isH264) {
         console.log(`[Queue] Remuxing rapide détecté (H264). Ajout à la file rapide (qui n'est jamais en pause).`);
@@ -795,10 +840,10 @@ app.get('/api/settings', requireAuth, (req: any, res) => {
         fundingCurrent: db.settings?.fundingCurrent ?? 0,
         fundingGoal: db.settings?.fundingGoal ?? 12
     };
-    if (req.user.role === 'owner') {
+    if (userHasRole(req.user, 'owner')) {
         settings.webhookUrl = db.settings?.webhookUrl || '';
         settings.securityCode = db.settings?.securityCode || '000000';
-    } else if (req.user.role === 'admin') {
+    } else if (userHasRole(req.user, 'admin')) {
         settings.webhookUrl = db.settings?.webhookUrl || '';
     }
     res.json(settings);
@@ -814,12 +859,12 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req: an
     if (req.body.fundingGoal !== undefined) {
         db.settings.fundingGoal = parseFloat(req.body.fundingGoal);
     }
-    if (req.user.role === 'owner' || req.user.role === 'admin') {
+    if (userHasRole(req.user, 'owner') || userHasRole(req.user, 'admin')) {
         if (req.body.webhookUrl !== undefined) {
             db.settings.webhookUrl = req.body.webhookUrl;
         }
     }
-    if (req.user.role === 'owner') {
+    if (userHasRole(req.user, 'owner')) {
         if (req.body.securityCode !== undefined) {
             db.settings.securityCode = req.body.securityCode;
         }
@@ -832,10 +877,10 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req: an
         fundingCurrent: db.settings.fundingCurrent,
         fundingGoal: db.settings.fundingGoal
     };
-    if (req.user.role === 'owner') {
+    if (userHasRole(req.user, 'owner')) {
         responseSettings.webhookUrl = db.settings.webhookUrl || '';
         responseSettings.securityCode = db.settings.securityCode || '';
-    } else if (req.user.role === 'admin') {
+    } else if (userHasRole(req.user, 'admin')) {
         responseSettings.webhookUrl = db.settings.webhookUrl || '';
     }
     res.json(responseSettings);
@@ -1095,7 +1140,7 @@ app.post('/api/users/:id/upgrade', requireAuth, requireRole(['owner']), (req, re
     const userToUpgrade = db.users.find((u: any) => u.id === req.params.id);
     if (!userToUpgrade) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
-    userToUpgrade.role = 'admin';
+    userToUpgrade.roles = ['admin'];
     saveDb();
     res.json({ success: true });
 });
@@ -1104,7 +1149,7 @@ app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) 
     const { role } = req.body;
     const userToEdit = db.users.find((u: any) => u.id === req.params.id);
     if (!userToEdit) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    userToEdit.role = role;
+    userToEdit.roles = Array.isArray(role) ? role : [role];
     saveDb();
     res.json({ success: true });
 });
@@ -1131,7 +1176,7 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res
         return res.status(404).json({ error: "Utilisateur non trouvé" });
     }
     
-    if (targetUser.role === 'owner') {
+    if (userHasRole(targetUser, 'owner')) {
         return res.status(403).json({ error: "Impossible de modifier le compte Patron." });
     }
     
@@ -1218,7 +1263,7 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
   let filmsList = db.films || [];
   
   // Masquer les films en attente de suppression définitive ou en quarantaine pour les membres réguliers
-  if (req.user.role !== 'owner' && req.user.role !== 'admin') {
+  if (!userHasRole(req.user, 'owner') && !userHasRole(req.user, 'admin')) {
       filmsList = filmsList.filter((f: any) => !f.pendingDeletion && !f.isQuarantined);
   }
 
@@ -1238,7 +1283,7 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
       }
     }
 
-    if (req.user.role !== 'owner' && req.user.role !== 'admin' && req.user.role !== 'technician') {
+    if (!userHasRole(req.user, 'owner') && !userHasRole(req.user, 'admin') && !userHasRole(req.user, 'technician')) {
         delete sanitizedF.originalName;
         delete sanitizedF.jellyfinId;
     }
@@ -2057,6 +2102,30 @@ app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     }
 });
 
+
+app.get('/api/admin/audit-fichiers', requireAuth, requireRole(['owner']), (req, res) => {
+    const missingFiles: any[] = [];
+    const films = db.films || [];
+    
+    films.forEach((film: any) => {
+        if (film.status === 'AVAILABLE' && film.filename && !film.jellyfinId) {
+            const safeName = path.basename(film.filename);
+            let found = false;
+            for (const dir of [UPLOADS_DIR, FILMS_DIR]) {
+                const p = path.join(dir, safeName);
+                if (fs.existsSync(p)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                missingFiles.push(film);
+            }
+        }
+    });
+    
+    res.json({ missingCount: missingFiles.length, missingFiles });
+});
 
 // ======================= VITE MIDDLEWARE =======================
 async function startServer() {

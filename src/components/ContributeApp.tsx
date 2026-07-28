@@ -1,4 +1,5 @@
 import { hasRole, primaryRole } from '../lib/roles';
+import { apiGet } from '../lib/api';
 import React, { useState, useEffect, useRef } from "react";
 import { notify } from "../lib/notify";
 import { Film, User } from "../types";
@@ -76,35 +77,16 @@ export default function ContributeApp({
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<{ url: string, timecode: number } | null>(null);
 
-  const fetchData = React.useCallback(() => {
-    fetch("/api/users")
-      .then((r) => r.json())
-      .then(setUsersList)
-      .catch(console.error);
-    fetch("/api/requests")
-      .then((r) => r.json())
-      .then(setRequestsList)
-      .catch(console.error);
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((data) => {
-          setSettings(data);
-          setWebhookUrlInput(data.webhookUrl || "");
-          if (data.securityCode) setSecurityCodeInput(data.securityCode);
-      })
-      .catch(console.error);
-    fetch("/api/invites")
-      .then((r) => r.json())
-      .then(setInvitesList)
-      .catch(console.error);
-    fetch("/api/polls/results")
-      .then((r) => r.json())
-      .then(setPollResults)
-      .catch(console.error);
-    fetch("/api/polls/config")
-      .then((r) => r.json())
-      .then(setPollsConfig)
-      .catch(console.error);
+  const fetchData = React.useCallback(async () => {
+    setUsersList(await apiGet<User[]>("/api/users", []));
+    setRequestsList(await apiGet<any[]>("/api/requests", []));
+    const data = await apiGet<any>("/api/settings", {});
+    setSettings(data);
+    setWebhookUrlInput(data.webhookUrl || "");
+    if (data.securityCode) setSecurityCodeInput(data.securityCode);
+    setInvitesList(await apiGet<any[]>("/api/invites", []));
+    setPollResults(await apiGet<any>("/api/polls/results", {}));
+    setPollsConfig(await apiGet<any[]>("/api/polls/config", []));
   }, []);
 
   useEffect(() => {

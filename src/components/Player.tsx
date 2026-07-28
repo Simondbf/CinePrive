@@ -342,7 +342,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     playsInline
                     crossOrigin="anonymous"
                 >
-                    <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} type="video/mp4" />
+                    <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} />
                 </video>
             </div>
         </div>

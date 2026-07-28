@@ -25,8 +25,12 @@ const processJob = async (job: any) => {
     const inputPath = path.join(UPLOADS_DIR, inputFilename);
     const ext = path.extname(inputFilename);
     const baseName = path.basename(inputFilename, ext);
-    const outputFilename = `${baseName}.mp4`;
+    const outputFilename = `${baseName}_conv.mp4`;
     const outputPath = path.join(UPLOADS_DIR, outputFilename);
+
+    if (path.resolve(outputPath) === path.resolve(inputPath)) {
+        throw new Error('[Worker] SÉCURITÉ : fichier sortie identique à source.');
+    }
 
     console.log(`[Worker] DÉMARRAGE de FFmpeg pour le film ID: ${filmId}...`);
     
@@ -126,9 +130,16 @@ const processJob = async (job: any) => {
         console.log(`[Worker] SUCCÈS pour le film ID: ${filmId}. Converti en ${outputFilename}`);
 
         try {
-            if (fs.existsSync(inputPath)) {
-                fs.unlinkSync(inputPath);
-                console.log(`[Worker] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
+            if (fs.existsSync(outputPath)) {
+                const outStat = fs.statSync(outputPath);
+                if (outStat.size >= 1024) {
+                    if (fs.existsSync(inputPath)) {
+                        fs.unlinkSync(inputPath);
+                        console.log(`[Worker] Fichier d'origine supprimé de l'espace disque : ${inputFilename}`);
+                    }
+                } else {
+                    console.error(`[Worker] SÉCURITÉ : Fichier de sortie trop petit (${outStat.size} bytes). Original conservé.`);
+                }
             }
         } catch (unlinkErr) {
             console.error(`[Worker] Impossible de supprimer l'original ${inputFilename}:`, unlinkErr);
@@ -141,10 +152,6 @@ const processJob = async (job: any) => {
             if (fs.existsSync(outputPath)) {
                 fs.unlinkSync(outputPath);
                 console.log(`[Worker] Fichier partiel supprimé : ${outputPath}`);
-            }
-            if (fs.existsSync(inputPath)) {
-                fs.unlinkSync(inputPath);
-                console.log(`[Worker] Fichier source supprimé suite à l'erreur : ${inputPath}`);
             }
         } catch (cleanupErr) {
             console.error(`[Worker] Erreur lors du nettoyage :`, cleanupErr);
