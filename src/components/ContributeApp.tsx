@@ -5,7 +5,7 @@ import { Film, User } from "../types";
 import {
   UploadCloud,
   Search,
-  CheckCircle,
+  CheckCircle, Check,
   Database,
   Server,
   X,

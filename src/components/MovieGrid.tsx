@@ -59,7 +59,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
 
   const handleDownload = (e: React.MouseEvent, film: Film) => {
       e.stopPropagation();
-      if (film.status === 'PROCESSING') {
+      if (film.status !== 'AVAILABLE') {
           e.preventDefault();
           notify("Le film est en cours de traitement et n'est pas encore téléchargeable.", "Non disponible");
           return;
@@ -115,7 +115,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                         </div>
                     )}
                     
-                    {film.status === 'PROCESSING' && (
+                    {film.status !== 'AVAILABLE' && (
                         <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3 p-4 text-center backdrop-blur-[2px]">
                             {transcodingStatuses?.[film.id]?.state === 'active' ? (
                                 <>
@@ -140,7 +140,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                     )}
                     
                     {/* Hover actions */}
-                    {film.status !== 'PROCESSING' && (
+                    {film.status === 'AVAILABLE' && (
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
                             <button className="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full hover:scale-105 transition-transform shadow-lg">
                                 <Play className="w-6 h-6 fill-black ml-1" />
@@ -182,11 +182,11 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                <Info className="w-4 h-4" />
                            </button>
                            <a 
-                               href={film.status === 'PROCESSING' ? '#' : `/api/download/${film.id}`}
-                               download={film.status === 'PROCESSING' ? undefined : (film.originalName || film.title)}
+                               href={film.status !== 'AVAILABLE' ? '#' : `/api/download/${film.id}`}
+                               download={film.status !== 'AVAILABLE' ? undefined : (film.originalName || film.title)}
                                onClick={(e) => handleDownload(e, film)}
-                               className={`shrink-0 mt-0.5 transition-colors ${film.status === 'PROCESSING' ? 'text-zinc-600 dark:text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-gold-500'}`}
-                               title={film.status === 'PROCESSING' ? "Téléchargement indisponible" : "Télécharger"}
+                               className={`shrink-0 mt-0.5 transition-colors ${film.status !== 'AVAILABLE' ? 'text-zinc-600 dark:text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-gold-500'}`}
+                               title={film.status !== 'AVAILABLE' ? "Téléchargement indisponible" : "Télécharger"}
                            >
                                <Download className="w-4 h-4" />
                            </a>
