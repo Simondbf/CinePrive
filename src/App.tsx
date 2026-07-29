@@ -326,7 +326,7 @@ export default function App() {
                   </motion.div>
               </div>
           )}
-          {showFunding && <FundingModal onClose={() => setShowFunding(false)} />}
+          {showFunding && <FundingModal activeUser={activeUser} onClose={() => setShowFunding(false)} />}
           
           {notification && (
               <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999]">

@@ -442,6 +442,7 @@ if (!db.requests) db.requests = [];
 if (!db.progress) db.progress = {};
 if (!db.settings) db.settings = { allowRegistrations: true, fundingCurrent: 0, fundingGoal: 12 };
 if (!db.settings.securityCode) db.settings.securityCode = Math.floor(100000 + Math.random() * 900000).toString();
+if (!db.fundingHistory) db.fundingHistory = [];
 
 // Sécurisation automatique de JWT_SECRET
 if (process.env.JWT_SECRET) {
@@ -713,6 +714,15 @@ cron.schedule('0 1 * * *', async () => {
     await transcodeQueue.resume();
 });
 
+// Tâche planifiée : Réinitialiser la cagnotte le 1er du mois
+cron.schedule('0 0 1 * *', () => {
+    console.log('[Cron] Réinitialisation mensuelle de la cagnotte.');
+    if (db.settings) {
+        db.settings.fundingCurrent = 0;
+        saveDb();
+    }
+});
+
 // État initial au démarrage du serveur
 const initQueueState = async () => {
     const now = new Date();
@@ -884,6 +894,30 @@ app.post('/api/settings', requireAuth, requireRole(['owner', 'admin']), (req: an
         responseSettings.webhookUrl = db.settings.webhookUrl || '';
     }
     res.json(responseSettings);
+});
+
+app.post('/api/settings/contribute', requireAuth, (req: any, res) => {
+    const { amount } = req.body;
+    if (typeof amount !== 'number' || amount <= 0) {
+        return res.status(400).json({ error: "Montant invalide" });
+    }
+    
+    db.settings.fundingCurrent = (db.settings.fundingCurrent || 0) + amount;
+    
+    db.fundingHistory.push({
+        id: Date.now().toString() + Math.random().toString().slice(2),
+        userId: req.user.id,
+        username: req.user.username,
+        amount,
+        date: new Date().toISOString()
+    });
+    
+    saveDb();
+    res.json({ success: true, fundingCurrent: db.settings.fundingCurrent });
+});
+
+app.get('/api/settings/funding-history', requireAuth, requireRole(['owner']), (req: any, res) => {
+    res.json(db.fundingHistory || []);
 });
 
 app.post('/api/settings/security/regenerate', requireAuth, requireRole(['owner']), async (req: any, res) => {
