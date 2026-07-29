@@ -506,6 +506,7 @@ export default function ContributeApp({
     id: string;
     file: File;
     tmdbQuery: string;
+    tmdbYear?: string;
     tmdbResults: any[];
     selectedMeta: any | null;
     status: "waiting" | "uploading" | "success" | "error" | "duplicate";
@@ -555,14 +556,15 @@ export default function ContributeApp({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isUploadingGlobal, onUploadStateChange]);
 
-  const searchTMDBForTask = async (taskId: string, query: string) => {
+  const searchTMDBForTask = async (taskId: string, query: string, year?: string) => {
     if (!query || query.length < 2) return;
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, isSearching: true } : t)),
     );
     try {
+      const finalQuery = year ? `${query} ${year}` : query;
       const res = await fetch(
-        `/api/tmdb/search?query=${encodeURIComponent(query)}`,
+        `/api/tmdb/search?query=${encodeURIComponent(finalQuery)}`,
       );
       const data = await res.json();
       setTasks((prev) =>
@@ -586,11 +588,11 @@ export default function ContributeApp({
     }
   };
 
-  const manualSearch = (taskId: string, query: string) => {
+  const manualSearch = (taskId: string, query: string, year?: string) => {
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, tmdbQuery: query } : t)),
+      prev.map((t) => (t.id === taskId ? { ...t, tmdbQuery: query, tmdbYear: year } : t)),
     );
-    searchTMDBForTask(taskId, query);
+    searchTMDBForTask(taskId, query, year);
   };
 
   const processFiles = (selectedFiles: File[]) => {
@@ -1070,13 +1072,29 @@ export default function ContributeApp({
                   )
                 }
                 onKeyDown={(e) =>
-                  e.key === "Enter" && searchTMDBForTask(task.id, task.tmdbQuery)
+                  e.key === "Enter" && searchTMDBForTask(task.id, task.tmdbQuery, task.tmdbYear)
                 }
                 className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-500"
                 placeholder="Rechercher un autre titre..."
               />
+              <input
+                type="text"
+                value={task.tmdbYear || ""}
+                onChange={(e) =>
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.id === task.id ? { ...t, tmdbYear: e.target.value } : t,
+                    ),
+                  )
+                }
+                onKeyDown={(e) =>
+                  e.key === "Enter" && searchTMDBForTask(task.id, task.tmdbQuery, task.tmdbYear)
+                }
+                className="w-20 bg-zinc-950 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-500"
+                placeholder="Année"
+              />
               <button
-                onClick={() => searchTMDBForTask(task.id, task.tmdbQuery)}
+                onClick={() => searchTMDBForTask(task.id, task.tmdbQuery, task.tmdbYear)}
                 className="px-3 bg-zinc-800 rounded text-xs font-medium text-white hover:bg-zinc-700 transition"
               >
                 Rechercher
