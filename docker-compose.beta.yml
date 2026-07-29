@@ -1,0 +1,10 @@
+services:
+  web:
+    volumes:
+      - ./data:/app/data
+      - ./test-media:/app/data/uploads
+      - ./test-media:/app/data/Films
+
+  worker:
+    profiles:
+      - manuel
