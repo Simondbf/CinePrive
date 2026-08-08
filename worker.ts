@@ -157,15 +157,10 @@ const processJob = async (job: any) => {
 
         return { filmId, newFilename: outputFilename };
     } catch (err) {
-        console.error(`[Worker] ÉCHEC du transcodage pour le film ID: ${filmId}. Nettoyage des fichiers...`);
-        try {
-            if (fs.existsSync(outputPath)) {
-                fs.unlinkSync(outputPath);
-                console.log(`[Worker] Fichier partiel supprimé : ${outputPath}`);
-            }
-        } catch (cleanupErr) {
-            console.error(`[Worker] Erreur lors du nettoyage :`, cleanupErr);
+        if (fs.existsSync(outputPath) && path.resolve(outputPath) !== path.resolve(inputPath)) {
+            fs.unlinkSync(outputPath);
         }
+        // Le fichier source est CONSERVÉ : il permet de relancer le traitement.
         throw err;
     }
 };
