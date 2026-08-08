@@ -23,11 +23,21 @@ const parseTimeToSeconds = (timeStr: string) => {
 const processJob = async (job: any) => {
     const { filmId, inputFilename } = job.data;
     const inputPath = path.join(UPLOADS_DIR, inputFilename);
-    const ext = path.extname(inputFilename);            // ".mp4"
-    const baseName = path.basename(inputFilename, ext);
-    const outputFilename = `${baseName}.mp4`;
+    const inputPath = path.join(UPLOADS_DIR, inputFilename);
+    const ext = path.extname(inputFilename).toLowerCase();
+
+// Le fichier est déjà au bon format : aucun traitement nécessaire.
+    if (ext === '.mp4') {
+        console.log(`[Worker] ${inputFilename} est déjà en MP4, transcodage ignoré.`);
+        return { filmId, newFilename: inputFilename };
+    }
+
+    const outputFilename = `${path.basename(inputFilename, ext)}.mp4`;
     const outputPath = path.join(UPLOADS_DIR, outputFilename);
 
+    if (path.resolve(outputPath) === path.resolve(inputPath)) {
+        throw new Error(`Sécurité : entrée et sortie identiques (${inputPath}).`);
+    }
     if (path.resolve(outputPath) === path.resolve(inputPath)) {
         throw new Error('[Worker] SÉCURITÉ : fichier sortie identique à source.');
     }
