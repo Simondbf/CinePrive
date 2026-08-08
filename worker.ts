@@ -23,9 +23,9 @@ const parseTimeToSeconds = (timeStr: string) => {
 const processJob = async (job: any) => {
     const { filmId, inputFilename } = job.data;
     const inputPath = path.join(UPLOADS_DIR, inputFilename);
-    const ext = path.extname(inputFilename);
+    const ext = path.extname(inputFilename);            // ".mp4"
     const baseName = path.basename(inputFilename, ext);
-    const outputFilename = `${baseName}_conv.mp4`;
+    const outputFilename = `${baseName}.mp4`;
     const outputPath = path.join(UPLOADS_DIR, outputFilename);
 
     if (path.resolve(outputPath) === path.resolve(inputPath)) {
