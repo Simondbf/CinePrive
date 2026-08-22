@@ -23,10 +23,9 @@ const parseTimeToSeconds = (timeStr: string) => {
 const processJob = async (job: any) => {
     const { filmId, inputFilename } = job.data;
     const inputPath = path.join(UPLOADS_DIR, inputFilename);
-    const inputPath = path.join(UPLOADS_DIR, inputFilename);
     const ext = path.extname(inputFilename).toLowerCase();
 
-// Le fichier est déjà au bon format : aucun traitement nécessaire.
+    // Le fichier est déjà au bon format : aucun traitement nécessaire.
     if (ext === '.mp4') {
         console.log(`[Worker] ${inputFilename} est déjà en MP4, transcodage ignoré.`);
         return { filmId, newFilename: inputFilename };
