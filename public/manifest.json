@@ -16,19 +16,4 @@
     { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
-}{
-  "name": "CinéPrivé",
-  "short_name": "CinéPrivé",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#d4af37",
-  "description": "Plateforme de streaming privée",
-  "icons": [
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d4af37'%3E%3Cpath d='M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6zm2 0v12h16V6H4zm2 2h12v8H6V8zm2 2v4l5-2-5-2z'/%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    }
-  ]
 }
