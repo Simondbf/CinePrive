@@ -258,8 +258,7 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                             <Coffee className="w-4 h-4" /> Frais du serveur
                         </h3>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                            Si vous souhaitez participer aux frais du serveur, c&rsquo;est avec plaisir.
-                            Rien d&rsquo;obligatoire, bien sûr.
+                            Si vous souhaitez participer aux frais du serveur, c&rsquo;est avec plaisir :)
                         </p>
                     </div>
 
