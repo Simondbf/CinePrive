@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Monitor, Settings, Home, LogOut, UploadCloud, Heart, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
+import { Monitor, Settings, Home, LogOut, UploadCloud, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
 import ViewerApp from './components/ViewerApp';
 import ContributeApp from './components/ContributeApp';
-import FundingModal from './components/FundingModal';
 import EasterEgg from './components/EasterEgg';
 import SettingsModal from './components/SettingsModal';
 import BugReportModal from './components/BugReportModal';
@@ -83,7 +82,6 @@ export default function App() {
       else navigate('/');
   };
 
-  const [showFunding, setShowFunding] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPolls, setShowPolls] = useState(false);
@@ -326,7 +324,6 @@ export default function App() {
                   </motion.div>
               </div>
           )}
-          {showFunding && <FundingModal activeUser={activeUser} onClose={() => setShowFunding(false)} />}
           
           {notification && (
               <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999]">
@@ -475,14 +472,6 @@ export default function App() {
                 <ListChecks className="w-4 h-4" /> <span>Sondages</span>
             </button>
 
-            <button 
-                onClick={() => setShowFunding(true)}
-                className="hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full transition text-pink-600 dark:text-pink-500/80 hover:text-pink-500 dark:hover:text-pink-400 bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20"
-                title="Soutenir"
-            >
-                <Heart className="w-4 h-4" /> <span>Soutenir</span>
-            </button>
-
             {hasRole(activeUser, 'owner') && (
                 <button 
                     onClick={() => setViewMode('admin')}
@@ -530,9 +519,6 @@ export default function App() {
                             <div className="xl:hidden border-b border-zinc-100 dark:border-zinc-800 py-1">
                                 <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
-                                </button>
-                                <button onClick={() => { setShowFunding(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-500/10 transition flex items-center gap-3">
-                                     <Heart className="w-4 h-4" /> Soutenir
                                 </button>
                                 {hasRole(activeUser, 'owner') && (
                                      <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
