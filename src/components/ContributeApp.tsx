@@ -36,8 +36,10 @@ export default function ContributeApp({
   mode,
   onUploadStateChange,
 }: Props) {
+  const [verifEnCours, setVerifEnCours] = useState(false);
+  const [resultatVerif, setResultatVerif] = useState<{ count: number; films: any[] } | null>(null);
   const [tab, setTab] = useState<
-    "upload" | "library" | "users" | "requests" | "polls" | "funding" | "security" | "quarantine"
+    "upload" | "library" | "users" | "requests" | "polls" | "security" | "quarantine"
   >(mode === "upload" ? "upload" : "users");
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
@@ -47,8 +49,6 @@ export default function ContributeApp({
   const [pollResults, setPollResults] = useState<any>({});
   const [settings, setSettings] = useState<{
     allowRegistrations: boolean;
-    fundingCurrent?: number;
-    fundingGoal?: number;
     webhookUrl?: string;
     securityCode?: string;
   }>({ allowRegistrations: true });
@@ -384,6 +384,34 @@ export default function ContributeApp({
           fetchData();
         },
       );
+    }
+  };
+
+  // Verifie que chaque film marque disponible possede bien son fichier sur le
+  // disque, et bascule en ERROR ceux dont le fichier a disparu.
+  const handleVerifierFichiers = async () => {
+    if (!window.confirm(
+      "Verifier tous les fichiers du catalogue ?\n\n" +
+      "Les films dont le fichier a disparu du serveur seront marques comme " +
+      "indisponibles. Aucun fichier ne sera supprime."
+    )) return;
+
+    setVerifEnCours(true);
+    setResultatVerif(null);
+    try {
+      const res = await fetch("/api/admin/reparer-fichiers", { method: "POST" });
+      if (!res.ok) {
+        notify("Erreur lors de la verification des fichiers.", "Erreur");
+        return;
+      }
+      const data = await res.json();
+      setResultatVerif(data);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      notify("Impossible de contacter le serveur.", "Erreur");
+    } finally {
+      setVerifEnCours(false);
     }
   };
 
@@ -958,12 +986,6 @@ export default function ContributeApp({
                   )}
                 </button>
                 <button
-                  className={`px-4 py-2 font-medium rounded transition-colors ${tab === "funding" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
-                  onClick={() => setTab("funding")}
-                >
-                  Financement
-                </button>
-                <button
                   className={`px-4 py-2 font-medium rounded transition-colors ${tab === "security" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
                   onClick={() => setTab("security")}
                 >
@@ -1325,7 +1347,40 @@ export default function ContributeApp({
                    {isRefreshingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                    {isRefreshingAll ? "Rafraîchissement en cours..." : "Rafraîchir tout le catalogue"}
                 </button>
+                <button
+                   onClick={handleVerifierFichiers}
+                   disabled={verifEnCours}
+                   title="Detecte les films dont le fichier a disparu du serveur"
+                   className="ml-3 bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-50 dark:hover:bg-amber-900/20 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                   {verifEnCours ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                   {verifEnCours ? "Verification en cours..." : "Verifier les fichiers"}
+                </button>
               </div>
+          )}
+
+          {resultatVerif && (
+            <div className={`rounded-xl border p-4 text-sm ${resultatVerif.count === 0
+              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+              : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"}`}>
+              {resultatVerif.count === 0 ? (
+                <p>Tous les fichiers du catalogue sont bien presents sur le serveur.</p>
+              ) : (
+                <>
+                  <p className="font-medium mb-2">
+                    {resultatVerif.count} film(s) sans fichier, marques comme indisponibles :
+                  </p>
+                  <ul className="list-disc pl-5 space-y-0.5">
+                    {resultatVerif.films.map((f: any) => (
+                      <li key={f.id}>{f.title} <span className="opacity-60">({f.filename})</span></li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 opacity-80">
+                    Ces films doivent etre renvoyes depuis l'espace contributeur.
+                  </p>
+                </>
+              )}
+            </div>
           )}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
             <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
@@ -1812,80 +1867,6 @@ export default function ContributeApp({
             </div>
           </div>
       )}
-
-      {tab === "funding" &&
-        (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-            <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-6">
-              Gestion Financière du Serveur
-            </h3>
-            <div className="max-w-md space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Montant actuel de la cagnotte (€)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={settings.fundingCurrent || 0}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        fundingCurrent: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Objectif mensuel (€)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={settings.fundingGoal || 12}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        fundingGoal: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  fetch("/api/settings", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      fundingCurrent: settings.fundingCurrent,
-                      fundingGoal: settings.fundingGoal,
-                    }),
-                  }).then(() =>
-                    notify(
-                      "Modifications sauvegardées avec succès !",
-                      "Cagnotte mise à jour",
-                    ),
-                  );
-                }}
-                className="mt-4 w-full bg-primary-600 text-white font-medium py-2 rounded hover:bg-primary-500 transition"
-              >
-                Valider les modifications
-              </button>
-              <p className="text-xs text-zinc-500 mt-4">
-                Ces valeurs s'affichent publiquement dans la modal "Soutenir".
-                Note: N'ayant pas d'intégration externe vers une banque,
-                l'incrémentation doit être mise à jour manuellement par les
-                soins de l'administrateur lors de l'arrivée de dons pour
-                CinéPrivé.
-              </p>
-            </div>
-          </div>
-        )}
 
       {tab === "polls" && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl mx-auto shadow-sm">
