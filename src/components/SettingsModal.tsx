@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings, Moon, Sun, Monitor, Type, KeyRound, Loader2, Link, Server } from 'lucide-react';
+import { Settings, Moon, Sun, Monitor, Type, KeyRound, Loader2, Link, Server, Coffee } from 'lucide-react';
 
 interface Props {
     onClose: () => void;
@@ -251,6 +251,17 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                         </form>
                     </div>
 
+
+
+                    <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Coffee className="w-4 h-4" /> Frais du serveur
+                        </h3>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                            Si vous souhaitez participer aux frais du serveur, c&rsquo;est avec plaisir.
+                            Rien d&rsquo;obligatoire, bien sûr.
+                        </p>
+                    </div>
 
                 </div>
 
