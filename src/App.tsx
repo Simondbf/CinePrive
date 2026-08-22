@@ -8,6 +8,7 @@ import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
 import ViewerApp from './components/ViewerApp';
 import ContributeApp from './components/ContributeApp';
+import InstallPrompt from './components/InstallPrompt';
 import EasterEgg from './components/EasterEgg';
 import SettingsModal from './components/SettingsModal';
 import BugReportModal from './components/BugReportModal';
@@ -300,6 +301,7 @@ export default function App() {
               />
           )}
           {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
+          <InstallPrompt />
           {showPolls && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPolls(false)} />
