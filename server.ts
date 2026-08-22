@@ -30,6 +30,10 @@ app.use('/api', (req, res, next) => {
 
 let JWT_SECRET = process.env.JWT_SECRET || 'cineprive_super_secret_dev_key';
 
+// Domaine public de l'application. Modifiable via le fichier .env : c'est le
+// seul endroit a changer lors d'une migration de nom de domaine.
+const PUBLIC_DOMAIN = process.env.PUBLIC_DOMAIN || 'cineprive.soleiljaune.be';
+
 const userHasRole = (user: any, ...wanted: string[]) => {
     const roles: string[] = user?.roles ?? (user?.role ? [user.role] : []);
     return wanted.some(r => roles.includes(r));
@@ -71,7 +75,7 @@ async function sendSecurityCodeEmail(email: string, name: string, code: string, 
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
     const fromName = process.env.SMTP_FROM_NAME || 'CinéPrivé Sécurité';
-    const fromAddress = process.env.SMTP_FROM_EMAIL || 'security@cineprive.rpisimon.uk';
+    const fromAddress = process.env.SMTP_FROM_EMAIL || `security@${PUBLIC_DOMAIN}`;
 
     if (!host || !user || !pass) {
         console.log(`[Sécurité Mail] SMTP non configuré. Le code généré pour ${email} (${name}) est : ${code}`);
@@ -139,7 +143,7 @@ async function sendNewPatronSecurityCodeEmail(email: string, name: string, code:
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
     const fromName = process.env.SMTP_FROM_NAME || 'CinéPrivé Sécurité';
-    const fromAddress = process.env.SMTP_FROM_EMAIL || 'security@cineprive.rpisimon.uk';
+    const fromAddress = process.env.SMTP_FROM_EMAIL || `security@${PUBLIC_DOMAIN}`;
 
     if (!host || !user || !pass) {
         console.log(`[Sécurité Mail] SMTP non configuré. Le nouveau code pour le Patron (${email}) est : ${code}`);
@@ -338,7 +342,7 @@ app.use((req, res, next) => {
         // Bloquer si le host est l'IP directe
         // On permet 'localhost' pour le développement interne
         if (isIp && !host.startsWith('127.0.0.1') && !host.startsWith('localhost')) {
-            return res.status(403).send("Accès direct par IP bloqué. Veuillez utiliser CinePrive.rpisimon.uk");
+            return res.status(403).send(`Accès direct par IP bloqué. Veuillez utiliser ${PUBLIC_DOMAIN}`);
         }
     }
     next();
@@ -500,8 +504,8 @@ const defaultPolls = [
         allowMultiple: false,
         allowCustom: true,
         options: [
-            { id: 'o1', label: 'cineprive.rpisimon.uk me convient très bien' },
-            { id: 'o2', label: 'Je préfèrerais un format plus court (ex: film.rpisimon.uk)' },
+            { id: 'o1', label: `${PUBLIC_DOMAIN} me convient très bien` },
+            { id: 'o2', label: 'Je préfèrerais un format plus court' },
             { id: 'o3', label: 'Il faudrait un vrai domaine professionnel (.com, .fr)' }
         ]
     }
@@ -2182,6 +2186,30 @@ app.get('/api/admin/audit-fichiers', requireAuth, requireRole(['owner']), (req, 
     });
     
     res.json({ missingCount: missingFiles.length, missingFiles });
+});
+
+// Marque en ERROR tous les films dont le fichier a disparu du disque.
+// Ils cessent ainsi d'etre proposes a la lecture, ce qui evite le lecteur
+// bloque a 00:00 devant un fichier inexistant.
+app.post('/api/admin/reparer-fichiers', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+    const films = db.films || [];
+    const repares: any[] = [];
+
+    films.forEach((film: any) => {
+        if (film.status === 'AVAILABLE' && film.filename && !film.jellyfinId) {
+            const safeName = path.basename(film.filename);
+            const trouve = [UPLOADS_DIR, FILMS_DIR].some((dir) => fs.existsSync(path.join(dir, safeName)));
+            if (!trouve) {
+                film.status = 'ERROR';
+                film.errorReason = 'Fichier introuvable sur le serveur';
+                repares.push({ id: film.id, title: film.title, filename: film.filename });
+            }
+        }
+    });
+
+    if (repares.length > 0) saveDb();
+    console.log(`[REPARATION] ${repares.length} film(s) marque(s) comme indisponible(s).`);
+    res.json({ count: repares.length, films: repares });
 });
 
 // ======================= VITE MIDDLEWARE =======================
