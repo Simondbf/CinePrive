@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>CinéPrivé</title>
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#09090b" />
+    <meta name="theme-color" content="#8c2f39" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CinéPrivé">
@@ -16,13 +16,14 @@
   <body class="overflow-x-hidden">
     <div id="root">
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #111315; color: white; font-family: ui-sans-serif, system-ui, sans-serif;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;">
-          <rect width="20" height="14" x="2" y="3" rx="2"></rect>
-          <line x1="8" x2="16" y1="21" y2="21"></line>
-          <line x1="12" x2="12" y1="17" y2="21"></line>
+        <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" style="animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;">
+          <g transform="translate(256 256)">
+            <circle r="132" fill="none" stroke="#b04f5e" stroke-width="22" stroke-dasharray="600 200" transform="rotate(-40)"></circle>
+            <path d="M-34 -46 L52 0 L-34 46 Z" fill="#b04f5e"></path>
+          </g>
         </svg>
         <h1 style="margin-top: 20px; font-size: 24px; font-weight: bold; letter-spacing: -0.025em;">CinéPrivé</h1>
-        <div style="margin-top: 16px; width: 40px; height: 40px; border: 3px solid rgba(220, 38, 38, 0.2); border-top-color: #dc2626; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <div style="margin-top: 16px; width: 40px; height: 40px; border: 3px solid rgba(140, 47, 57, 0.25); border-top-color: #b04f5e; border-radius: 50%; animation: spin 1s linear infinite;"></div>
         <style>
           @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
           @keyframes spin { to { transform: rotate(360deg); } }
