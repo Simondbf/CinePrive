@@ -212,6 +212,9 @@ export default function AuthScreen({ onLogin }: Props) {
                                   </label>
                                   <input 
                                       value={username} onChange={e => setUsername(e.target.value)} required
+                                      minLength={!isLogin ? 2 : undefined}
+                                      maxLength={!isLogin ? 20 : undefined}
+                                      title={!isLogin ? "Entre 2 et 20 caractères" : undefined}
                                       placeholder={!isLogin ? "Ex: Simon" : "Votre nom ou email"}
                                       className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                                   />
