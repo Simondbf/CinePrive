@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Monitor, Settings, Home, LogOut, UploadCloud, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
+import { Settings, Home, LogOut, UploadCloud, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
 import ViewerApp from './components/ViewerApp';
 import ContributeApp from './components/ContributeApp';
 import InstallPrompt from './components/InstallPrompt';
+import Logo from './components/Logo';
 import EasterEgg from './components/EasterEgg';
 import SettingsModal from './components/SettingsModal';
 import BugReportModal from './components/BugReportModal';
@@ -399,7 +400,7 @@ export default function App() {
                className="text-xl font-bold tracking-tight mr-2 xl:mr-10 flex items-center gap-2 text-primary-600 cursor-pointer select-none"
                onClick={handleLogoClick}
             >
-                <Monitor className="w-6 h-6 shrink-0" /> <span className="hidden sm:inline">CinéPrivé</span>
+                <Logo className="w-7 h-7 shrink-0" /> <span className="hidden sm:inline">CinéPrivé</span>
             </div>
         </div>
         
