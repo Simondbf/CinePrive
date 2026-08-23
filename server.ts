@@ -998,7 +998,7 @@ app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) =
 });
 
 app.post('/api/register', async (req, res) => {
-    const { username, password, email, name, inviteCode, rememberMe } = req.body;
+    let { username, password, email, name, inviteCode, rememberMe } = req.body;
     
     let bypassWithCode = false;
     if (inviteCode && db.invites) {
@@ -1023,6 +1023,20 @@ app.post('/api/register', async (req, res) => {
     }
 
     if (!username || !password || !name) return res.status(400).json({ error: 'Champs manquants' });
+
+    // Longueur minimale du pseudo : un pseudo d'une seule lettre est
+    // impossible a distinguer dans les listes et les mentions.
+    username = String(username).trim();
+    name = String(name).trim();
+    if (username.length < 2) {
+        return res.status(400).json({ error: 'Le pseudo doit contenir au moins 2 caractères.' });
+    }
+    if (username.length > 20) {
+        return res.status(400).json({ error: 'Le pseudo ne doit pas dépasser 20 caractères.' });
+    }
+    if (name.length < 2) {
+        return res.status(400).json({ error: 'Le prénom doit contenir au moins 2 caractères.' });
+    }
 
     if (db.users.find((u: any) => (u.username || '').toLowerCase() === username.toLowerCase())) {
         return res.status(400).json({ error: 'Ce pseudo est déjà pris' });
