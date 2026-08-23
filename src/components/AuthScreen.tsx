@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { Monitor, Loader2, KeyRound, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Loader2, KeyRound, Eye, EyeOff, LogIn } from 'lucide-react';
+import Logo from './Logo';
 
 // Nouvelle adresse publique de CinéPrivé, et detection de l'ancienne.
 const NOUVEAU_DOMAINE = 'cineprive.soleiljaune.be';
@@ -137,7 +138,7 @@ export default function AuthScreen({ onLogin }: Props) {
       <div className="min-h-screen bg-zinc-50 dark:bg-[#16181c] dark:amoled:bg-black flex flex-col items-center justify-center text-zinc-900 dark:text-white px-4 transition-colors">
           <div className="w-full max-w-md">
               <h1 className="text-4xl md:text-5xl font-bold font-sans tracking-tight text-center mb-12 text-zinc-900 dark:text-zinc-100 flex items-center justify-center gap-3">
-                  <Monitor className="w-10 h-10 text-primary-600" />
+                  <Logo className="w-12 h-12 text-primary-600" />
                   CinéPrivé
               </h1>
 
