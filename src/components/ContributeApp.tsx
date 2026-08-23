@@ -18,7 +18,9 @@ import {
   LogOut,
   Settings,
   AlertTriangle,
-  Video
+  Video,
+  FileUp,
+  Layers
 } from "lucide-react";
 
 interface Props {
@@ -695,6 +697,7 @@ export default function ContributeApp({
   };
 
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const lotInputRef = useRef<HTMLInputElement>(null);
   const [replacingFilm, setReplacingFilm] = useState<{id: string, title: string, tmdbId?: number} | null>(null);
 
   const handleReplaceFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -720,6 +723,97 @@ export default function ContributeApp({
     setTab('upload');
     setReplacingFilm(null);
     e.target.value = '';
+  };
+
+  // Normalise un texte pour comparer un nom de fichier a un titre de film :
+  // minuscules, sans accents, sans ponctuation ni extension.
+  const normaliser = (t: string) =>
+    t
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\.(mp4|mkv|avi|mov|webm)$/i, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+  // Score de ressemblance : proportion de mots du titre presents dans le
+  // nom du fichier. Simple, mais suffisant pour des titres de films.
+  const score = (nomFichier: string, titre: string): number => {
+    const a = normaliser(nomFichier);
+    const motsTitre = normaliser(titre).split(' ').filter((m) => m.length > 2);
+    if (motsTitre.length === 0) return 0;
+    const trouves = motsTitre.filter((m) => a.includes(m)).length;
+    return trouves / motsTitre.length;
+  };
+
+  // Remplacement en lot : on associe chaque fichier choisi au film
+  // indisponible dont le titre lui ressemble le plus.
+  const handleLotFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fichiers = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (fichiers.length === 0) return;
+
+    const candidats = films.filter((f: any) => f.status === 'ERROR');
+    if (candidats.length === 0) {
+      notify(
+        "Aucun film indisponible a remplacer. Lancez d'abord « Verifier les fichiers ».",
+        'Rien a faire'
+      );
+      return;
+    }
+
+    const nouvelles: UploadTask[] = [];
+    const associes = new Set<string>();
+    const orphelins: string[] = [];
+
+    fichiers.forEach((file) => {
+      let meilleur: any = null;
+      let meilleurScore = 0;
+      candidats.forEach((f: any) => {
+        if (associes.has(f.id)) return;
+        const sc = Math.max(score(file.name, f.title), score(file.name, f.originalName || ''));
+        if (sc > meilleurScore) {
+          meilleurScore = sc;
+          meilleur = f;
+        }
+      });
+
+      if (meilleur && meilleurScore >= 0.5) {
+        associes.add(meilleur.id);
+        nouvelles.push({
+          id: Math.random().toString(36).substr(2, 9),
+          file,
+          tmdbQuery: meilleur.title,
+          tmdbResults: [],
+          selectedMeta: { id: meilleur.tmdbId, title: meilleur.title },
+          status: 'waiting',
+          progress: 0,
+          isSearching: false,
+          replaceFilmId: meilleur.id,
+          replaceFilmTitle: meilleur.title,
+        } as UploadTask);
+      } else {
+        orphelins.push(file.name);
+      }
+    });
+
+    if (nouvelles.length === 0) {
+      notify(
+        `Aucun fichier n'a pu etre associe. Verifiez que les noms de fichiers ressemblent aux titres.`,
+        'Aucune correspondance'
+      );
+      return;
+    }
+
+    setTasks((prev) => [...prev, ...nouvelles]);
+    setTab('upload');
+    notify(
+      `${nouvelles.length} fichier(s) associe(s) et ajoute(s) a la file.` +
+        (orphelins.length > 0
+          ? ` ${orphelins.length} non reconnu(s) : ${orphelins.slice(0, 3).join(', ')}${orphelins.length > 3 ? '...' : ''}`
+          : ''),
+      'File d\'attente mise a jour'
+    );
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1224,6 +1318,14 @@ export default function ContributeApp({
           accept="video/*,.mkv" 
           onChange={handleReplaceFile} 
       />
+      <input
+          type="file"
+          ref={lotInputRef}
+          className="hidden"
+          accept="video/*,.mkv"
+          multiple
+          onChange={handleLotFiles}
+      />
       <div className="flex justify-between items-start mb-8 p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-transparent border-l-4 border-l-primary-600 rounded-r shadow-sm">
         <div>
           <h2 className="text-xl font-medium text-zinc-900 dark:text-white mb-2">
@@ -1377,6 +1479,14 @@ export default function ContributeApp({
                    {verifEnCours ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
                    {verifEnCours ? "Verification en cours..." : "Verifier les fichiers"}
                 </button>
+                <button
+                   onClick={() => lotInputRef.current?.click()}
+                   title="Selectionner plusieurs fichiers et les associer automatiquement aux films indisponibles"
+                   className="ml-3 bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition flex items-center gap-2 shadow-sm"
+                >
+                   <Layers className="w-4 h-4" />
+                   Remplacer en lot
+                </button>
               </div>
           )}
 
@@ -1504,7 +1614,7 @@ export default function ContributeApp({
                                 className="text-zinc-500 hover:text-green-600 transition-all font-medium text-xs px-2.5 py-1.5 rounded flex items-center justify-center border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
                                 title="Remplacer la vidéo"
                               >
-                                <Video className="w-3.5 h-3.5" />
+                                <FileUp className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={async () => {
