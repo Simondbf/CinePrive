@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: var(--color-red-50);
-  --color-primary-100: var(--color-red-100);
-  --color-primary-200: var(--color-red-200);
-  --color-primary-300: var(--color-red-300);
-  --color-primary-400: var(--color-red-400);
-  --color-primary-500: var(--color-red-500);
-  --color-primary-600: var(--color-red-600);
-  --color-primary-700: var(--color-red-700);
-  --color-primary-800: var(--color-red-800);
-  --color-primary-900: var(--color-red-900);
-  --color-primary-950: var(--color-red-950);
+  /* Palette bordeaux, accordee au logo. Toute la couleur d'accent de
+     l'application descend de ces onze valeurs : les modifier ici suffit. */
+  --color-primary-50:  #fbf5f6;
+  --color-primary-100: #f6e8ea;
+  --color-primary-200: #ecd0d4;
+  --color-primary-300: #dda9b0;
+  --color-primary-400: #c87884;
+  --color-primary-500: #b04f5e;
+  --color-primary-600: #8c2f39;
+  --color-primary-700: #762832;
+  --color-primary-800: #63232c;
+  --color-primary-900: #552129;
+  --color-primary-950: #2f0e13;
   --color-gold-500: #d4af37;
 }
 
