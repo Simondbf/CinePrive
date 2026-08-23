@@ -1,0 +1,201 @@
+# Bonnes pratiques — CinéPrivé & Gringotts
+
+Règles tirées de pannes réelles. Chacune a coûté au moins une soirée de débogage. À lire avant toute modification, et à faire lire à toute IA sollicitée sur ces projets.
+
+---
+
+## 1. Vérifications avant chaque envoi sur GitHub
+
+### Contrôler les types
+
+Ni Vite ni esbuild ne vérifient les types. Une icône non importée, une variable déclarée deux fois, une propriété renommée : tout cela **passe le build sans un mot** et casse l'application à l'exécution.
+
+Le serveur n'ayant ni Node ni npm, la vérification se fait sur le poste de développement :
+
+```powershell
+npm install ; npx tsc --noEmit
+```
+
+Ou, depuis le serveur, dans un conteneur jetable :
+
+```bash
+docker run --rm -v /root/CinePrive:/app -w /app node:20-alpine \
+  sh -c "npm install --silent ; npx tsc --noEmit"
+```
+
+**Pannes évitées par cette seule commande :** `hasRole` utilisé sans être importé, l'icône `Check` manquante provoquant un écran blanc, `inputPath` déclaré deux fois empêchant toute reconstruction du worker, le SDK PocketBase en retard d'une version majeure.
+
+### Un commit, un sujet
+
+**Ne jamais reconstruire un fichier entier à partir d'une version antérieure.** Trois commits successifs ont effacé silencieusement du travail de cette manière :
+
+| Commit | Message affiché | Contenu réel |
+|---|---|---|
+| `b3c206f` | « Update print statement from Hello to Goodbye » | 368 lignes supprimées, deux routes d'API perdues |
+| `f21974b` | « standardize role management » | 593 lignes réécrites, correctifs vidéo perdus, backend ramené à l'ancien modèle de rôles |
+| `87c8722` | « migrate to PocketBase » | Marche arrière complète vers Supabase |
+
+Modifier uniquement les portions concernées, par recherche-remplacement ciblée.
+
+---
+
+## 2. Service worker
+
+### Les trois gardes obligatoires
+
+En tête du gestionnaire `fetch` de `public/sw.js` :
+
+```js
+if (req.method !== 'GET') return;
+if (url.origin !== self.location.origin) return;
+if (
+  url.pathname.startsWith('/videos/') ||
+  url.pathname.startsWith('/api/') ||
+  req.headers.has('range')
+) return;
+```
+
+Sans elles, le service worker intercepte les requêtes partielles de la vidéo et **le lecteur reste bloqué à 00:00**. Sur Gringotts, l'absence de la garde sur `/api/` et `/_/` rendait le panneau PocketBase totalement inaccessible.
+
+### Incrémenter le cache à chaque déploiement
+
+```js
+const CACHE_NAME = 'cineprive-v2';   // etait v1
+```
+
+Modifier un fichier sans changer cette valeur ne sert à rien : le navigateur continue de servir l'ancienne version, parfois plusieurs jours, sans le moindre signe visible. Symptôme typique : une console vide alors que la page ne se comporte pas comme prévu.
+
+Pour purger côté navigateur : DevTools → Application → Service Workers → Unregister, puis rechargement forcé. Sur Firefox, `Ctrl+Maj+R` ne suffit pas — il faut passer par `about:preferences#privacy` → Gérer les données.
+
+---
+
+## 3. Appels réseau
+
+### Toujours vérifier `res.ok` avant `res.json()`
+
+`fetch` ne rejette **pas** sur un code d'erreur HTTP, uniquement sur une panne réseau. Un `.catch()` ne protège donc de rien.
+
+Trois pannes distinctes ont eu cette même origine : une réponse `403` passée à un `setState`, transformant un tableau en `{error: "..."}`. Le `.map()` suivant lève `m.map is not a function` et React démonte tout l'arbre — écran blanc, sans message.
+
+Utiliser `apiGet` de `src/lib/api.ts`, qui renvoie une valeur de repli en cas d'erreur :
+
+```ts
+setUsersList(await apiGet<User[]>("/api/users", []));
+```
+
+Pour les écritures, vérifier explicitement :
+
+```ts
+if (!res.ok) {
+  const detail = await res.json().catch(() => ({}));
+  console.error("[CONTEXTE] HTTP", res.status, detail);
+  notify("...", "Erreur");
+  return;
+}
+```
+
+### Journaliser les routes sensibles
+
+Le middleware de journalisation est monté sur `/api` uniquement. Les routes hors de ce préfixe — `/videos/` notamment — n'apparaissent **jamais** dans les logs, même en échec. Une absence de log n'est donc pas une information.
+
+---
+
+## 4. Docker et réseau
+
+### Docker contourne le pare-feu
+
+Docker écrit ses propres règles iptables et passe devant `ufw`. Un port publié sans préfixe reste joignable depuis Internet malgré un `ufw deny`.
+
+**La seule protection fiable est le préfixe dans `docker-compose.yml` :**
+
+```yaml
+ports:
+  - "127.0.0.1:3001:80"     # bon
+  - "3001:80"               # exposé sur Internet
+```
+
+Contrôle après chaque déploiement :
+
+```bash
+sudo ss -tlnp | grep -vE '127\.0\.0\.|\[::1\]'
+```
+
+Seuls `sshd` et `nginx` doivent apparaître.
+
+### « address already in use »
+
+Un processus `docker-proxy` peut survivre à son conteneur et garder le port indéfiniment. Aucun `docker compose down` ne l'atteint, puisqu'il n'y a plus de conteneur à supprimer.
+
+```bash
+sudo ss -tlnp | grep 3000
+ps -fp <PID>
+sudo kill <PID>
+```
+
+Un cas réel a duré **plusieurs semaines**, faisant croire à un conteneur fantôme et masquant le fait que le code déployé n'était jamais celui qui répondait.
+
+### Ne jamais supprimer un montage sans comprendre son rôle
+
+Un commit a retiré les montages de la Storage Box en les qualifiant de « redondants ». Ils ne l'étaient pas : `./data` porte `db.json` sur le disque local, les deux autres portent les fichiers vidéo sur la Storage Box. Sans eux, le conteneur ne voit aucun film.
+
+Vérifier aussi que le montage CIFS est actif **avant** de démarrer les conteneurs — un montage créé après n'est pas propagé :
+
+```bash
+mount | grep cineprive
+```
+
+---
+
+## 5. nginx
+
+**Deux nginx coexistent.** Celui de l'hôte, dans `/etc/nginx/`, jamais versionné, qui reçoit Internet et trie par nom de domaine. Et celui du conteneur Gringotts, dans son dépôt, qui sert les fichiers React.
+
+**`proxy_buffering off` est indispensable pour la vidéo.** Sans lui, nginx met le flux en tampon et casse les requêtes partielles — le lecteur reste à 00:00.
+
+**Attention à la barre oblique dans `proxy_pass`.** `proxy_pass http://serveur:8090/_/;` retire `/_/` avant de transmettre, et le service en aval construit alors des liens sans préfixe. Sans chemin, l'adresse passe intacte.
+
+**Un seul `default_server` par port.** En déclarer deux fait échouer `nginx -t`.
+
+**Toujours tester avant de recharger :**
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+---
+
+## 6. Traitement des fichiers vidéo
+
+**Ne jamais écrire dans le fichier qu'on est en train de lire.** Le worker construisait un nom de sortie identique au nom d'entrée quand le fichier était déjà en MP4, puis supprimait « la source » après traitement — détruisant le résultat. Des films ont été perdus.
+
+Garde-fou en place, à ne pas retirer :
+
+```ts
+if (path.resolve(outputPath) === path.resolve(inputPath)) {
+    throw new Error('Sécurité : entrée et sortie identiques.');
+}
+```
+
+**En cas d'échec, ne jamais supprimer le fichier source.** Il permet de relancer le traitement. Seule la sortie partielle doit être nettoyée.
+
+---
+
+## 7. Interface
+
+**Tailwind v4 a supprimé les utilitaires d'opacité.** `bg-opacity-75`, `text-opacity-*`, `border-opacity-*` et `ring-opacity-*` n'existent plus. La syntaxe est désormais `bg-gray-500/75`.
+
+Symptôme observé : un voile de fenêtre modale rendu **totalement opaque** au lieu de translucide, masquant le formulaire — un écran gris sans erreur en console.
+
+**Un élément positionné passe au-dessus d'un élément non positionné**, quel que soit l'ordre dans le HTML. Le contenu d'une fenêtre modale doit porter `relative`, sinon le voile en `fixed` le recouvre.
+
+**Une palette centralisée.** Toute la couleur d'accent descend des variables `--color-primary-*` de `src/index.css`. Ne jamais coder une couleur en dur dans un composant.
+
+---
+
+## 8. Sur le travail assisté par IA
+
+**Ne pas laisser une IA deviner le comportement d'une API qu'elle ne peut pas tester.** Plusieurs correctifs successifs sur la recherche par ISBN ont introduit des régressions parce qu'ils reposaient sur des suppositions. Le navigateur est le seul outil ayant réellement accès à ces services : tester d'abord, corriger ensuite.
+
+**Exiger le contrôle des types avant toute remise.** C'est la seule barrière automatique du projet.
+
+**Se méfier des messages de commit générés automatiquement.** Ils décrivent rarement le contenu réel. Vérifier le diff avant de fusionner.
