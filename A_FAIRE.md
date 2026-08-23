@@ -1,4 +1,4 @@
-Liste des évolutions décidées mais pas encore réalisées. 
+Liste des évolutions décidées mais pas encore réalisées. La liste suivante n'est pas une liste par ordre de priorité
 
 1. Invitation à installer l'application
 
