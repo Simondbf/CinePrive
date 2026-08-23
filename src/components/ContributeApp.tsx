@@ -500,10 +500,31 @@ export default function ContributeApp({
           allowRegistrations: !settings.allowRegistrations,
         }),
       });
+
+      // Sans cette verification, une reponse d'erreur remplacerait l'objet
+      // settings par { error: ... } et le bouton cesserait de repondre.
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        console.error("[SETTINGS] HTTP", res.status, detail);
+        notify(
+          res.status === 403
+            ? "Votre compte n'a pas les droits pour modifier ce réglage."
+            : `Le serveur a refusé la modification (erreur ${res.status}).`,
+          "Modification impossible"
+        );
+        return;
+      }
+
       const newSettings = await res.json();
+      if (typeof newSettings?.allowRegistrations !== "boolean") {
+        console.error("[SETTINGS] reponse inattendue", newSettings);
+        notify("Réponse inattendue du serveur.", "Modification impossible");
+        return;
+      }
       setSettings(newSettings);
     } catch (e) {
       console.error(e);
+      notify("Impossible de contacter le serveur.", "Erreur réseau");
     }
   };
 
