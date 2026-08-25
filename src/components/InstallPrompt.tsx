@@ -21,7 +21,23 @@ export default function InstallPrompt() {
     if (localStorage.getItem('cine_install_dismissed') === 'true') return;
 
     const ua = window.navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(ua)) {
+
+    // Le bandeau est réservé au mobile et à la tablette : sur un ordinateur de
+    // bureau, il n'a aucun sens et Chrome le proposerait pourtant.
+    // Un iPad récent se déclare « macintosh » : seul maxTouchPoints le trahit.
+    const estIos =
+      /iphone|ipad|ipod/.test(ua) ||
+      (/macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const estAndroid = /android/.test(ua);
+    const ecranTactile = window.matchMedia('(pointer: coarse)').matches;
+    const surMobileOuTablette =
+      estIos ||
+      estAndroid ||
+      (ecranTactile && window.matchMedia('(max-width: 1280px)').matches);
+
+    if (!surMobileOuTablette) return;
+
+    if (estIos) {
       // Safari n'implémente pas beforeinstallprompt : on affiche la marche
       // à suivre manuelle, après un court délai pour ne pas gêner l'arrivée.
       const t = setTimeout(() => {
