@@ -1,4 +1,12 @@
-<!doctype html>
+/**
+ * Vitrine figée de l'ancienne adresse cineprive.rpisimon.uk.
+ *
+ * Cloudflare Worker : aucune machine à entretenir, la page vit chez
+ * Cloudflare. À déployer dans le tableau de bord (Workers & Pages),
+ * puis attacher le domaine personnalisé cineprive.rpisimon.uk.
+ */
+
+const PAGE = `<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
@@ -42,7 +50,7 @@
     Pensez à mettre à jour vos favoris et l'application sur votre écran d'accueil.</p>
     <a class="adresse" href="https://cineprive.soleiljaune.be">cineprive.soleiljaune.be</a>
     <p class="compte">Redirection automatique dans <span id="compteur">15</span> secondes…</p>
-    <p class="fige">Cette page restera la vitrine figée de l'ancienne adresse cineprive.rpisimon.uk.</p>
+    <p class="fige">Cette page est la vitrine figée de l'ancienne adresse : le site n'est plus accessible ici.</p>
   </main>
   <script>
     let restant = 15;
@@ -57,4 +65,15 @@
     }, 1000);
   </script>
 </body>
-</html>
+</html>`;
+
+export default {
+  async fetch() {
+    return new Response(PAGE, {
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'public, max-age=3600',
+      },
+    });
+  },
+};

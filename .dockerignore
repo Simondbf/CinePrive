@@ -26,5 +26,5 @@ logs/
 .git
 .gitignore
 
-# Vitrine statique de l ancien domaine : servie depuis le Raspberry Pi, jamais dans l image du site
+# Vitrine statique de l ancien domaine : deployee en Cloudflare Worker, jamais dans l image du site
 vitrine-rpisimon/
