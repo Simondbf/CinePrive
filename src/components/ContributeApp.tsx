@@ -1,4 +1,5 @@
 import { hasRole, primaryRole } from '../lib/roles';
+import AideImportModal from './AideImportModal';
 import { apiGet } from '../lib/api';
 import React, { useState, useEffect, useRef } from "react";
 import { notify } from "../lib/notify";
@@ -20,7 +21,8 @@ import {
   AlertTriangle,
   Video,
   FileUp,
-  Layers
+  Layers,
+  HelpCircle
 } from "lucide-react";
 
 interface Props {
@@ -40,6 +42,8 @@ export default function ContributeApp({
 }: Props) {
   const [verifEnCours, setVerifEnCours] = useState(false);
   const [resultatVerif, setResultatVerif] = useState<{ count: number; films: any[] } | null>(null);
+  const [rechercheFilm, setRechercheFilm] = useState("");
+  const [showAide, setShowAide] = useState(false);
   const [tab, setTab] = useState<
     "upload" | "library" | "users" | "requests" | "polls" | "security" | "quarantine"
   >(mode === "upload" ? "upload" : "users");
@@ -1309,6 +1313,27 @@ export default function ContributeApp({
     </div>
   );
 
+  // Recherche dans la zone de controle des films (onglet Historique).
+  // On enleve les accents et la casse pour que "amelie" trouve "Amélie".
+  const normaliserTexte = (s: string) =>
+    (s || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+  const filmsFiltres = React.useMemo(() => {
+    const q = normaliserTexte(rechercheFilm).trim();
+    if (!q) return films;
+    return films.filter((f) => {
+      const uploader = usersList.find((u) => u.id === f.addedBy);
+      return (
+        normaliserTexte(f.title).includes(q) ||
+        normaliserTexte(f.originalName || "").includes(q) ||
+        normaliserTexte(uploader?.name || f.addedBy || "").includes(q)
+      );
+    });
+  }, [films, rechercheFilm, usersList]);
+
   return (
     <div className="p-6 lg:p-12 pb-24 max-w-[1200px] mx-auto">
       <input 
@@ -1364,13 +1389,19 @@ export default function ContributeApp({
         ) : (
           <>
             <div className="flex flex-col gap-6">
-              <div className="hidden lg:block bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                  <h4 className="font-semibold text-blue-800 dark:text-blue-400 mb-2">Guide d'optimisation</h4>
-                  <ul className="text-sm text-blue-700 dark:text-blue-300 list-disc pl-5 space-y-1">
-                      <li>Le format <strong>.mp4</strong> est fortement recommandé pour un traitement instantané sans surcharger le serveur.</li>
-                      <li>Pour extraire un DVD : utilisez <strong>MakeMKV</strong>, puis convertissez avec <strong>HandBrake</strong>.</li>
-                      <li>Dans HandBrake : Cochez l'option <strong>"Web Optimized"</strong> et assurez-vous de conserver les pistes audio et sous-titres dans l'onglet "Audio".</li>
-                  </ul>
+              <div className="hidden lg:flex items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Le format <strong className="font-medium text-zinc-900 dark:text-white">.mp4</strong> est mis en ligne
+                      immédiatement. Les autres formats sont acceptés, mais convertis la nuit suivante.
+                  </p>
+                  <button
+                      type="button"
+                      onClick={() => setShowAide(true)}
+                      className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
+                  >
+                      <HelpCircle className="w-4 h-4" />
+                      Aide
+                  </button>
               </div>
               <div className="lg:hidden p-8 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
                   <p className="text-zinc-400">L'ajout de films nécessite un ordinateur (drag & drop).</p>
@@ -1513,6 +1544,32 @@ export default function ContributeApp({
               )}
             </div>
           )}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+            <input
+              type="text"
+              value={rechercheFilm}
+              onChange={(e) => setRechercheFilm(e.target.value)}
+              placeholder="Rechercher un titre, un fichier ou un contributeur..."
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500 transition shadow-sm"
+            />
+            {rechercheFilm && (
+              <button
+                onClick={() => setRechercheFilm("")}
+                title="Effacer la recherche"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {rechercheFilm && (
+            <p className="-mt-2 text-xs text-zinc-500">
+              {filmsFiltres.length} film(s) sur {films.length}
+            </p>
+          )}
+
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
             <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
             <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
@@ -1529,14 +1586,16 @@ export default function ContributeApp({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {films.length === 0 ? (
+              {filmsFiltres.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-8">
-                    Base de données vide.
+                    {films.length === 0
+                      ? "Base de données vide."
+                      : "Aucun film ne correspond à cette recherche."}
                   </td>
                 </tr>
               ) : (
-                films.map((f) => {
+                filmsFiltres.map((f) => {
                   const uploader = usersList.find((u) => u.id === f.addedBy);
                   return (
                     <tr
@@ -2737,6 +2796,7 @@ export default function ContributeApp({
           </div>
         </div>
       )}
+      {showAide && <AideImportModal onClose={() => setShowAide(false)} />}
 
     </div>
   );
