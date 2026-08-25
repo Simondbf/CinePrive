@@ -1751,6 +1751,39 @@ app.post('/api/films/:id/refresh-metadata', requireAuth, requireRole(['owner', '
     }
 });
 
+// Bande-annonce du film (A_FAIRE n°5) : on interroge TMDB et on renvoie le
+// lien YouTube. Français d'abord, anglais en secours. Le front ouvre le lien
+// dans un nouvel onglet ; en cas d'échec il retombe sur une recherche YouTube.
+app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: "Film introuvable" });
+
+    const apiKey = process.env.TMDB_API_KEY;
+    if (!apiKey || !film.tmdbId) {
+        return res.status(404).json({ error: "Bande-annonce indisponible pour ce film" });
+    }
+
+    try {
+        for (const langue of ['fr-FR', 'en-US']) {
+            const reponse = await fetch(`https://api.themoviedb.org/3/movie/${film.tmdbId}/videos?api_key=${apiKey}&language=${langue}`);
+            if (!reponse.ok) continue;
+            const data = await reponse.json();
+            const videos = Array.isArray(data.results) ? data.results : [];
+            const choix =
+                videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer' && v.official) ||
+                videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') ||
+                videos.find((v: any) => v.site === 'YouTube' && v.type === 'Teaser');
+            if (choix) {
+                return res.json({ url: `https://www.youtube.com/watch?v=${choix.key}`, name: choix.name });
+            }
+        }
+        return res.status(404).json({ error: "Aucune bande-annonce trouvée sur TMDB" });
+    } catch (err: any) {
+        console.error("TMDB trailer error", err);
+        return res.status(500).json({ error: "Erreur lors de la recherche de la bande-annonce" });
+    }
+});
+
 // Upload Video par paquets (Chunking pour contourner Cloudflare)
 app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (req: any, res) => {
     const { uploadId, chunkIndex } = req.body;

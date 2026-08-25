@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Film, User } from '../types';
-import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
+import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check, Youtube } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
 import { hasRole, primaryRole } from '../lib/roles';
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching, isCompleteGrid }: Props) {
+  const [chargementBA, setChargementBA] = useState(false);
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
   const [editingGenre, setEditingGenre] = useState(false);
@@ -301,6 +302,30 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                 {infoFilm.synopsis || "Aucun synopsis disponible pour ce film."}
                             </p>
                         </div>
+                        <button
+                            onClick={async () => {
+                                if (!infoFilm || chargementBA) return;
+                                // L'onglet est ouvert AVANT l'attente reseau, sinon
+                                // le bloqueur de fenetres du navigateur l'interdit.
+                                const onglet = window.open('', '_blank');
+                                setChargementBA(true);
+                                let url = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${infoFilm.title} ${infoFilm.year || ''} bande-annonce`)}`;
+                                try {
+                                    const res = await fetch(`/api/films/${infoFilm.id}/trailer`);
+                                    if (res.ok) {
+                                        const data = await res.json();
+                                        if (data.url) url = data.url;
+                                    }
+                                } catch { /* recherche YouTube en secours */ }
+                                setChargementBA(false);
+                                if (onglet) { onglet.location.href = url; } else { window.location.href = url; }
+                            }}
+                            disabled={chargementBA}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-60"
+                        >
+                            {chargementBA ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
+                            Bande-annonce
+                        </button>
                         <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500">
                             Ajouté par {infoFilm.addedBy} 
                             {(infoFilm as any).modifiedBy && ` (Mis à jour par ${(infoFilm as any).modifiedBy})`}
