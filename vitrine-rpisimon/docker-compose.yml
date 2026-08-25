@@ -1,0 +1,13 @@
+# Vitrine figée de l'ancienne adresse cineprive.rpisimon.uk.
+# À déployer sur le Raspberry Pi (Portainer : nouvelle stack, ou docker compose up -d
+# dans ce dossier), puis faire pointer le tunnel Cloudflare du sous-domaine
+# cineprive vers http://localhost:8091.
+services:
+  vitrine-cineprive:
+    image: nginx:alpine
+    container_name: vitrine-cineprive
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8091:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro

@@ -25,3 +25,6 @@ logs/
 # Git
 .git
 .gitignore
+
+# Vitrine statique de l ancien domaine : servie depuis le Raspberry Pi, jamais dans l image du site
+vitrine-rpisimon/
