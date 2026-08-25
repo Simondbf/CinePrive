@@ -116,11 +116,18 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         });
 
         // Structure d'affichage pour iterer facilement (Structural prototype)
+        // Catalogue complet, trie par titre, pour retrouver un film sans
+        // passer par les genres.
+        const tousLesFilms = films
+            .filter(f => !isProcessing(f))
+            .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'fr'));
+
         const blocs = [
             { title: "🎬 Reprendre la lecture", films: reprendreFilms, alwaysShow: false, isContinueWatching: true },
             { title: "🎬 Nouveautés", films: nouveautes, alwaysShow: false, isCategory: true },
             { title: "⏳ Bientôt disponible", films: bientotDisponibleFilms, alwaysShow: false, isCategory: true },
-            { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: false, isCategory: true }
+            { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: false, isCategory: true },
+            { title: "🎞️ Tous les films", films: tousLesFilms, alwaysShow: false, isCategory: true }
         ];
 
         Array.from(categories.entries())
@@ -145,6 +152,9 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             }
             if (selectedGenre === "⏳ Bientôt disponible") {
                 return films.filter(f => isProcessing(f)).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+            }
+            if (selectedGenre === "🎞️ Tous les films") {
+                return films.filter(f => !isProcessing(f)).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'fr'));
             }
             return films.filter(f => !isProcessing(f) && (f.genres || [f.genre]).includes(selectedGenre));
         }
