@@ -511,12 +511,21 @@ const defaultPolls = [
     }
 ];
 
-// Fusionner les sondages par défaut s'ils manquent (ex: nouveau sondage ajouté dans le code)
-defaultPolls.forEach(defaultPoll => {
-    if (!db.pollsConfig.find((p: any) => p.id === defaultPoll.id)) {
-        db.pollsConfig.push(defaultPoll);
+// Amorcer les sondages par defaut UNE SEULE FOIS, a la toute premiere
+// initialisation de la base. L'ancienne version re-fusionnait a chaque
+// demarrage du serveur : tout sondage supprime par le Patron reapparaissait
+// au redemarrage suivant. Les nouveaux sondages se creent desormais depuis
+// la Salle des Serveurs, pas dans le code.
+if (!db.pollsSeedInitial) {
+    if (db.pollsConfig.length === 0) {
+        defaultPolls.forEach(defaultPoll => {
+            db.pollsConfig.push(defaultPoll);
+        });
     }
-});
+    // Les bases existantes (comme celle en production) sont considerees
+    // comme deja amorcees : on ne touche plus a leur liste.
+    db.pollsSeedInitial = true;
+}
 
 const saveDb = () => {
     const tmpFile = dbFile + '.tmp';
