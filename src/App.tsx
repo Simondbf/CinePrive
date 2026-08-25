@@ -479,7 +479,7 @@ export default function App() {
             {hasRole(activeUser, 'owner') && (
                 <button 
                     onClick={() => setViewMode('admin')}
-                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-zinc-900 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-700' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
+                    className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-primary-600 border border-primary-600' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
                     title="Salle des Serveurs"
                 >
                     <Shield className="w-4 h-4"/> <span>Salle des Serveurs</span>

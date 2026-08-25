@@ -1078,7 +1078,7 @@ export default function ContributeApp({
     <div className="flex flex-wrap gap-2 border-b border-zinc-200 dark:border-zinc-800 mb-8 pb-4">
       {mode === "upload" ? (
         <button
-          className={`px-4 py-2 font-medium rounded transition-colors bg-zinc-800 dark:bg-white text-white dark:text-black`}
+          className={`px-4 py-2 font-medium rounded transition-colors bg-primary-600 text-white`}
         >
           Plateforme de Transfert
         </button>
@@ -1086,7 +1086,7 @@ export default function ContributeApp({
         <>
           {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
             <button
-              className={`px-4 py-2 font-medium rounded transition-colors ${tab === "users" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+              className={`px-4 py-2 font-medium rounded transition-colors ${tab === "users" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
               onClick={() => setTab("users")}
             >
               Membres ({usersList.filter((u) => u.status === "pending").length}{" "}
@@ -1105,7 +1105,7 @@ export default function ContributeApp({
                   )}
                 </button>
                 <button
-                  className={`px-4 py-2 font-medium rounded transition-colors ${tab === "security" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+                  className={`px-4 py-2 font-medium rounded transition-colors ${tab === "security" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
                   onClick={() => setTab("security")}
                 >
                   Sécurité
@@ -1113,13 +1113,13 @@ export default function ContributeApp({
             </>
           )}
           <button
-            className={`px-4 py-2 font-medium rounded transition-colors ${tab === "polls" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+            className={`px-4 py-2 font-medium rounded transition-colors ${tab === "polls" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
             onClick={() => setTab("polls")}
           >
             Sondages
           </button>
           <button
-            className={`px-4 py-2 font-medium rounded transition-colors ${tab === "library" ? "bg-zinc-800 dark:bg-white text-white dark:text-black" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
+            className={`px-4 py-2 font-medium rounded transition-colors ${tab === "library" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
             onClick={() => setTab("library")}
           >
             Historique ({films.length})
@@ -2184,7 +2184,7 @@ export default function ContributeApp({
                         Saisie libre
                       </label>
                     </div>
-                    <button className="bg-zinc-900 text-white px-4 py-2 rounded">
+                    <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded transition">
                       Sauvegarder
                     </button>
                   </form>
