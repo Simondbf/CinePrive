@@ -14,8 +14,6 @@ Règles d'affichage, dans l'ordre
 | Bandeau écarté par l'utilisateur | Ne plus réafficher |
 
 
-2. Choix du logo par utilisateur
-
 3. Trois variantes du logo existent : **bordeaux** (par defaut), **vert foret** et **bleu nuit**. L'idee est de laisser chacun choisir la sienne dans les reglages de son compte.
 Mise en oeuvre : la couleur d'accent de toute l'application descend des variables `--color-primary-*` de `src/index.css`. Il suffirait donc d'appliquer une classe sur `<html>` (par exemple `theme-vert`) qui redefinit ces onze variables, et de memoriser le choix sur le compte.
 Le logo lui-meme n'a rien a changer : `src/components/Logo.tsx` utilise `currentColor` et suit automatiquement.
