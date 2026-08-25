@@ -1313,6 +1313,26 @@ export default function ContributeApp({
     </div>
   );
 
+  // Une date absente ou invalide ne doit JAMAIS faire tomber l'ecran :
+  // Intl.DateTimeFormat.format() leve une exception sur une date invalide,
+  // et un seul vieux film sans addedAt rendait toute la Salle des Serveurs
+  // noire. Idem pour toISOString() sur un timecode manquant.
+  const formatDateSure = (valeur: any): string => {
+    const d = new Date(valeur);
+    if (!valeur || isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d).replace(" ", " à ");
+  };
+  const formatTimecode = (t: any): string =>
+    Number.isFinite(t) && t >= 0
+      ? new Date(t * 1000).toISOString().substr(11, 8)
+      : "—";
+
   // Recherche dans la zone de controle des films (onglet Historique).
   // On enleve les accents et la casse pour que "amelie" trouve "Amélie".
   const normaliserTexte = (s: string) =>
@@ -1614,16 +1634,7 @@ export default function ContributeApp({
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        {(() => {
-                            const d = new Date(f.addedAt);
-                            return new Intl.DateTimeFormat('fr-FR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                            }).format(d).replace(' ', ' à ');
-                        })()}
+                        {formatDateSure(f.addedAt)}
                       </td>
                       <td
                         className="px-6 py-4 max-w-[200px] truncate"
@@ -2018,10 +2029,10 @@ export default function ContributeApp({
                                     <div key={r.id} className="bg-primary-50 dark:bg-primary-950/30 p-2 rounded border border-primary-100 dark:border-primary-900/50 flex justify-between items-center gap-2">
                                         <div>
                                             <p className="text-xs text-primary-800 dark:text-primary-400 font-medium">Par {r.userName}</p>
-                                            <p className="text-xs text-primary-600 dark:text-primary-500 mt-1">Timecode: <span className="font-mono bg-primary-100 dark:bg-primary-900/50 px-1 py-0.5 rounded">{new Date(r.timecode * 1000).toISOString().substr(11, 8)}</span></p>
+                                            <p className="text-xs text-primary-600 dark:text-primary-500 mt-1">Timecode: <span className="font-mono bg-primary-100 dark:bg-primary-900/50 px-1 py-0.5 rounded">{formatTimecode(r.timecode)}</span></p>
                                         </div>
                                         <button
-                                            onClick={() => setPreviewVideo({ url: f.jellyfinId ? `/api/stream/${f.jellyfinId}` : `/videos/${f.filename}`, timecode: r.timecode })}
+                                            onClick={() => setPreviewVideo({ url: f.jellyfinId ? `/api/stream/${f.jellyfinId}` : `/videos/${f.filename}`, timecode: Number.isFinite(r.timecode) ? r.timecode : 0 })}
                                             className="text-xs font-medium bg-primary-200 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-3 py-1.5 rounded hover:bg-primary-300 dark:hover:bg-primary-900/60 transition-colors shrink-0 flex items-center gap-1"
                                         >
                                             <Video className="w-3 h-3" />
@@ -2791,7 +2802,7 @@ export default function ContributeApp({
                 </video>
             </div>
             <div className="p-4 bg-zinc-900 flex justify-between items-center text-sm text-zinc-400">
-                <p>Lecture démarrée 10 secondes avant le timecode signalé (<span className="text-white font-mono">{new Date(previewVideo.timecode * 1000).toISOString().substr(11, 8)}</span>).</p>
+                <p>Lecture démarrée 10 secondes avant le timecode signalé (<span className="text-white font-mono">{formatTimecode(previewVideo.timecode)}</span>).</p>
             </div>
           </div>
         </div>
