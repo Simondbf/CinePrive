@@ -1,7 +1,7 @@
 // Service worker de CinéPrivé.
 // A incrementer a chaque deploiement touchant aux fichiers du site.
-const CACHE_NAME = 'cineprive-v1';
-const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+const CACHE_NAME = 'cineprive-v2';
+const PRECACHE = ['/', '/index.html', '/manifest.json', '/favicon.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
