@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CinéPrivé">
+  <rect width="512" height="512" rx="112" fill="#8c2f39"/>
+  <g transform="translate(256 256)">
+    <circle r="138" fill="none" stroke="#fbf5f6" stroke-width="40" stroke-dasharray="630 240" transform="rotate(-40)"/>
+    <path d="M-38 -52 L58 0 L-38 52 Z" fill="#fbf5f6"/>
+  </g>
+</svg>
