@@ -16,6 +16,7 @@ import BugReportModal from './components/BugReportModal';
 import Polls from './components/Polls';
 import Loader from './components/Loader';
 import NotFoundPage from './components/NotFoundPage';
+import GardeFou from './components/GardeFou';
 import { ArrowUp } from 'lucide-react';
 import { hasRole, primaryRole } from './lib/roles';
 
@@ -581,6 +582,7 @@ export default function App() {
       <ScrollToTop />
       
       <main>
+        <GardeFou>
         <Routes>
           <Route path="/" element={
             <ViewerApp 
@@ -602,6 +604,7 @@ export default function App() {
           } />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </GardeFou>
       </main>
 
       <AnimatePresence>
