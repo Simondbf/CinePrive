@@ -564,6 +564,9 @@ export default function ContributeApp({
     tmdbYear?: string;
     tmdbResults: any[];
     selectedMeta: any | null;
+    // Renseigne apres l'import : permet de corriger la fiche a posteriori.
+    filmId?: string;
+    correctionOuverte?: boolean;
     status: "waiting" | "uploading" | "success" | "error" | "duplicate";
     progress: number;
     isSearching: boolean;
@@ -836,6 +839,36 @@ export default function ContributeApp({
     e.preventDefault();
   };
 
+  // Corriger la correspondance TMDB d'un film DEJA importe. La recherche
+  // reutilise exactement celle de l'import ; seule l'application differe.
+  const corrigerFiche = async (taskId: string, meta: any) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task?.filmId || !meta?.id) return;
+    try {
+      const res = await fetch(`/api/films/${task.filmId}/relink`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdbId: meta.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        notify(err.error || "La correction a échoué.", "Erreur");
+        return;
+      }
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? { ...t, selectedMeta: meta, correctionOuverte: false, tmdbResults: [] }
+            : t,
+        ),
+      );
+      onRefresh(true);
+      notify(`La fiche pointe désormais sur « ${meta.title} ».`, "Fiche corrigée");
+    } catch (e) {
+      notify("Erreur de connexion.", "Erreur");
+    }
+  };
+
   const updateTaskMeta = async (taskId: string, meta: any) => {
     if (meta) {
         if (meta.adult) {
@@ -1042,9 +1075,11 @@ export default function ContributeApp({
       });
 
       if (finRes.ok) {
+        const donneesFin = await finRes.json().catch(() => ({}));
+        const idCree = donneesFin?.film?.id || task.replaceFilmId;
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === task.id ? { ...t, status: "success" } : t,
+            t.id === task.id ? { ...t, status: "success", filmId: idCree } : t,
           ),
         );
         onRefresh(true);
@@ -1307,8 +1342,111 @@ export default function ContributeApp({
                 Modifier
               </button>
             )}
+            {task.status === "success" && task.filmId && (
+              <button
+                onClick={() => {
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.id === task.id
+                        ? {
+                            ...t,
+                            correctionOuverte: !t.correctionOuverte,
+                            tmdbQuery: t.correctionOuverte ? t.tmdbQuery : (t.selectedMeta?.title || t.tmdbQuery),
+                            tmdbResults: [],
+                          }
+                        : t,
+                    ),
+                  );
+                }}
+                className="text-[10px] font-medium text-zinc-300 hover:text-white px-2 py-1 bg-primary-900/50 hover:bg-primary-800/60 border border-primary-700/50 rounded transition shrink-0"
+                title="La fiche ne correspond pas au film ? Choisissez la bonne."
+              >
+                {task.correctionOuverte ? "Annuler" : "Mauvais film ?"}
+              </button>
+            )}
           </div>
         ) : null}
+
+        {/* Correction de la correspondance APRES import : le fichier video est
+            deja en place, on ne remplace que les metadonnees. */}
+        {task.status === "success" && task.filmId && task.correctionOuverte && (
+          <div className="mt-3 p-3 bg-zinc-950 rounded border border-primary-800/40 space-y-3">
+            <p className="text-[11px] text-zinc-400">
+              Cherchez le bon film puis cliquez sur son affiche. Titre, affiche,
+              synopsis, genres et casting seront remplacés. Le fichier vidéo,
+              lui, ne bouge pas. Ajoutez l'année si le titre est ambigu.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={task.tmdbQuery || ""}
+                onChange={(e) =>
+                  setTasks((prev) =>
+                    prev.map((t) => (t.id === task.id ? { ...t, tmdbQuery: e.target.value } : t)),
+                  )
+                }
+                onKeyDown={(e) =>
+                  e.key === "Enter" && searchTMDBForTask(task.id, task.tmdbQuery, task.tmdbYear)
+                }
+                className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-primary-500"
+                placeholder="Titre du film"
+              />
+              <input
+                type="text"
+                value={task.tmdbYear || ""}
+                onChange={(e) =>
+                  setTasks((prev) =>
+                    prev.map((t) => (t.id === task.id ? { ...t, tmdbYear: e.target.value } : t)),
+                  )
+                }
+                onKeyDown={(e) =>
+                  e.key === "Enter" && searchTMDBForTask(task.id, task.tmdbQuery, task.tmdbYear)
+                }
+                className="w-20 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-primary-500"
+                placeholder="Année"
+              />
+              <button
+                onClick={() => searchTMDBForTask(task.id, task.tmdbQuery, task.tmdbYear)}
+                className="px-3 bg-primary-600 hover:bg-primary-700 rounded text-xs font-medium text-white transition"
+              >
+                Rechercher
+              </button>
+            </div>
+
+            {task.isSearching ? (
+              <p className="text-xs text-zinc-500">Recherche TMDB en cours...</p>
+            ) : task.tmdbResults.length > 0 ? (
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                {task.tmdbResults.map((res: any) => (
+                  <div
+                    key={res.id}
+                    onClick={() => corrigerFiche(task.id, res)}
+                    className="w-[90px] shrink-0 cursor-pointer group"
+                  >
+                    {res.poster_path ? (
+                      <img
+                        src={`https://image.tmdb.org/t/p/w92${res.poster_path}`}
+                        className="w-full h-[135px] object-cover rounded bg-zinc-800 group-hover:ring-2 ring-primary-500 ring-offset-2 ring-offset-zinc-950 transition"
+                      />
+                    ) : (
+                      <div className="w-full h-[135px] bg-zinc-800 rounded flex items-center justify-center p-2 text-center text-[10px] text-zinc-400 group-hover:ring-2 ring-primary-500 ring-offset-2 ring-offset-zinc-950 transition">
+                        {res.title}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-zinc-400 mt-1 truncate group-hover:text-white transition">
+                      {res.title}
+                    </p>
+                    <p className="text-[10px] text-zinc-600">
+                      {res.release_date?.split("-")[0]}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-600">Aucun résultat pour l'instant.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

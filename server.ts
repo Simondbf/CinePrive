@@ -1793,6 +1793,59 @@ app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
     }
 });
 
+// Corriger la correspondance TMDB d'un film deja importe (A_FAIRE : mauvaise
+// association detectee trop tard, ex. "Inferno" qui tombait sur un film
+// d'horreur). Reecrit titre, affiche, synopsis, annee, genres, casting et
+// realisateur a partir du tmdbId choisi. Ne touche pas au fichier video.
+app.post('/api/films/:id/relink', requireAuth, requireRole(['owner', 'admin', 'technician']), express.json(), async (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: "Film introuvable" });
+
+    const tmdbId = req.body?.tmdbId;
+    if (!tmdbId) return res.status(400).json({ error: "tmdbId manquant" });
+
+    const apiKey = process.env.TMDB_API_KEY;
+    if (!apiKey) return res.status(400).json({ error: "Clé API TMDB non configurée" });
+
+    try {
+        const reponse = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${apiKey}&language=fr-FR&append_to_response=credits`);
+        if (!reponse.ok) return res.status(404).json({ error: "Fiche TMDB introuvable" });
+        const meta: any = await reponse.json();
+
+        const ancienTitre = film.title;
+
+        film.tmdbId = meta.id;
+        if (meta.title) film.title = meta.title;
+        film.posterUrl = meta.poster_path ? `https://image.tmdb.org/t/p/w500${meta.poster_path}` : null;
+        film.synopsis = meta.overview || '';
+        if (meta.release_date) film.year = parseInt(meta.release_date.split('-')[0]);
+        if (meta.runtime) film.runtime = meta.runtime;
+        if (Array.isArray(meta.genres) && meta.genres.length > 0) {
+            film.genres = meta.genres.map((g: any) => g.name);
+            film.genre = film.genres[0]; // Rétrocompatibilité
+        }
+        if (meta.credits?.cast) {
+            film.cast = meta.credits.cast.slice(0, 10).map((c: any) => ({
+                name: c.name,
+                character: c.character,
+                profilePath: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null
+            }));
+        }
+        if (meta.credits?.crew) {
+            const real = meta.credits.crew.find((c: any) => c.job === 'Director');
+            if (real) film.director = real.name;
+        }
+        film.modifiedBy = req.user?.name || req.user?.id;
+
+        saveDb();
+        console.log(`[Relink] "${ancienTitre}" -> "${film.title}" (TMDB ${meta.id}) par ${film.modifiedBy}`);
+        res.json({ success: true, film });
+    } catch (err: any) {
+        console.error("Relink error", err);
+        res.status(500).json({ error: "Erreur lors de la correction de la fiche" });
+    }
+});
+
 // Upload Video par paquets (Chunking pour contourner Cloudflare)
 app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (req: any, res) => {
     const { uploadId, chunkIndex } = req.body;
