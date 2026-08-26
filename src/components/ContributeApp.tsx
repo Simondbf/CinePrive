@@ -564,6 +564,8 @@ export default function ContributeApp({
     tmdbYear?: string;
     tmdbResults: any[];
     selectedMeta: any | null;
+    // Vrai pendant l'assemblage cote serveur, apres l'envoi des morceaux.
+    finalisation?: boolean;
     // Renseigne apres l'import : permet de corriger la fiche a posteriori.
     filmId?: string;
     correctionOuverte?: boolean;
@@ -1038,11 +1040,16 @@ export default function ContributeApp({
             throw e;
         }
 
-        const progress = Math.round(((i + 1) / totalChunks) * 100);
+        // L'envoi des morceaux ne represente que 95 % du travail : le serveur
+        // doit encore les rassembler, analyser le fichier et l'enregistrer.
+        // La barre s'arretait donc a 100 % puis semblait figee ; elle plafonne
+        // desormais a 95 %, les 5 % restants etant la finalisation.
+        const partEnvoi = ((i + 1) / totalChunks) * 95;
+        const progress = Math.round(partEnvoi);
         const elapsedTime = (Date.now() - startTime) / 1000;
         let eta = null;
-        if (progress > 0 && progress < 100) {
-          const estimatedTotal = elapsedTime / (progress / 100);
+        if (partEnvoi > 0 && partEnvoi < 95) {
+          const estimatedTotal = elapsedTime / (partEnvoi / 95);
           eta = Math.round(estimatedTotal - elapsedTime);
         }
 
@@ -1054,6 +1061,12 @@ export default function ContributeApp({
       }
 
       if (failed) throw new Error("Chunk upload failed");
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === task.id ? { ...t, progress: 97, etaSeconds: null, finalisation: true } : t,
+        ),
+      );
 
       const finalizeUrl = task.replaceFilmId 
         ? `/api/films/${task.replaceFilmId}/replace-finalize`
@@ -1079,13 +1092,35 @@ export default function ContributeApp({
         const idCree = donneesFin?.film?.id || task.replaceFilmId;
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === task.id ? { ...t, status: "success", filmId: idCree } : t,
+            t.id === task.id
+              ? { ...t, status: "success", progress: 100, finalisation: false, filmId: idCree }
+              : t,
           ),
         );
         onRefresh(true);
+
+        // Le serveur indique le traitement reellement applique. L'ancien
+        // message annoncait a tout le monde une attente de plusieurs dizaines
+        // de minutes, y compris pour les fichiers deja lisibles.
+        const messagesParTraitement: Record<string, { titre: string; texte: string }> = {
+          immediat: {
+            titre: "Film disponible",
+            texte: "Le fichier était déjà au bon format : il est visible dans le catalogue dès maintenant.",
+          },
+          rapide: {
+            titre: "Conversion rapide en cours",
+            texte: "Le fichier est en cours de remise en forme. Comptez quelques minutes avant qu'il soit lisible.",
+          },
+          nuit: {
+            titre: "Conversion programmée",
+            texte: "Ce format demande un réencodage complet, trop lourd pour être fait pendant que d'autres regardent un film. Il sera traité cette nuit et disponible au matin.",
+          },
+        };
+        const info = messagesParTraitement[donneesFin?.traitement] || messagesParTraitement.rapide;
+
         notify(
-          task.replaceFilmId ? "Le fichier a été remplacé avec succès." : "Les projectionnistes préparent les bobines pour le web. Ce processus d'optimisation intensif s'exécute en tâche de fond et peut prendre plusieurs dizaines de minutes.",
-          task.replaceFilmId ? "Remplacement terminé" : "🎬 En salle de montage..."
+          task.replaceFilmId ? "Le fichier a été remplacé avec succès." : info.texte,
+          task.replaceFilmId ? "Remplacement terminé" : info.titre,
         );
       } else {
         setTasks((prev) =>
@@ -1198,7 +1233,12 @@ export default function ContributeApp({
               </div>
               {task.progress}%
             </div>
-            {task.etaSeconds !== null && task.etaSeconds !== undefined && (
+            {task.finalisation && (
+              <p className="text-zinc-400 font-normal">
+                Envoi terminé — le serveur assemble et vérifie le fichier...
+              </p>
+            )}
+            {!task.finalisation && task.etaSeconds !== null && task.etaSeconds !== undefined && (
               <div className="flex justify-between items-center bg-zinc-900/50 rounded px-2 py-1.5 mt-1 border border-zinc-800">
                 <span className="text-zinc-500 font-normal">
                   Temps estimé restant
@@ -1550,7 +1590,8 @@ export default function ContributeApp({
               <div className="hidden lg:flex items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">
                       Le format <strong className="font-medium text-zinc-900 dark:text-white">.mp4</strong> est mis en ligne
-                      immédiatement. Les autres formats sont acceptés, mais convertis la nuit suivante.
+                      immédiatement. Les autres sont acceptés : quelques minutes de conversion, ou la nuit suivante
+                      si l'image doit être entièrement réencodée.
                   </p>
                   <button
                       type="button"

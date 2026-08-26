@@ -96,11 +96,17 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                     onClick={() => {
                         if (film.status !== 'AVAILABLE') {
                             const status = transcodingStatuses?.[film.id];
-                            let extraText = "Le fichier sera converti cette nuit pour être disponible demain matin.";
-                            if (status && status.state === 'active') {
-                                extraText = "Le transcodage est actuellement en cours.";
+                            // Seule la file nocturne impose d'attendre le
+                            // lendemain ; la file rapide tourne en permanence.
+                            let texte = "Le film est en cours de préparation. Réessayez dans quelques minutes.";
+                            if (status?.file === 'nuit') {
+                                texte = status.state === 'active'
+                                    ? "Le réencodage de ce film est en cours. Il devrait être disponible d'ici demain matin."
+                                    : "Ce format demande un réencodage complet, fait la nuit pour ne pas gêner les autres. Le film sera disponible demain matin.";
+                            } else if (status?.state === 'active') {
+                                texte = "La conversion de ce film est en cours. Encore quelques minutes.";
                             }
-                            notify(`Le film est en cours d'optimisation pour le web. ${extraText}`, "Traitement en cours");
+                            notify(texte, "Film pas encore disponible");
                         } else {
                             onPlay(film);
                         }

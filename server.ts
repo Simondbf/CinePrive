@@ -664,7 +664,12 @@ const probeStreams = (inputPath: string): Promise<{ video: string, audio: string
     });
 };
 
-export const enqueueTranscode = async (filmId: string, inputFilename: string) => {
+// Renvoie le traitement reellement applique, pour que l'interface annonce
+// un delai exact au lieu d'un message unique parlant toujours de la nuit :
+//   'immediat' : rien a faire, le film est deja lisible
+//   'rapide'   : remuxage sur la file rapide, jamais mise en pause
+//   'nuit'     : encodage lourd, file active seulement de 01h00 a 06h45
+export const enqueueTranscode = async (filmId: string, inputFilename: string): Promise<'immediat' | 'rapide' | 'nuit'> => {
     try {
         await transcodeQueue.remove(filmId);
         await transcodeFastQueue.remove(filmId);
@@ -682,7 +687,7 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
             film.progress = 100;
             saveDb();
         }
-        return;
+        return 'immediat';
     }
 
     const isH264 = video === 'h264';
@@ -711,6 +716,7 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string) =>
         );
     }
     console.log(`[Queue] Job ajouté à BullMQ pour le film ID: ${filmId}`);
+    return isH264 ? 'rapide' : 'nuit';
 };
 
 import cron from 'node-cron';
@@ -2046,13 +2052,20 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
         
         saveDb();
 
+        // On attend le verdict (une simple lecture d'en-tetes par ffprobe) pour
+        // pouvoir annoncer un delai exact a celui qui vient d'envoyer le film.
+        let traitement: 'immediat' | 'rapide' | 'nuit' = 'immediat';
         if (!isMp4) {
-            // Ajout à la file d'attente
-            enqueueTranscode(film.id, finalFilename);
+            try {
+                traitement = await enqueueTranscode(film.id, finalFilename);
+            } catch (e) {
+                console.error("Enqueue transcode error", e);
+                traitement = 'nuit';
+            }
         }
 
         const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
-        res.json({ success: true, film: reloadedFilm });
+        res.json({ success: true, film: reloadedFilm, traitement });
     } catch (e) {
         console.error("Upload finalize error", e);
         res.status(500).json({ error: 'Internal upload finalize error' });
@@ -2148,14 +2161,17 @@ app.get('/api/films/transcoding-status', requireAuth, async (req, res) => {
         
         const tasks: Record<string, any> = {};
         
-        for (const job of [...activeJobs, ...fastActiveJobs]) {
-            tasks[job.data.filmId] = job.progress !== undefined && job.progress !== null && typeof job.progress === 'object' 
-                ? { ...job.progress, state: 'active' } 
-                : { progress: 0, etaSeconds: null, state: 'active' };
-        }
-        for (const job of [...waitingJobs, ...fastWaitingJobs]) {
-            tasks[job.data.filmId] = { progress: 0, etaSeconds: null, state: 'waiting' };
-        }
+        // On distingue les deux files : la rapide tourne en permanence, la
+        // nocturne n'est active que de 01h00 a 06h45. L'interface peut ainsi
+        // annoncer le bon delai au lieu de parler de nuit dans tous les cas.
+        const marquer = (job: any, state: string, file: 'rapide' | 'nuit') => {
+            const base = job.progress && typeof job.progress === 'object' ? job.progress : { progress: 0, etaSeconds: null };
+            tasks[job.data.filmId] = { ...base, state, file };
+        };
+        for (const job of activeJobs) marquer(job, 'active', 'nuit');
+        for (const job of fastActiveJobs) marquer(job, 'active', 'rapide');
+        for (const job of waitingJobs) tasks[job.data.filmId] = { progress: 0, etaSeconds: null, state: 'waiting', file: 'nuit' };
+        for (const job of fastWaitingJobs) tasks[job.data.filmId] = { progress: 0, etaSeconds: null, state: 'waiting', file: 'rapide' };
         res.json(tasks);
     } catch (e) {
         // Fallback for dev mode without redis

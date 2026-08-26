@@ -143,10 +143,13 @@ export default function AideImportModal({ onClose }: { onClose: () => void }) {
               Envoyez le fichier tel quel. Il est accepté sans condition.
             </p>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              La conversion est alors faite par le serveur, la nuit suivante,
-              entre 1 h et 6 h 45 — c'est le seul créneau où il peut y consacrer
-              toute sa puissance sans gêner ceux qui regardent un film. Le titre
-              apparaît donc dans le catalogue avant d'être réellement lisible.
+              Le serveur s'en charge, et le délai dépend du travail à faire. Si
+              seule l'enveloppe du fichier doit changer — un .mkv déjà en H.264,
+              le cas le plus courant — c'est une affaire de quelques minutes. Si
+              l'image doit être entièrement réencodée, en H.265 par exemple, le
+              travail est reporté à la nuit suivante, entre 1 h et 6 h 45 : c'est
+              le seul créneau où le serveur peut y consacrer toute sa puissance
+              sans gêner ceux qui regardent un film.
             </p>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
               Si un film reste indisponible plus de deux jours, signalez-le : la
