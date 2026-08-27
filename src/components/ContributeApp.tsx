@@ -1186,7 +1186,7 @@ export default function ContributeApp({
                   className={`px-4 py-2 font-medium rounded transition-colors flex items-center gap-2 ${tab === "quarantine" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
                   onClick={() => setTab("quarantine")}
                 >
-                  <AlertTriangle className="w-4 h-4" /> Quarantaine
+                  <AlertTriangle className="w-4 h-4" /> Modération
                   {films.filter(f => (f as any).isQuarantined).length > 0 && (
                       <span className="bg-primary-500 text-white text-xs px-2 py-0.5 rounded-full">{films.filter(f => (f as any).isQuarantined).length}</span>
                   )}
@@ -2306,7 +2306,7 @@ export default function ContributeApp({
 
             <div>
             <h3 className="text-lg font-medium text-primary-600 dark:text-primary-500 mb-6 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" /> Films en Quarantaine
+              <AlertTriangle className="w-5 h-5" /> Films signalés
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[800px]">
@@ -2367,7 +2367,7 @@ export default function ContributeApp({
                                 onClick={() => handleRestoreFilm(f.id)}
                                 className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-950/60 font-medium text-xs bg-green-50 dark:bg-green-950/30 px-3 py-1.5 rounded transition-all"
                               >
-                                Lever la Quarantaine
+                                Rétablir le film
                               </button>
                               <button
                                 onClick={() => handleDeleteFilm(f.id, f.title)}
