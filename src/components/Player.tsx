@@ -236,6 +236,8 @@ export default function Player({ film, activeUser, onClose }: Props) {
             
             if (duration > 0 && current / duration >= 0.95) {
                 fetch(`/api/progress/${film.id}`, { method: 'DELETE' }).catch(console.error);
+                // Film termine sur la plateforme : marque comme vu sans rien demander.
+                fetch(`/api/films/${film.id}/seen-auto`, { method: 'POST' }).catch(console.error);
             } else if (current > 15) {
                 fetch('/api/progress', {
                     method: 'POST',
@@ -255,6 +257,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             const duration = playerRef.current.duration;
             if (duration > 0 && current / duration >= 0.95) {
                 fetch(`/api/progress/${film.id}`, { method: 'DELETE', keepalive: true }).catch(console.error);
+                fetch(`/api/films/${film.id}/seen-auto`, { method: 'POST', keepalive: true }).catch(console.error);
             } else if (current > 15) {
                 fetch('/api/progress', {
                     method: 'POST',

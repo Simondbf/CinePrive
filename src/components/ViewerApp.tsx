@@ -79,8 +79,9 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
 
         const isProcessing = (f: Film) => f.status === 'PROCESSING' || (!f.jellyfinId && (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv')));
 
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Nouveautes : dix jours, pas davantage — au-dela ce n'est plus une nouveaute.
+        const dixJours = new Date();
+        dixJours.setDate(dixJours.getDate() - 10);
         
         const bientotDisponibleFilms = films
             .filter(f => isProcessing(f))
@@ -88,7 +89,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
 
         const nouveautes = films
             .filter(f => !isProcessing(f))
-            .filter(f => new Date(f.addedAt) >= thirtyDaysAgo)
+            .filter(f => new Date(f.addedAt) >= dixJours)
             .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
             .slice(0, 12);
 
@@ -159,9 +160,9 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         if (selectedGenre) {
             if (selectedGenre === "📌 Ma Liste") return films.filter(f => activeUser.myList?.includes(f.id));
             if (selectedGenre === "🎬 Nouveautés") {
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                return films.filter(f => !isProcessing(f) && new Date(f.addedAt) >= thirtyDaysAgo).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+                const limite = new Date();
+                limite.setDate(limite.getDate() - 10);
+                return films.filter(f => !isProcessing(f) && new Date(f.addedAt) >= limite).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
             }
             if (selectedGenre === "⏳ Bientôt disponible") {
                 return films.filter(f => isProcessing(f)).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
