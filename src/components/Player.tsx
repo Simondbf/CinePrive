@@ -168,7 +168,13 @@ export default function Player({ film, activeUser, onClose }: Props) {
         }
     };
 
+    // Comptabiliser une lecture, une seule fois par ouverture du lecteur.
+    let lectureComptee = false;
     player.on('play', () => {
+        if (!lectureComptee) {
+            lectureComptee = true;
+            fetch(`/api/films/${film.id}/view`, { method: 'POST' }).catch(() => {});
+        }
         if (window.innerWidth <= 768) {
              tryFullscreen();
         }
