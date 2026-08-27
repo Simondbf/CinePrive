@@ -1621,6 +1621,16 @@ app.post('/api/notifications/read-all', requireAuth, (req: any, res) => {
     res.json({ success: true });
 });
 
+// Vider la boite d'un coup : la suppression une par une devenait penible
+// des que plusieurs films etaient importes le meme jour.
+app.delete('/api/notifications', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+    const nombre = (db.notifications || []).length;
+    db.notifications = [];
+    saveDb();
+    console.log(`[Notifs] ${nombre} notification(s) supprimee(s).`);
+    res.json({ success: true, supprimees: nombre });
+});
+
 app.delete('/api/notifications/:id', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     if (!db.notifications) db.notifications = [];
     db.notifications = db.notifications.filter((n: any) => n.id !== req.params.id);
@@ -1797,6 +1807,154 @@ app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
         console.error("TMDB trailer error", err);
         return res.status(500).json({ error: "Erreur lors de la recherche de la bande-annonce" });
     }
+});
+
+// ---------- DEJA VU ----------
+// Marqueur personnel, stocke sur le compte de chacun : un film vu par
+// l'un ne l'est pas pour les autres.
+app.post('/api/films/:id/seen', requireAuth, express.json(), (req: any, res) => {
+    const utilisateur = db.users.find((u: any) => u.id === req.user.id);
+    if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: 'Film introuvable' });
+
+    if (!Array.isArray(utilisateur.seenFilms)) utilisateur.seenFilms = [];
+
+    const dejaLa = utilisateur.seenFilms.includes(film.id);
+    utilisateur.seenFilms = dejaLa
+        ? utilisateur.seenFilms.filter((id: string) => id !== film.id)
+        : [...utilisateur.seenFilms, film.id];
+
+    saveDb();
+    res.json({ success: true, seen: !dejaLa, seenFilms: utilisateur.seenFilms });
+});
+
+// Affichage du marqueur : preference personnelle, active par defaut.
+app.post('/api/users/me/show-seen', requireAuth, express.json(), (req: any, res) => {
+    const utilisateur = db.users.find((u: any) => u.id === req.user.id);
+    if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    utilisateur.showSeenBadge = req.body?.actif !== false;
+    saveDb();
+    res.json({ success: true, showSeenBadge: utilisateur.showSeenBadge });
+});
+
+// ---------- SOUS-TITRES ----------
+// Les pistes de sous-titres survivent au transcodage (`-map 0:s?` dans
+// worker.ts) mais restent enfermees dans le MP4 en mov_text : aucun
+// navigateur ne sait les afficher. On les extrait donc a la demande en
+// WebVTT, seul format compris par la balise <track>, et on met le resultat
+// en cache pour ne le faire qu'une fois par piste.
+const SUBS_DIR = path.join(process.cwd(), 'data', 'subtitles');
+if (!fs.existsSync(SUBS_DIR)) fs.mkdirSync(SUBS_DIR, { recursive: true });
+
+const NOMS_LANGUES: Record<string, string> = {
+    fre: 'Français', fra: 'Français', fr: 'Français',
+    eng: 'Anglais', en: 'Anglais',
+    spa: 'Espagnol', es: 'Espagnol',
+    ger: 'Allemand', deu: 'Allemand', de: 'Allemand',
+    ita: 'Italien', it: 'Italien',
+    dut: 'Néerlandais', nld: 'Néerlandais', nl: 'Néerlandais',
+    por: 'Portugais', pt: 'Portugais',
+    jpn: 'Japonais', ja: 'Japonais',
+    ara: 'Arabe', ar: 'Arabe',
+};
+
+// Code BCP-47 pour l'attribut srclang de <track>.
+const codeCourt = (langue: string): string => {
+    const l = (langue || '').toLowerCase();
+    if (l.startsWith('fr')) return 'fr';
+    if (l.startsWith('en') || l === 'eng') return 'en';
+    if (l.startsWith('sp') || l === 'spa' || l === 'es') return 'es';
+    if (l.startsWith('ge') || l === 'deu' || l === 'de') return 'de';
+    if (l.startsWith('it')) return 'it';
+    if (l.startsWith('du') || l === 'nld' || l === 'nl') return 'nl';
+    if (l.startsWith('po') || l === 'pt') return 'pt';
+    return l.slice(0, 2) || 'und';
+};
+
+const listerSousTitres = (cheminVideo: string): Promise<Array<{ index: number; langue: string; titre: string }>> => {
+    return new Promise((resolve) => {
+        execFile('ffprobe', [
+            '-v', 'error',
+            '-select_streams', 's',
+            '-show_entries', 'stream=index:stream_tags=language,title',
+            '-of', 'json', cheminVideo
+        ], (err, stdout) => {
+            if (err || !stdout) return resolve([]);
+            try {
+                const data = JSON.parse(stdout);
+                const pistes = (data.streams || []).map((flux: any, position: number) => ({
+                    // `position` est l'indice PARMI les sous-titres (0:s:N),
+                    // pas l'indice global du flux dans le fichier.
+                    index: position,
+                    langue: flux.tags?.language || 'und',
+                    titre: flux.tags?.title || '',
+                }));
+                resolve(pistes);
+            } catch {
+                resolve([]);
+            }
+        });
+    });
+};
+
+app.get('/api/films/:id/subtitles', requireAuth, async (req, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film || !film.filename) return res.json([]);
+
+    const cheminVideo = resolveVideoPath(path.basename(film.filename));
+    if (!cheminVideo) return res.json([]);
+
+    try {
+        const pistes = await listerSousTitres(cheminVideo);
+        res.json(pistes.map((p) => ({
+            index: p.index,
+            srclang: codeCourt(p.langue),
+            label: p.titre || NOMS_LANGUES[p.langue.toLowerCase()] || p.langue.toUpperCase(),
+            url: `/api/films/${film.id}/subtitles/${p.index}.vtt`,
+        })));
+    } catch (e) {
+        console.error('Subtitles list error', e);
+        res.json([]);
+    }
+});
+
+app.get('/api/films/:id/subtitles/:index.vtt', requireAuth, async (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film || !film.filename) return res.status(404).send('Film introuvable');
+
+    const index = parseInt(req.params.index, 10);
+    if (!Number.isInteger(index) || index < 0 || index > 30) return res.status(400).send('Piste invalide');
+
+    const cheminVideo = resolveVideoPath(path.basename(film.filename));
+    if (!cheminVideo) return res.status(404).send('Fichier introuvable');
+
+    const cache = path.join(SUBS_DIR, `${film.id}_${index}.vtt`);
+
+    const envoyer = () => {
+        res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        fs.createReadStream(cache).pipe(res);
+    };
+
+    if (fs.existsSync(cache) && fs.statSync(cache).size > 0) return envoyer();
+
+    // Extraction ponctuelle : quelques secondes, une seule fois par piste.
+    execFile('ffmpeg', [
+        '-y', '-i', cheminVideo,
+        '-map', `0:s:${index}`,
+        '-c:s', 'webvtt',
+        '-f', 'webvtt', cache
+    ], { timeout: 120000 }, (err) => {
+        if (err || !fs.existsSync(cache) || fs.statSync(cache).size === 0) {
+            console.error(`[Subs] Extraction impossible pour ${film.id} piste ${index}`, err?.message);
+            try { if (fs.existsSync(cache)) fs.unlinkSync(cache); } catch {}
+            return res.status(404).send('Piste non extractible');
+        }
+        console.log(`[Subs] Piste ${index} extraite pour "${film.title}"`);
+        envoyer();
+    });
 });
 
 // Corriger la correspondance TMDB d'un film deja importe (A_FAIRE : mauvaise

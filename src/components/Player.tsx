@@ -16,6 +16,8 @@ interface Props {
 export default function Player({ film, activeUser, onClose }: Props) {
   const [showCast, setShowCast] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [pistesSousTitres, setPistesSousTitres] = useState<Array<{ index: number; srclang: string; label: string; url: string }>>([]);
+  const [sousTitresCharges, setSousTitresCharges] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
   const saveProgressIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -99,7 +101,23 @@ export default function Player({ film, activeUser, onClose }: Props) {
       }
   };
 
+  // Plyr construit son menu de sous-titres au moment de l'initialisation :
+  // les <track> doivent donc etre dans le DOM AVANT. On charge la liste
+  // d'abord, et le lecteur n'est monte qu'ensuite.
   useEffect(() => {
+    let annule = false;
+    fetch(`/api/films/${film.id}/subtitles`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((pistes) => {
+        if (!annule) setPistesSousTitres(Array.isArray(pistes) ? pistes : []);
+      })
+      .catch(() => { if (!annule) setPistesSousTitres([]); })
+      .finally(() => { if (!annule) setSousTitresCharges(true); });
+    return () => { annule = true; };
+  }, [film.id]);
+
+  useEffect(() => {
+    if (!sousTitresCharges) return;
     if (isMkv) {
         notify("L'écran risque de rester noir.\n\nLes navigateurs Web ne supportent pas nativement le format .MKV. Téléchargez le fichier pour le lire avec VLC.", "Format Vidéo Incompatible");
     }
@@ -169,6 +187,16 @@ export default function Player({ film, activeUser, onClose }: Props) {
             }
         }
         player.language = 'fr';
+
+        // Selectionner la piste francaise si elle existe, sinon laisser
+        // les sous-titres eteints : personne n'aime les subir.
+        const piste = pistesSousTitres.findIndex((t) => t.srclang === 'fr');
+        if (piste >= 0) {
+            try {
+                player.currentTrack = piste;
+                player.toggleCaptions(true);
+            } catch (e) { /* Plyr n'expose pas toujours currentTrack */ }
+        }
     });
 
     player.on('error', () => {
@@ -238,7 +266,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             playerRef.current.destroy();
         }
     };
-  }, [activeUser.id, film.id, isMkv]);
+  }, [activeUser.id, film.id, isMkv, sousTitresCharges]);
 
 
   return (
@@ -336,6 +364,11 @@ export default function Player({ film, activeUser, onClose }: Props) {
         )}
 
         <div className="w-full h-full relative z-10 flex items-center justify-center bg-black">
+            {!sousTitresCharges && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+                    <div className="w-10 h-10 border-[3px] border-primary-600/20 border-t-primary-600 rounded-full animate-spin" />
+                </div>
+            )}
             <div className="w-full h-full [&>.plyr]:h-full [&>.plyr]:w-full [&_video]:max-h-screen">
                 <video
                     ref={videoRef}
@@ -343,6 +376,15 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     crossOrigin="anonymous"
                 >
                     <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} />
+                    {pistesSousTitres.map((piste) => (
+                        <track
+                            key={piste.index}
+                            kind="captions"
+                            src={piste.url}
+                            srcLang={piste.srclang}
+                            label={piste.label}
+                        />
+                    ))}
                 </video>
             </div>
         </div>
