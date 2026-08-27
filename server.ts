@@ -39,6 +39,9 @@ const userHasRole = (user: any, ...wanted: string[]) => {
     return wanted.some(r => roles.includes(r));
 };
 
+// Rempli plus bas, une fois db charge : le comptage de frequentation.
+let compterVisite: ((userId: string) => void) | null = null;
+
 const requireAuth = (req: any, res: any, next: any) => {
     let token = req.cookies.token;
     if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
@@ -54,6 +57,13 @@ const requireAuth = (req: any, res: any, next: any) => {
         if (req.user.status === 'pending_ban') {
             return res.status(403).json({ error: 'Votre compte est temporairement suspendu en attente de la validation finale du Patron.' });
         }
+
+        // Comptage anonyme de frequentation (voir plus bas). Defini plus tard
+        // dans le fichier, d'ou la verification.
+        if (compterVisite) {
+            try { compterVisite(req.user.id); } catch (e) { /* jamais bloquant */ }
+        }
+
         next();
     } catch {
         res.status(401).json({ error: 'Token invalide' });
@@ -1637,35 +1647,35 @@ app.post('/api/notifications/read-all', requireAuth, (req: any, res) => {
 
 // Vider la boite d'un coup : la suppression une par une devenait penible
 // des que plusieurs films etaient importes le meme jour.
+// Vider sa boite est toujours un geste personnel, pour tout le monde :
+// personne n'efface la boite des autres depuis ici. La suppression reelle
+// se fait depuis la Salle des Serveurs (route /global ci-dessous).
 app.delete('/api/notifications', requireAuth, (req: any, res) => {
     const utilisateur = db.users.find((u: any) => u.id === req.user.id);
     if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
-    const equipe = utilisateur.roles?.includes('owner') || utilisateur.roles?.includes('admin');
     const visibles = notifsVisiblesPour(utilisateur);
-
-    if (equipe) {
-        db.notifications = [];
-    } else {
-        if (!Array.isArray(utilisateur.hiddenNotifs)) utilisateur.hiddenNotifs = [];
-        utilisateur.hiddenNotifs = [...new Set([...utilisateur.hiddenNotifs, ...visibles.map((n: any) => n.id)])];
-    }
+    if (!Array.isArray(utilisateur.hiddenNotifs)) utilisateur.hiddenNotifs = [];
+    utilisateur.hiddenNotifs = [...new Set([...utilisateur.hiddenNotifs, ...visibles.map((n: any) => n.id)])];
     saveDb();
     res.json({ success: true, supprimees: visibles.length });
+});
+
+// Retirer une notification pour TOUS les membres : sert quand l'annonce
+// elle-meme pose probleme (contenu inapproprie signale par son titre).
+app.delete('/api/notifications/:id/global', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    if (!db.notifications) db.notifications = [];
+    const avant = db.notifications.length;
+    db.notifications = db.notifications.filter((n: any) => n.id !== req.params.id);
+    saveDb();
+    res.json({ success: true, supprimee: avant !== db.notifications.length });
 });
 
 app.delete('/api/notifications/:id', requireAuth, (req: any, res) => {
     const utilisateur = db.users.find((u: any) => u.id === req.user.id);
     if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
-    if (!db.notifications) db.notifications = [];
-
-    const equipe = utilisateur.roles?.includes('owner') || utilisateur.roles?.includes('admin');
-    if (equipe) {
-        db.notifications = db.notifications.filter((n: any) => n.id !== req.params.id);
-    } else {
-        if (!Array.isArray(utilisateur.hiddenNotifs)) utilisateur.hiddenNotifs = [];
-        if (!utilisateur.hiddenNotifs.includes(req.params.id)) utilisateur.hiddenNotifs.push(req.params.id);
-    }
+    if (!Array.isArray(utilisateur.hiddenNotifs)) utilisateur.hiddenNotifs = [];
+    if (!utilisateur.hiddenNotifs.includes(req.params.id)) utilisateur.hiddenNotifs.push(req.params.id);
     saveDb();
     res.json({ success: true });
 });
@@ -1852,6 +1862,102 @@ app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
         console.error("TMDB trailer error", err);
         return res.status(500).json({ error: "Erreur lors de la recherche de la bande-annonce" });
     }
+});
+
+// ---------- FREQUENTATION ----------
+// Comptage volontairement anonyme : on garde des NOMBRES, jamais qui a
+// regarde quoi. Le dedoublonnage du jour se fait en memoire vive et
+// disparait au redemarrage ; seuls les totaux sont ecrits sur le disque.
+// Aucun cookie ni identifiant n'est ajoute : tout est deduit des requetes
+// deja authentifiees, ce qui evite d'avoir a demander un consentement.
+if (!db.stats) db.stats = { jours: {}, films: {} };
+if (!db.stats.jours) db.stats.jours = {};
+if (!db.stats.films) db.stats.films = {};
+
+let jourCourant = '';
+let visiteursDuJour = new Set<string>();
+
+const jourActuel = () => new Date().toISOString().slice(0, 10);
+
+const ligneDuJour = (jour: string) => {
+    if (!db.stats.jours[jour]) db.stats.jours[jour] = { visiteurs: 0, lectures: 0 };
+    return db.stats.jours[jour];
+};
+
+// Ne conserver que 180 jours : au-dela, la courbe n'apprend plus rien.
+const purgerVieuxJours = () => {
+    const limite = new Date();
+    limite.setDate(limite.getDate() - 180);
+    const seuil = limite.toISOString().slice(0, 10);
+    for (const jour of Object.keys(db.stats.jours)) {
+        if (jour < seuil) delete db.stats.jours[jour];
+    }
+};
+
+compterVisite = (userId: string) => {
+    const jour = jourActuel();
+    if (jour !== jourCourant) {
+        jourCourant = jour;
+        visiteursDuJour = new Set();
+        purgerVieuxJours();
+    }
+    if (visiteursDuJour.has(userId)) return;
+    visiteursDuJour.add(userId);
+    ligneDuJour(jour).visiteurs = visiteursDuJour.size;
+    saveDb();
+};
+
+// Une lecture demarree. Le film est compte globalement, sans lien avec
+// la personne qui l'a lance.
+app.post('/api/films/:id/view', requireAuth, (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: 'Film introuvable' });
+    const jour = jourActuel();
+    ligneDuJour(jour).lectures += 1;
+    db.stats.films[film.id] = (db.stats.films[film.id] || 0) + 1;
+    saveDb();
+    res.json({ success: true });
+});
+
+app.get('/api/stats', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+    const jours = Object.keys(db.stats.jours).sort();
+    const depuis = (n: number) => {
+        const d = new Date();
+        d.setDate(d.getDate() - n);
+        const seuil = d.toISOString().slice(0, 10);
+        return jours.filter((j) => j >= seuil);
+    };
+    const somme = (liste: string[], champ: 'visiteurs' | 'lectures') =>
+        liste.reduce((total, j) => total + (db.stats.jours[j]?.[champ] || 0), 0);
+    const maximum = (liste: string[], champ: 'visiteurs' | 'lectures') =>
+        liste.reduce((max, j) => Math.max(max, db.stats.jours[j]?.[champ] || 0), 0);
+
+    const jour = jourActuel();
+    const topFilms = Object.entries(db.stats.films as Record<string, number>)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([id, lectures]) => ({
+            titre: db.films.find((f: any) => f.id === id)?.title || 'Film supprimé',
+            lectures,
+        }));
+
+    res.json({
+        aujourdhui: {
+            visiteurs: db.stats.jours[jour]?.visiteurs || 0,
+            lectures: db.stats.jours[jour]?.lectures || 0,
+        },
+        septJours: {
+            lectures: somme(depuis(7), 'lectures'),
+            pointeVisiteurs: maximum(depuis(7), 'visiteurs'),
+        },
+        trenteJours: {
+            lectures: somme(depuis(30), 'lectures'),
+            pointeVisiteurs: maximum(depuis(30), 'visiteurs'),
+        },
+        courbe: depuis(30).map((j) => ({ jour: j, ...db.stats.jours[j] })),
+        topFilms,
+        membresInscrits: db.users.filter((u: any) => u.status === 'active').length,
+    });
 });
 
 // ---------- DEJA VU ----------
