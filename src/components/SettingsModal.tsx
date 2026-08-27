@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings, Moon, Sun, Monitor, Type, KeyRound, Loader2, Link, Server, Coffee } from 'lucide-react';
+import { Settings, Moon, Sun, Monitor, Type, KeyRound, Loader2, Link, Server, Coffee, Eye } from 'lucide-react';
 
 interface Props {
     onClose: () => void;
@@ -12,9 +12,11 @@ interface Props {
     onTriggerEasterEgg?: () => void;
     userId: string;
     userRole?: string;
+    afficherDejaVu?: boolean;
+    setAfficherDejaVu?: (a: boolean) => void;
 }
 
-export default function SettingsModal({ onClose, themeMode, setThemeMode, amoledUnlocked, amoledActive, setAmoledActive, onTriggerEasterEgg, userId, userRole }: Props) {
+export default function SettingsModal({ onClose, themeMode, setThemeMode, amoledUnlocked, amoledActive, setAmoledActive, onTriggerEasterEgg, userId, userRole, afficherDejaVu, setAfficherDejaVu }: Props) {
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [msg, setMsg] = useState('');
@@ -196,6 +198,23 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
                             </button>
                         </div>
                     </div>
+
+                    {setAfficherDejaVu && (
+                        <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                            <label className="flex items-center justify-between cursor-pointer group">
+                                <div>
+                                    <h4 className="font-medium text-sm text-zinc-900 dark:text-white flex items-center gap-2">
+                                        <Eye className="w-4 h-4 text-primary-600" /> Marquer les films déjà vus
+                                    </h4>
+                                    <p className="text-xs text-zinc-500 mt-1">Grise les affiches des films que vous avez marqués comme vus, et ajoute la catégorie « Déjà vus ».</p>
+                                </div>
+                                <div className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ml-4 ${afficherDejaVu !== false ? 'bg-primary-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
+                                    <div className={`absolute top-1 bottom-1 w-4 bg-white rounded-full transition-all ${afficherDejaVu !== false ? 'left-7' : 'left-1'}`} />
+                                </div>
+                                <input type="checkbox" className="hidden" checked={afficherDejaVu !== false} onChange={() => setAfficherDejaVu(afficherDejaVu === false)} />
+                            </label>
+                        </div>
+                    )}
 
                     {amoledUnlocked && (
                         <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">

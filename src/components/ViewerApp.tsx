@@ -39,6 +39,18 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         }
     };
 
+    const toggleSeen = async (filmId: string) => {
+        try {
+            const res = await fetch(`/api/films/${filmId}/seen`, { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                onUpdateUser({ ...activeUser, seenFilms: data.seenFilms });
+            }
+        } catch (e) {
+            console.error("Toggle seen error", e);
+        }
+    };
+
     const toggleMyList = async (filmId: string) => {
         const action = (activeUser.myList || []).includes(filmId) ? 'remove' : 'add';
         try {
@@ -127,7 +139,8 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             { title: "🎬 Nouveautés", films: nouveautes, alwaysShow: false, isCategory: true },
             { title: "⏳ Bientôt disponible", films: bientotDisponibleFilms, alwaysShow: false, isCategory: true },
             { title: "📌 Ma Liste", films: maListeFilms, alwaysShow: false, isCategory: true },
-            { title: "🎞️ Tous les films", films: tousLesFilms, alwaysShow: false, isCategory: true }
+            { title: "🎞️ Tous les films", films: tousLesFilms, alwaysShow: false, isCategory: true },
+            { title: "👁️ Déjà vus", films: films.filter(f => (activeUser.seenFilms || []).includes(f.id) && !isProcessing(f)), alwaysShow: false, isCategory: true }
         ];
 
         Array.from(categories.entries())
@@ -137,7 +150,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         });
 
         return blocs;
-    }, [films, activeUser.myList, searchQuery, selectedGenre, progress]);
+    }, [films, activeUser.myList, activeUser.seenFilms, searchQuery, selectedGenre, progress]);
 
     const displayedFilms = useMemo(() => {
         const isProcessing = (f: Film) => f.status === 'PROCESSING' || (!f.jellyfinId && (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv')));
@@ -153,13 +166,17 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
             if (selectedGenre === "⏳ Bientôt disponible") {
                 return films.filter(f => isProcessing(f)).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
             }
+            if (selectedGenre === "👁️ Déjà vus") {
+                return films.filter(f => (activeUser.seenFilms || []).includes(f.id) && !isProcessing(f))
+                            .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'fr'));
+            }
             if (selectedGenre === "🎞️ Tous les films") {
                 return films.filter(f => !isProcessing(f)).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'fr'));
             }
             return films.filter(f => !isProcessing(f) && (f.genres || [f.genre]).includes(selectedGenre));
         }
         return [];
-    }, [films, searchQuery, selectedGenre, activeUser.myList]);
+    }, [films, searchQuery, selectedGenre, activeUser.myList, activeUser.seenFilms]);
 
     return (
         <div className="p-6 lg:p-12 pb-24 max-w-[1600px] mx-auto space-y-8 lg:space-y-10">
@@ -180,7 +197,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                         )}
                     </div>
                     {displayedFilms.length > 0 ? (
-                         <MovieGrid films={displayedFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} isCompleteGrid={true} />
+                         <MovieGrid films={displayedFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} onToggleSeen={toggleSeen} transcodingStatuses={transcodingStatuses} isCompleteGrid={true} />
                     ) : (
                          <div className="p-12 flex flex-col items-center gap-4 justify-center text-center text-zinc-500 bg-zinc-900/50 rounded-xl border border-zinc-800 border-dashed">
                              <p>{searchQuery ? `Le film "${searchQuery}" n'est pas (encore) dans la bibliothèque.` : `Cette catégorie est vide.`}</p>
@@ -226,7 +243,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                                     )}
                                 </div>
                                 {list.films.length > 0 ? (
-                                    <MovieGrid films={list.films} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} transcodingStatuses={transcodingStatuses} onRemoveFromContinueWatching={list.isContinueWatching ? handleRemoveProgress : undefined} />
+                                    <MovieGrid films={list.films} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} onToggleSeen={toggleSeen} transcodingStatuses={transcodingStatuses} onRemoveFromContinueWatching={list.isContinueWatching ? handleRemoveProgress : undefined} />
                                 ) : (
                                     <div className="p-8 text-center text-zinc-500 bg-zinc-900/20 rounded-xl border border-zinc-800 border-dashed text-sm">
                                         Cette catégorie est vide pour le moment.

@@ -10,6 +10,8 @@ export interface User {
     requestedBanBy?: string;
     requestedBanAt?: number;
     myList: string[]; // Liste des IDs de films à voir
+  seenFilms?: string[];
+  showSeenBadge?: boolean;
 }
 
 export interface MovieRequest {

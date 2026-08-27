@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Film, User } from '../types';
-import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check, Youtube } from 'lucide-react';
+import { Play, Heart, Loader2, Download, Info, X, ChevronLeft, ChevronRight, Edit2, Check, Youtube, Eye, EyeOff } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { AnimatePresence, motion } from 'motion/react';
 import { hasRole, primaryRole } from '../lib/roles';
@@ -13,9 +13,10 @@ interface Props {
   transcodingStatuses?: Record<string, any>;
   onRemoveFromContinueWatching?: (filmId: string) => void;
   isCompleteGrid?: boolean;
+  onToggleSeen?: (filmId: string) => void;
 }
 
-export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching, isCompleteGrid }: Props) {
+export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching, isCompleteGrid, onToggleSeen }: Props) {
   const [chargementBA, setChargementBA] = useState(false);
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
@@ -88,6 +89,9 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
         <div ref={scrollRef} className={isCompleteGrid ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6 pb-4" : "flex overflow-x-auto gap-4 md:gap-6 pb-4 snap-x snap-mandatory hide-scrollbar"}>
       {films.map((film) => {
         const inList = (activeUser.myList || []).includes(film.id);
+        const dejaVu = (activeUser.seenFilms || []).includes(film.id);
+        // Le marqueur peut etre masque depuis les reglages ; actif par defaut.
+        const afficherDejaVu = activeUser.showSeenBadge !== false;
 
         return (
             <div key={film.id} className={`group relative flex flex-col gap-2 shrink-0 snap-start ${isCompleteGrid ? "w-full" : "w-28 sm:w-32 md:w-36 lg:w-44"}`}>
@@ -146,12 +150,32 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                         </div>
                     )}
                     
+                    {/* Marqueur "deja vu" : l'affiche est grisee et porte une pastille. */}
+                    {afficherDejaVu && dejaVu && film.status === 'AVAILABLE' && (
+                        <>
+                            <div className="absolute inset-0 bg-black/45 pointer-events-none group-hover:bg-black/20 transition-colors" />
+                            <div className="absolute top-2 right-2 z-10 pointer-events-none bg-black/70 backdrop-blur text-white rounded-full p-1.5 shadow-lg" title="Déjà vu">
+                                <Eye className="w-3.5 h-3.5" />
+                            </div>
+                        </>
+                    )}
+
                     {/* Hover actions */}
                     {film.status === 'AVAILABLE' && (
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
                             <button className="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full hover:scale-105 transition-transform shadow-lg">
                                 <Play className="w-6 h-6 fill-black ml-1" />
                             </button>
+                            {onToggleSeen && afficherDejaVu && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onToggleSeen(film.id); }}
+                                    className="flex items-center gap-1.5 text-[11px] font-medium text-white bg-black/60 hover:bg-black/80 border border-white/20 rounded-full px-3 py-1.5 transition"
+                                    title={dejaVu ? "Retirer des films vus" : "Marquer comme vu"}
+                                >
+                                    {dejaVu ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                    {dejaVu ? "Pas vu" : "Déjà vu"}
+                                </button>
+                            )}
                         </div>
                     )}
                     
