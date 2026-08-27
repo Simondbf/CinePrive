@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
-import { Settings, Home, LogOut, UploadCloud, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search } from 'lucide-react';
+import { Settings, Home, LogOut, UploadCloud, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
@@ -300,6 +300,17 @@ export default function App() {
                  onTriggerEasterEgg={() => setShowEasterEgg(true)}
                  userId={activeUser.id}
                  userRole={primaryRole(activeUser)}
+                 afficherDejaVu={activeUser.showSeenBadge !== false}
+                 setAfficherDejaVu={async (actif) => {
+                     setActiveUser({ ...activeUser, showSeenBadge: actif });
+                     try {
+                         await fetch('/api/users/me/show-seen', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ actif }),
+                         });
+                     } catch (e) { console.error('Preference deja vu', e); }
+                 }}
               />
           )}
           {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
@@ -658,6 +669,19 @@ export default function App() {
                            }} className="px-4 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-medium rounded text-sm hover:opacity-80 transition flex items-center gap-2">
                                <Check className="w-4 h-4"/> Lu
                            </button>
+
+                           {/* Vider la boite d'un coup : la suppression une par
+                               une devenait penible apres plusieurs imports. */}
+                           {(hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin')) && adminNotifs.length > 0 && (
+                               <button onClick={async () => {
+                                   if (!window.confirm(`Supprimer les ${adminNotifs.length} notification(s) ? Cette action est definitive.`)) return;
+                                   await fetch('/api/notifications', { method: 'DELETE' });
+                                   setHasUnread(false);
+                                   fetchFilms(true);
+                               }} className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded text-sm transition flex items-center gap-2">
+                                   <Trash2 className="w-4 h-4"/> Tout supprimer
+                               </button>
+                           )}
                           <button onClick={() => setShowInbox(false)} className="px-4 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black font-medium rounded text-sm hover:opacity-80 transition">Fermer</button>
                       </div>
                   </motion.div>
