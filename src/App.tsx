@@ -230,7 +230,7 @@ export default function App() {
     try {
       const res = await fetch('/api/films');
       if (res.ok) setFilms(await res.json());
-      if (activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin'))) {
+      if (activeUser) {
           const nres = await fetch('/api/notifications');
           if (nres.ok) {
               const ndata = await nres.json();
@@ -633,7 +633,7 @@ export default function App() {
                           <h2 className="text-lg font-bold">Nouveautés</h2>
                       </div>
                       <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto">
-                           {(hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin')) && adminNotifs.length > 0 ? (
+                           {adminNotifs.length > 0 ? (
                                adminNotifs.map(n => (
                                    <div key={n.id} className={`p-4 rounded-lg border ${!n.readBy.includes(activeUser.id) ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-900/50' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
                                        <div className="flex justify-between items-start mb-1">
@@ -661,20 +661,18 @@ export default function App() {
                       <div className="p-3 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
                            <button onClick={async () => {
                                setShowInbox(false);
-                               if (hasRole(activeUser, 'owner')) {
-                                   await fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: activeUser.id}) });
-                                   setHasUnread(false);
-                                   fetchFilms(true);
-                               }
+                               await fetch('/api/notifications/read-all', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: activeUser.id}) });
+                               setHasUnread(false);
+                               fetchFilms(true);
                            }} className="px-4 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-medium rounded text-sm hover:opacity-80 transition flex items-center gap-2">
                                <Check className="w-4 h-4"/> Lu
                            </button>
 
                            {/* Vider la boite d'un coup : la suppression une par
                                une devenait penible apres plusieurs imports. */}
-                           {(hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin')) && adminNotifs.length > 0 && (
+                           {adminNotifs.length > 0 && (
                                <button onClick={async () => {
-                                   if (!window.confirm(`Supprimer les ${adminNotifs.length} notification(s) ? Cette action est definitive.`)) return;
+                                   if (!window.confirm(`Vider les ${adminNotifs.length} notification(s) de votre boîte ?`)) return;
                                    await fetch('/api/notifications', { method: 'DELETE' });
                                    setHasUnread(false);
                                    fetchFilms(true);

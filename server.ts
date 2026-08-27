@@ -1596,8 +1596,22 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
 });
 
 // Notifications
-app.get('/api/notifications', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
-    res.json(db.notifications || []);
+// La boite s'appelle "Nouveautes" et concerne tout le monde. Les membres
+// voient les arrivees de films ; les notifications de gestion (demandes de
+// compte, bugs, votes) restent reservees a l'equipe. Chacun peut vider sa
+// boite : suppression reelle pour l'equipe, masquage personnel pour les
+// autres, afin qu'un membre n'efface pas la boite des cinquante autres.
+const notifsVisiblesPour = (utilisateur: any) => {
+    const equipe = utilisateur?.roles?.includes('owner') || utilisateur?.roles?.includes('admin');
+    const masquees: string[] = utilisateur?.hiddenNotifs || [];
+    return (db.notifications || [])
+        .filter((n: any) => equipe || n.type === 'upload')
+        .filter((n: any) => !masquees.includes(n.id));
+};
+
+app.get('/api/notifications', requireAuth, (req: any, res) => {
+    const utilisateur = db.users.find((u: any) => u.id === req.user.id);
+    res.json(notifsVisiblesPour(utilisateur));
 });
 app.post('/api/notifications/:id/read', requireAuth, (req: any, res) => {
     const userId = req.user.id;
@@ -1623,17 +1637,35 @@ app.post('/api/notifications/read-all', requireAuth, (req: any, res) => {
 
 // Vider la boite d'un coup : la suppression une par une devenait penible
 // des que plusieurs films etaient importes le meme jour.
-app.delete('/api/notifications', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
-    const nombre = (db.notifications || []).length;
-    db.notifications = [];
+app.delete('/api/notifications', requireAuth, (req: any, res) => {
+    const utilisateur = db.users.find((u: any) => u.id === req.user.id);
+    if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+    const equipe = utilisateur.roles?.includes('owner') || utilisateur.roles?.includes('admin');
+    const visibles = notifsVisiblesPour(utilisateur);
+
+    if (equipe) {
+        db.notifications = [];
+    } else {
+        if (!Array.isArray(utilisateur.hiddenNotifs)) utilisateur.hiddenNotifs = [];
+        utilisateur.hiddenNotifs = [...new Set([...utilisateur.hiddenNotifs, ...visibles.map((n: any) => n.id)])];
+    }
     saveDb();
-    console.log(`[Notifs] ${nombre} notification(s) supprimee(s).`);
-    res.json({ success: true, supprimees: nombre });
+    res.json({ success: true, supprimees: visibles.length });
 });
 
-app.delete('/api/notifications/:id', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
+app.delete('/api/notifications/:id', requireAuth, (req: any, res) => {
+    const utilisateur = db.users.find((u: any) => u.id === req.user.id);
+    if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
     if (!db.notifications) db.notifications = [];
-    db.notifications = db.notifications.filter((n: any) => n.id !== req.params.id);
+
+    const equipe = utilisateur.roles?.includes('owner') || utilisateur.roles?.includes('admin');
+    if (equipe) {
+        db.notifications = db.notifications.filter((n: any) => n.id !== req.params.id);
+    } else {
+        if (!Array.isArray(utilisateur.hiddenNotifs)) utilisateur.hiddenNotifs = [];
+        if (!utilisateur.hiddenNotifs.includes(req.params.id)) utilisateur.hiddenNotifs.push(req.params.id);
+    }
     saveDb();
     res.json({ success: true });
 });
@@ -1784,13 +1816,24 @@ app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
     if (!film) return res.status(404).json({ error: "Film introuvable" });
 
     const apiKey = process.env.TMDB_API_KEY;
-    if (!apiKey || !film.tmdbId) {
-        return res.status(404).json({ error: "Bande-annonce indisponible pour ce film" });
-    }
+    if (!apiKey) return res.status(404).json({ error: "Clé API TMDB non configurée" });
 
     try {
+        // Les films importes avant l'association TMDB n'ont pas de tmdbId :
+        // on le retrouve par une recherche sur le titre et l'annee.
+        let tmdbId = film.tmdbId;
+        if (!tmdbId) {
+            const rechercheUrl = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&language=fr-FR&query=${encodeURIComponent(film.title || '')}${film.year ? `&year=${film.year}` : ''}`;
+            const rechercheRes = await fetch(rechercheUrl);
+            if (rechercheRes.ok) {
+                const data: any = await rechercheRes.json();
+                if (data.results?.length) tmdbId = data.results[0].id;
+            }
+        }
+        if (!tmdbId) return res.status(404).json({ error: "Film introuvable sur TMDB" });
+
         for (const langue of ['fr-FR', 'en-US']) {
-            const reponse = await fetch(`https://api.themoviedb.org/3/movie/${film.tmdbId}/videos?api_key=${apiKey}&language=${langue}`);
+            const reponse = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/videos?api_key=${apiKey}&language=${langue}`);
             if (!reponse.ok) continue;
             const data = await reponse.json();
             const videos = Array.isArray(data.results) ? data.results : [];
@@ -1799,7 +1842,9 @@ app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
                 videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer') ||
                 videos.find((v: any) => v.site === 'YouTube' && v.type === 'Teaser');
             if (choix) {
-                return res.json({ url: `https://www.youtube.com/watch?v=${choix.key}`, name: choix.name });
+                // `key` permet de l'integrer directement dans la fiche, sans
+                // ouverture d'onglet que les navigateurs bloquent souvent.
+                return res.json({ key: choix.key, url: `https://www.youtube.com/watch?v=${choix.key}`, name: choix.name });
             }
         }
         return res.status(404).json({ error: "Aucune bande-annonce trouvée sur TMDB" });
@@ -1812,6 +1857,22 @@ app.get('/api/films/:id/trailer', requireAuth, async (req: any, res) => {
 // ---------- DEJA VU ----------
 // Marqueur personnel, stocke sur le compte de chacun : un film vu par
 // l'un ne l'est pas pour les autres.
+// Marquage automatique : appele par le lecteur quand le film est fini
+// (au-dela de 95 %). Ne desactive jamais le marqueur, contrairement a la
+// bascule manuelle.
+app.post('/api/films/:id/seen-auto', requireAuth, (req: any, res) => {
+    const utilisateur = db.users.find((u: any) => u.id === req.user.id);
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!utilisateur || !film) return res.status(404).json({ error: 'Introuvable' });
+
+    if (!Array.isArray(utilisateur.seenFilms)) utilisateur.seenFilms = [];
+    if (!utilisateur.seenFilms.includes(film.id)) {
+        utilisateur.seenFilms.push(film.id);
+        saveDb();
+    }
+    res.json({ success: true, seenFilms: utilisateur.seenFilms });
+});
+
 app.post('/api/films/:id/seen', requireAuth, express.json(), (req: any, res) => {
     const utilisateur = db.users.find((u: any) => u.id === req.user.id);
     if (!utilisateur) return res.status(404).json({ error: 'Utilisateur introuvable' });
