@@ -18,6 +18,27 @@ interface Props {
 
 export default function MovieGrid({ films, activeUser, onPlay, onToggleList, transcodingStatuses, onRemoveFromContinueWatching, isCompleteGrid, onToggleSeen }: Props) {
   const [chargementBA, setChargementBA] = useState(false);
+  const [cleBA, setCleBA] = useState<string | null>(null);
+  const [erreurBA, setErreurBA] = useState<string | null>(null);
+
+  // On recharge la bande-annonce a chaque ouverture de fiche.
+  const chargerBandeAnnonce = async (film: Film) => {
+    setChargementBA(true);
+    setErreurBA(null);
+    try {
+      const res = await fetch(`/api/films/${film.id}/trailer`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.key) {
+        setCleBA(data.key);
+      } else {
+        setErreurBA(data.error || "Aucune bande-annonce trouvée.");
+      }
+    } catch {
+      setErreurBA("Impossible de contacter le serveur.");
+    } finally {
+      setChargementBA(false);
+    }
+  };
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
   const [editingGenre, setEditingGenre] = useState(false);
@@ -150,32 +171,20 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                         </div>
                     )}
                     
-                    {/* Marqueur "deja vu" : l'affiche est grisee et porte une pastille. */}
+                    {/* Marqueur "deja vu" : une simple pastille en coin.
+                        L'affiche n'est pas assombrie : elle doit rester lisible. */}
                     {afficherDejaVu && dejaVu && film.status === 'AVAILABLE' && (
-                        <>
-                            <div className="absolute inset-0 bg-black/45 pointer-events-none group-hover:bg-black/20 transition-colors" />
-                            <div className="absolute top-2 right-2 z-10 pointer-events-none bg-black/70 backdrop-blur text-white rounded-full p-1.5 shadow-lg" title="Déjà vu">
-                                <Eye className="w-3.5 h-3.5" />
-                            </div>
-                        </>
+                        <div className="absolute top-2 right-2 z-10 pointer-events-none bg-primary-600 text-white rounded-full p-1.5 shadow-lg" title="Déjà vu">
+                            <Eye className="w-3.5 h-3.5" />
+                        </div>
                     )}
 
                     {/* Hover actions */}
                     {film.status === 'AVAILABLE' && (
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
                             <button className="bg-white text-black w-12 h-12 flex items-center justify-center rounded-full hover:scale-105 transition-transform shadow-lg">
                                 <Play className="w-6 h-6 fill-black ml-1" />
                             </button>
-                            {onToggleSeen && afficherDejaVu && (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onToggleSeen(film.id); }}
-                                    className="flex items-center gap-1.5 text-[11px] font-medium text-white bg-black/60 hover:bg-black/80 border border-white/20 rounded-full px-3 py-1.5 transition"
-                                    title={dejaVu ? "Retirer des films vus" : "Marquer comme vu"}
-                                >
-                                    {dejaVu ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                    {dejaVu ? "Pas vu" : "Déjà vu"}
-                                </button>
-                            )}
                         </div>
                     )}
                     
@@ -201,7 +210,11 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 {/* Meta details (Classic prototype structurally organized data) */}
                 <div>
                    <div className="flex items-start justify-between gap-1">
-                       <h4 className="font-medium text-zinc-900 dark:text-zinc-100 text-sm line-clamp-2 leading-tight pr-2 grow" title={film.title}>
+                       <h4
+                           onClick={(e) => { e.stopPropagation(); setInfoFilm(film); }}
+                           className="font-medium text-zinc-900 dark:text-zinc-100 text-sm line-clamp-2 leading-tight pr-2 grow cursor-pointer hover:text-primary-600 dark:hover:text-primary-500 transition-colors"
+                           title="Voir la fiche"
+                       >
                            {film.title}
                        </h4>
                        <div className="flex items-center gap-2 shrink-0">
@@ -264,7 +277,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
     <AnimatePresence>
         {infoFilm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInfoFilm(null)} />
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setInfoFilm(null); setCleBA(null); setErreurBA(null); }} />
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95, y: -20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -273,7 +286,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 >
                     <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                         <h2 className="text-lg font-bold text-zinc-900 dark:text-white">À propos du film</h2>
-                        <button onClick={() => setInfoFilm(null)} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition">
+                        <button onClick={() => { setInfoFilm(null); setCleBA(null); setErreurBA(null); }} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -332,30 +345,73 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                 {infoFilm.synopsis || "Aucun synopsis disponible pour ce film."}
                             </p>
                         </div>
-                        <button
-                            onClick={async () => {
-                                if (!infoFilm || chargementBA) return;
-                                // L'onglet est ouvert AVANT l'attente reseau, sinon
-                                // le bloqueur de fenetres du navigateur l'interdit.
-                                const onglet = window.open('', '_blank');
-                                setChargementBA(true);
-                                let url = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${infoFilm.title} ${infoFilm.year || ''} bande-annonce`)}`;
-                                try {
-                                    const res = await fetch(`/api/films/${infoFilm.id}/trailer`);
-                                    if (res.ok) {
-                                        const data = await res.json();
-                                        if (data.url) url = data.url;
-                                    }
-                                } catch { /* recherche YouTube en secours */ }
-                                setChargementBA(false);
-                                if (onglet) { onglet.location.href = url; } else { window.location.href = url; }
-                            }}
-                            disabled={chargementBA}
-                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-60"
-                        >
-                            {chargementBA ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
-                            Bande-annonce
-                        </button>
+                        {/* Bande-annonce integree : l'ancienne version ouvrait un
+                            onglet, souvent bloque par le navigateur. */}
+                        <div className="mt-5">
+                            {cleBA ? (
+                                <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
+                                    <iframe
+                                        src={`https://www.youtube-nocookie.com/embed/${cleBA}?rel=0&autoplay=1`}
+                                        title={`Bande-annonce de ${infoFilm.title}`}
+                                        className="w-full h-full"
+                                        allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+                                        allowFullScreen
+                                    />
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <button
+                                        onClick={() => chargerBandeAnnonce(infoFilm)}
+                                        disabled={chargementBA}
+                                        className="inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-60"
+                                    >
+                                        {chargementBA ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
+                                        Bande-annonce
+                                    </button>
+                                    {erreurBA && (
+                                        <a
+                                            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${infoFilm.title} ${infoFilm.year || ''} bande-annonce`)}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-xs text-zinc-500 hover:text-primary-600 underline"
+                                        >
+                                            {erreurBA} Chercher sur YouTube.
+                                        </a>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Vu / pas vu et favoris : c'est ici qu'on declare avoir
+                            vu un film ailleurs que sur la plateforme. */}
+                        <div className="mt-5 flex flex-wrap items-center gap-3">
+                            {onToggleSeen && (
+                                <button
+                                    onClick={() => onToggleSeen(infoFilm.id)}
+                                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition border ${
+                                        (activeUser.seenFilms || []).includes(infoFilm.id)
+                                            ? 'bg-primary-600 border-primary-600 text-white hover:bg-primary-700'
+                                            : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                                    }`}
+                                >
+                                    {(activeUser.seenFilms || []).includes(infoFilm.id)
+                                        ? <><Eye className="w-4 h-4" /> Déjà vu</>
+                                        : <><EyeOff className="w-4 h-4" /> Pas encore vu</>}
+                                </button>
+                            )}
+                            <button
+                                onClick={(e) => handleToggle(e as any, infoFilm.id)}
+                                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition border ${
+                                    (activeUser.myList || []).includes(infoFilm.id)
+                                        ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-400'
+                                        : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                                }`}
+                            >
+                                <Heart className="w-4 h-4" fill={(activeUser.myList || []).includes(infoFilm.id) ? "currentColor" : "none"} />
+                                {(activeUser.myList || []).includes(infoFilm.id) ? "Dans ma liste" : "Ajouter à ma liste"}
+                            </button>
+                        </div>
+
                         <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500">
                             Ajouté par {infoFilm.addedBy} 
                             {(infoFilm as any).modifiedBy && ` (Mis à jour par ${(infoFilm as any).modifiedBy})`}
