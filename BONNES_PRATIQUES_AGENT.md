@@ -262,6 +262,14 @@ Comparer l'identifiant, pas l'objet : sinon une simple mise à jour de profil re
 
 **Un Effect ne doit pas déclencher sa propre relance.** L'Effect de sondage dépendait de `films` et appelle `fetchFilms()`, qui remplace `films` : l'intervalle était détruit et recréé toutes les cinq secondes. Dépendre de la condition dérivée (`transcodageEnCours`), pas du tableau entier.
 
+### Changer de route ne remonte pas forcément le composant
+
+Erreur commise en septembre 2026, à ne pas refaire. `/upload` et `/serveurs` sont deux `<Route>` distinctes, et on en a déduit que chacune donnait sa propre instance de `ContributeApp` — donc qu'une remise à zéro de l'onglet actif était inutile. Faux. Les deux routes rendent le **même composant au même endroit** de l'arbre : React réconcilie par type, garde l'instance vivante et se contente de changer la prop `mode`. On arrivait dans la Salle des Serveurs avec l'onglet d'envoi encore affiché.
+
+Deux composants de types **différents** forcent bien un démontage. Deux `<Route>` sur le même composant, non. Dans le doute, partir du principe que l'état survit à la navigation.
+
+C'est aussi pour cela que `key` n'était pas la bonne réponse ici : remonter `ContributeApp` aurait détruit la file d'envoi en cours. D'où l'ajustement pendant le rendu.
+
 ### Avant de rendre du React
 
 Compter les `useEffect` ajoutés. Pour chacun, répondre à : *quel système extérieur est-ce que je synchronise ?* Si la réponse n'est pas immédiate, l'Effect n'a pas lieu d'être.
