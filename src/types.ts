@@ -74,3 +74,18 @@ export interface UploadTask {
   replaceFilmId?: string;
   replaceFilmTitle?: string;
 }
+
+export interface ReglagesServeur {
+  allowRegistrations: boolean;
+  webhookUrl?: string;
+  securityCode?: string;
+}
+
+export interface EtatDialogue {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  isAlert?: boolean;
+  closeOnConfirm?: boolean;
+}
