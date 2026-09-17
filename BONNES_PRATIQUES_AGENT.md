@@ -199,3 +199,57 @@ Symptôme observé : un voile de fenêtre modale rendu **totalement opaque** au 
 **Exiger le contrôle des types avant toute remise.** C'est la seule barrière automatique du projet.
 
 **Se méfier des messages de commit générés automatiquement.** Ils décrivent rarement le contenu réel. Vérifier le diff avant de fusionner.
+
+---
+
+## 9. React — les Effects
+
+**La règle courte.** Calculer pendant le rendu. Les événements dans les gestionnaires. Réinitialiser avec `key`. `useMemo` pour un calcul pur et coûteux. Un `useEffect` **uniquement** pour se synchroniser avec un système extérieur à React.
+
+Un système extérieur, c'est : un écouteur sur `window` ou `document`, un `setInterval`, une instance Plyr, le service worker, le `localStorage`, une requête réseau. Rien d'autre.
+
+### Les quatre usages à proscrire
+
+**L'état dérivé.** Si une valeur se déduit d'autres états ou de props, elle se calcule pendant le rendu — pas dans un Effect qui appelle `setState`. Chaque Effect de ce type coûte un rendu supplémentaire et crée un décalage d'une frame pendant lequel l'affichage est faux.
+
+```tsx
+// Non
+useEffect(() => { setTab(mode === "upload" ? "upload" : "users") }, [mode]);
+
+// Oui
+const tab = mode === "upload" ? "upload" : "users";
+```
+
+**Les événements branchés dans un Effect.** Prévenir le parent, envoyer une requête, afficher une notification : tout cela appartient au gestionnaire qui a déclenché l'action, pas à un Effect qui observe le changement d'état après coup. Dans un Effect, on perd la cause : on ne sait plus *pourquoi* la valeur a changé.
+
+```tsx
+// Non
+useEffect(() => { onUploadStateChange(isUploadingGlobal) }, [isUploadingGlobal]);
+
+// Oui — dans la fonction qui démarre réellement l'envoi
+const demarrerEnvoi = () => { setIsUploadingGlobal(true); onUploadStateChange(true); };
+```
+
+**La réinitialisation d'état.** Pour repartir de zéro quand l'utilisateur change, on remonte le composant avec `key` — on ne remet pas six `setState` à leur valeur initiale dans un Effect.
+
+```tsx
+// Non
+useEffect(() => { if (!activeUser) { setA(false); setB(false); setC('system') } }, [activeUser]);
+
+// Oui
+<Reglages key={activeUser?.id ?? 'anonyme'} />
+```
+
+**Le calcul coûteux.** `useMemo`, jamais un Effect suivi d'un `setState`.
+
+### Deux erreurs déjà présentes dans ce dépôt
+
+**Un hook ne se place jamais dans un bloc conditionnel.** `src/App.tsx`, composant `FilmPlayerRoute` : un `useEffect` appelé à l'intérieur d'un `if (!film)`. Le nombre de hooks change alors d'un rendu à l'autre et React lève « Rendered fewer hooks than expected » — écran blanc. Pour une redirection, utiliser `<Navigate to="/" replace />`, pas un Effect.
+
+**Deux Effects qui chargent la même chose.** Toujours dans `src/App.tsx` : `fetchFilms()` est appelé dans l'Effect de montage `[]` *et* dans l'Effect `[activeUser]`. Au démarrage avec une session ouverte, la liste part deux fois.
+
+**Un Effect ne doit pas déclencher sa propre relance.** L'Effect de sondage dépend de `films` et appelle `fetchFilms()`, qui remplace `films` : l'intervalle est détruit et recréé toutes les cinq secondes. Dépendre de la condition (`hasTranscoding`), pas du tableau entier.
+
+### Avant de rendre du React
+
+Compter les `useEffect` ajoutés. Pour chacun, répondre à : *quel système extérieur est-ce que je synchronise ?* Si la réponse n'est pas immédiate, l'Effect n'a pas lieu d'être.
