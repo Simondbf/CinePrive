@@ -240,15 +240,27 @@ useEffect(() => { if (!activeUser) { setA(false); setB(false); setC('system') } 
 <Reglages key={activeUser?.id ?? 'anonyme'} />
 ```
 
+Quand le découpage n'est pas praticable — l'état est lu partout dans le composant et l'extraire déplacerait trop de choses — React documente une seconde forme : **ajuster pendant le rendu**, en comparant à la valeur précédente. Elle évite elle aussi la frame intermédiaire où l'écran affiche encore l'état de l'utilisateur précédent.
+
+```tsx
+const [idCharge, setIdCharge] = useState(activeUser?.id);
+if (idCharge !== activeUser?.id) {
+  setIdCharge(activeUser?.id);
+  setThemeMode(lireReglages(activeUser?.id).theme);
+}
+```
+
+Comparer l'identifiant, pas l'objet : sinon une simple mise à jour de profil recrée un objet `activeUser` et déclenche une réinitialisation non voulue.
+
 **Le calcul coûteux.** `useMemo`, jamais un Effect suivi d'un `setState`.
 
-### Deux erreurs déjà présentes dans ce dépôt
+### Trois erreurs corrigées dans ce dépôt (septembre 2026)
 
-**Un hook ne se place jamais dans un bloc conditionnel.** `src/App.tsx`, composant `FilmPlayerRoute` : un `useEffect` appelé à l'intérieur d'un `if (!film)`. Le nombre de hooks change alors d'un rendu à l'autre et React lève « Rendered fewer hooks than expected » — écran blanc. Pour une redirection, utiliser `<Navigate to="/" replace />`, pas un Effect.
+**Un hook ne se place jamais dans un bloc conditionnel.** `src/App.tsx`, composant `FilmPlayerRoute` : un `useEffect` était appelé à l'intérieur d'un `if (!film)`. Le nombre de hooks change alors d'un rendu à l'autre et React lève « Rendered fewer hooks than expected » — écran blanc. Pour une redirection, utiliser `<Navigate to="/" replace />`, pas un Effect.
 
-**Deux Effects qui chargent la même chose.** Toujours dans `src/App.tsx` : `fetchFilms()` est appelé dans l'Effect de montage `[]` *et* dans l'Effect `[activeUser]`. Au démarrage avec une session ouverte, la liste part deux fois.
+**Deux Effects qui chargent la même chose.** Toujours dans `src/App.tsx` : `fetchFilms()` était appelé dans l'Effect de montage `[]` *et* dans l'Effect `[activeUser]`. Au démarrage, la liste partait deux fois. Un seul point de chargement désormais.
 
-**Un Effect ne doit pas déclencher sa propre relance.** L'Effect de sondage dépend de `films` et appelle `fetchFilms()`, qui remplace `films` : l'intervalle est détruit et recréé toutes les cinq secondes. Dépendre de la condition (`hasTranscoding`), pas du tableau entier.
+**Un Effect ne doit pas déclencher sa propre relance.** L'Effect de sondage dépendait de `films` et appelle `fetchFilms()`, qui remplace `films` : l'intervalle était détruit et recréé toutes les cinq secondes. Dépendre de la condition dérivée (`transcodageEnCours`), pas du tableau entier.
 
 ### Avant de rendre du React
 

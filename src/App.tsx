@@ -60,6 +60,18 @@ const ScrollToTop = () => {
     );
 };
 
+type ModeTheme = 'light' | 'dark' | 'system';
+
+// Lecture des reglages d'un utilisateur. Ne modifie rien : on peut l'appeler
+// pendant le rendu comme dans un initialiseur paresseux de useState.
+function lireReglages(id?: string): { deverrouille: boolean; actif: boolean; theme: ModeTheme } {
+    if (!id) return { deverrouille: false, actif: false, theme: 'system' };
+    const deverrouille = localStorage.getItem(`salleObscureUnlocked_${id}`) === 'true';
+    const actif = localStorage.getItem(`salleObscureActive_${id}`) === 'true';
+    const theme = localStorage.getItem(`themeMode_${id}`) as ModeTheme | null;
+    return { deverrouille, actif: actif && deverrouille, theme: theme || 'system' };
+}
+
 // Identite stable : recreer `{}` a chaque rendu ferait passer une nouvelle prop
 // a MovieGrid sans qu'aucune donnee ait change.
 const AUCUN_STATUT: Record<string, any> = {};
@@ -96,10 +108,11 @@ export default function App() {
   const [showInbox, setShowInbox] = useState(false);
   const [hasUnread, setHasUnread] = useState(() => localStorage.getItem('inbox_read') !== 'true');
 
-  // Theme & Amoled States
-  const [themeMode, setThemeMode] = useState<'light'|'dark'|'system'>('system');
-  const [amoledUnlocked, setAmoledUnlocked] = useState(false);
-  const [amoledActive, setAmoledActive] = useState(false);
+  // Theme & Amoled States — valeur initiale lue directement, sans passer par un
+  // Effect qui viendrait la corriger apres le premier rendu.
+  const [themeMode, setThemeMode] = useState<ModeTheme>(() => lireReglages().theme);
+  const [amoledUnlocked, setAmoledUnlocked] = useState(() => lireReglages().deverrouille);
+  const [amoledActive, setAmoledActive] = useState(() => lireReglages().actif);
   const [logoTaps, setLogoTaps] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
@@ -136,19 +149,22 @@ export default function App() {
      return () => window.removeEventListener('app-notify', handleNotify);
   }, []);
 
-  // Synchronisation depuis un systeme exterieur (localStorage), branche unique :
-  // sans utilisateur, les getItem renvoient null et on retombe sur les valeurs par
-  // defaut. Plus besoin d'une branche de remise a zero.
-  useEffect(() => {
-     const id = activeUser?.id;
-     const deverrouille = id ? localStorage.getItem(`salleObscureUnlocked_${id}`) === 'true' : false;
-     const actif = id ? localStorage.getItem(`salleObscureActive_${id}`) === 'true' : false;
-     const theme = (id ? localStorage.getItem(`themeMode_${id}`) : null) as 'light'|'dark'|'system' | null;
+  // Dernier Effect de reinitialisation supprime. Le decoupage en sous-composant
+  // monte avec `key` aurait oblige a deplacer seize usages de ces trois etats ;
+  // on utilise donc l'autre forme documentee : on ajuste pendant le rendu.
+  // Deux gains au passage : plus de frame intermediaire ou l'ecran affiche encore
+  // le theme du precedent utilisateur, et la comparaison porte sur l'identifiant
+  // et non sur l'objet activeUser — une simple mise a jour de profil ne vient
+  // plus ecraser un theme change en cours de session.
+  const [idReglagesCharges, setIdReglagesCharges] = useState(activeUser?.id);
 
-     setAmoledUnlocked(deverrouille);
-     setAmoledActive(actif && deverrouille);
-     setThemeMode(theme || 'system');
-  }, [activeUser]);
+  if (idReglagesCharges !== activeUser?.id) {
+     const reglages = lireReglages(activeUser?.id);
+     setIdReglagesCharges(activeUser?.id);
+     setAmoledUnlocked(reglages.deverrouille);
+     setAmoledActive(reglages.actif);
+     setThemeMode(reglages.theme);
+  }
 
   // Theme Applier Effect
   useEffect(() => {
