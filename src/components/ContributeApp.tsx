@@ -103,9 +103,9 @@ export default function ContributeApp({
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    setTab(mode === "upload" ? "upload" : "users");
-  }, [mode]);
+  // `mode` ne change jamais sur une instance montee : /upload et /serveurs sont
+  // deux <Route> distinctes, donc deux instances. La valeur initiale du useState
+  // ci-dessus suffit, l'Effect de synchronisation qui existait ici etait mort.
 
   const generateInvite = async () => {
     try {
@@ -583,6 +583,15 @@ export default function ContributeApp({
   }
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploadingGlobal, setIsUploadingGlobal] = useState(false);
+
+  // L'etat d'envoi et la notification du parent changent ensemble : une seule
+  // fonction les porte, appelee par le gestionnaire qui declenche reellement
+  // l'action. Ce n'est pas le role d'un Effect qui observerait le changement
+  // apres coup, sans savoir pourquoi il a eu lieu.
+  const majEtatEnvoi = React.useCallback((enCours: boolean) => {
+    setIsUploadingGlobal(enCours);
+    onUploadStateChange?.(enCours);
+  }, [onUploadStateChange]);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const isUploadingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -602,11 +611,9 @@ export default function ContributeApp({
     selectedVersion: "Version Longue"
   });
 
+  // Systeme exterieur : la fenetre. Cet Effect ne fait plus que brancher l'ecouteur.
+  // La notification du parent est partie dans majEtatEnvoi, avec le changement d'etat.
   useEffect(() => {
-    if (onUploadStateChange) {
-      onUploadStateChange(isUploadingGlobal);
-    }
-
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isUploadingGlobal) {
         e.preventDefault();
@@ -618,7 +625,14 @@ export default function ContributeApp({
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isUploadingGlobal, onUploadStateChange]);
+  }, [isUploadingGlobal]);
+
+  // Au demontage (changement de route), l'envoi est interrompu : le parent ne doit
+  // pas rester bloque sur "envoi en cours", sinon sa demande de confirmation se
+  // declenche a tort a la navigation suivante.
+  useEffect(() => {
+    return () => { onUploadStateChange?.(false); };
+  }, [onUploadStateChange]);
 
   const searchTMDBForTask = async (taskId: string, query: string, year?: string) => {
     if (!query || query.length < 2) return;
@@ -923,7 +937,7 @@ export default function ContributeApp({
       isAlert: false,
       onConfirm: () => {
         isUploadingRef.current = false;
-        setIsUploadingGlobal(false);
+        majEtatEnvoi(false);
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
@@ -943,7 +957,7 @@ export default function ContributeApp({
 
   const abortUploads = () => {
     isUploadingRef.current = false;
-    setIsUploadingGlobal(false);
+    majEtatEnvoi(false);
     if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -968,7 +982,7 @@ export default function ContributeApp({
     if (!nextTask) return; // Plus rien à uploader
 
     isUploadingRef.current = true;
-    setIsUploadingGlobal(true);
+    majEtatEnvoi(true);
 
     const task = nextTask;
 
@@ -981,7 +995,7 @@ export default function ContributeApp({
                 notify(`Film déjà présent : ${task.selectedMeta.title}`, "Upload bloqué");
                 setTasks((prev) => prev.filter((t) => t.id !== task.id));
                 isUploadingRef.current = false;
-                setIsUploadingGlobal(false);
+                majEtatEnvoi(false);
                 
                 // Launch the next one
                 setTimeout(() => processUploadQueue(), 100);
@@ -1138,7 +1152,7 @@ export default function ContributeApp({
     }
 
     isUploadingRef.current = false;
-    setIsUploadingGlobal(false);
+    majEtatEnvoi(false);
   };
 
   useEffect(() => {

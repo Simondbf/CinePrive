@@ -8,3 +8,5 @@ Le logo lui-meme n'a rien a changer : `src/components/Logo.tsx` utilise `current
 Reste a trancher : les icones d'installation, elles, sont des fichiers PNG figes. Le logo de l'ecran d'accueil du telephone resterait donc bordeaux pour tout le monde.
 
 4. membre bêta pour aider à la validation et surtout stabilisation de la plateforme
+
+5. **Extraire les états de thème de `src/App.tsx`.** Les trois états `themeMode`, `amoledUnlocked` et `amoledActive` sont relus depuis le `localStorage` par un Effect à chaque changement d'`activeUser`. La forme correcte est un sous-composant monté avec `key={activeUser.id}` et une valeur initiale lue en paresseux (`useState(() => ...)`), ce qui supprimerait l'Effect. Non fait pour l'instant : ces trois états traversent la barre de navigation, les fenêtres modales et les routes, et le découpage ne peut pas se vérifier sans lancer la plateforme.

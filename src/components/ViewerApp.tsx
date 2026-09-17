@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { apiGet } from '../lib/api';
 import { notify } from '../lib/notify';
 import { Film, User } from '../types';
 import MovieGrid from './MovieGrid';
@@ -19,11 +20,14 @@ interface Props {
 export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, transcodingStatuses, searchQuery, setSearchQuery, selectedGenre, setSelectedGenre }: Props) {
     const [progress, setProgress] = useState<Record<string, number>>({});
 
+    // apiGet controle res.ok : sans lui, un 403 remplacait la table de progression
+    // par un objet d'erreur.
     useEffect(() => {
-        fetch('/api/progress')
-            .then(res => res.json())
-            .then(data => setProgress(data))
-            .catch(console.error);
+        let annule = false;
+        apiGet<Record<string, number>>('/api/progress', {}).then(data => {
+            if (!annule) setProgress(data || {});
+        });
+        return () => { annule = true; };
     }, [activeUser.id]);
 
     const handleRemoveProgress = async (filmId: string) => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet } from '../lib/api';
 import { CheckCircle, BarChart3, Edit3 } from 'lucide-react';
 import { User } from '../types';
 
@@ -39,17 +40,27 @@ export default function Polls({ activeUser }: { activeUser: User }) {
 
     const [pollsConfig, setPollsConfig] = useState<any[]>([]);
 
+    // apiGet controle res.ok et renvoie le repli : un 403 ne peut plus finir
+    // dans setPollsConfig et casser le .map() du rendu.
     useEffect(() => {
-        fetch('/api/polls/config').then(r => r.json()).then(setPollsConfig).catch(console.error);
-        fetch('/api/polls/results').then(r => r.json()).then(data => {
+        let annule = false;
+
+        apiGet<any[]>('/api/polls/config', []).then(config => {
+            if (!annule) setPollsConfig(Array.isArray(config) ? config : []);
+        });
+
+        apiGet<Record<string, any>>('/api/polls/results', {}).then(data => {
+            if (annule) return;
             const alreadyVoted: Record<string, boolean> = {};
-            Object.keys(data).forEach(pollId => {
-                if (data[pollId].votedUsers && data[pollId].votedUsers.includes(activeUser.id)) {
+            Object.keys(data || {}).forEach(pollId => {
+                if (data[pollId]?.votedUsers?.includes(activeUser.id)) {
                     alreadyVoted[pollId] = true;
                 }
             });
             setSubmitted(alreadyVoted);
-        }).catch(console.error);
+        });
+
+        return () => { annule = true; };
     }, [activeUser.id]);
 
     const submitVote = async (pollId: string) => {

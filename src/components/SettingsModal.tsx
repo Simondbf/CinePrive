@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet } from '../lib/api';
 import { motion } from 'motion/react';
 import { Settings, Moon, Sun, Monitor, Type, KeyRound, Loader2, Link, Server, Coffee, Eye } from 'lucide-react';
 
@@ -36,17 +37,19 @@ export default function SettingsModal({ onClose, themeMode, setThemeMode, amoled
     const [securityCodeMsg, setSecurityCodeMsg] = useState('');
     const [securityCodeIsError, setSecurityCodeIsError] = useState(false);
 
+    // Ce fetch n'avait ni controle de res.ok ni .catch : un 403 partait dans
+    // setWebhookUrl et l'erreur reseau remontait en rejet non gere.
     useEffect(() => {
-        if (userRole === 'owner' || userRole === 'admin') {
-            fetch('/api/settings')
-                .then(r => r.json())
-                .then(data => {
-                    setWebhookUrl(data.webhookUrl || '');
-                    if (data.securityCode) {
-                        setPatronCode(data.securityCode);
-                    }
-                });
-        }
+        if (userRole !== 'owner' && userRole !== 'admin') return;
+
+        let annule = false;
+        apiGet<any>('/api/settings', {}).then(data => {
+            if (annule) return;
+            setWebhookUrl(data?.webhookUrl || '');
+            if (data?.securityCode) setPatronCode(data.securityCode);
+        });
+
+        return () => { annule = true; };
     }, [userRole]);
 
     const handleChangePassword = async (e: React.FormEvent) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
 import { Settings, Home, LogOut, UploadCloud, ListChecks, Inbox, ArrowLeft, Shield, Check, MessageSquare, X, Search, Trash2 } from 'lucide-react';
@@ -59,6 +59,10 @@ const ScrollToTop = () => {
         </AnimatePresence>
     );
 };
+
+// Identite stable : recreer `{}` a chaque rendu ferait passer une nouvelle prop
+// a MovieGrid sans qu'aucune donnee ait change.
+const AUCUN_STATUT: Record<string, any> = {};
 
 export default function App() {
   const [activeUser, setActiveUser] = useState<User | null>(null);
@@ -132,21 +136,18 @@ export default function App() {
      return () => window.removeEventListener('app-notify', handleNotify);
   }, []);
 
+  // Synchronisation depuis un systeme exterieur (localStorage), branche unique :
+  // sans utilisateur, les getItem renvoient null et on retombe sur les valeurs par
+  // defaut. Plus besoin d'une branche de remise a zero.
   useEffect(() => {
-     if (!activeUser) {
-         setAmoledUnlocked(false);
-         setAmoledActive(false);
-         setThemeMode('system');
-         return;
-     }
-     // Retrieve saved settings
-     const savedAmoledUnlocked = localStorage.getItem(`salleObscureUnlocked_${activeUser.id}`) === 'true';
-     const savedAmoledActive = localStorage.getItem(`salleObscureActive_${activeUser.id}`) === 'true';
-     const savedTheme = localStorage.getItem(`themeMode_${activeUser.id}`) as 'light'|'dark'|'system' || 'system';
-     
-     setAmoledUnlocked(savedAmoledUnlocked);
-     setAmoledActive(savedAmoledActive && savedAmoledUnlocked);
-     setThemeMode(savedTheme);
+     const id = activeUser?.id;
+     const deverrouille = id ? localStorage.getItem(`salleObscureUnlocked_${id}`) === 'true' : false;
+     const actif = id ? localStorage.getItem(`salleObscureActive_${id}`) === 'true' : false;
+     const theme = (id ? localStorage.getItem(`themeMode_${id}`) : null) as 'light'|'dark'|'system' | null;
+
+     setAmoledUnlocked(deverrouille);
+     setAmoledActive(actif && deverrouille);
+     setThemeMode(theme || 'system');
   }, [activeUser]);
 
   // Theme Applier Effect
@@ -201,10 +202,9 @@ export default function App() {
       setTimeout(() => { if (logoTaps > 0) setLogoTaps(0) }, 1000);
   };
 
+  // Cet Effect ne fait qu'une chose : brancher l'ecouteur clavier du konami.
+  // Le chargement des films appartient a l'Effect [activeUser] plus bas.
   useEffect(() => {
-    fetchFilms();
-
-    // -- EASTER EGG FALLBACK --
     const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
     let konamiIndex = 0;
 
@@ -261,27 +261,32 @@ export default function App() {
     }
   };
 
+  // Unique point de chargement de la liste. Se declenche au montage (activeUser
+  // encore null : on charge le catalogue et on leve isLoading) puis a la connexion.
   useEffect(() => {
-     if (activeUser) fetchFilms();
+     fetchFilms();
   }, [activeUser]);
 
+  // Condition calculee pendant le rendu. L'Effect en depend, et non de `films` :
+  // il appelle fetchFilms(), qui remplace `films`, ce qui detruisait et recreait
+  // l'intervalle toutes les cinq secondes.
+  const transcodageEnCours = films.some(f => f.status === 'PROCESSING');
+
   useEffect(() => {
-     const hasTranscoding = films.some(f => f.status === 'PROCESSING');
-     if (hasTranscoding) {
-         const interval = setInterval(async () => {
-             fetchFilms(true);
-             try {
-                 const res = await fetch('/api/films/transcoding-status');
-                 if (res.ok) setTranscodingStatuses(await res.json());
-             } catch (e) {}
-         }, 5000);
-         return () => clearInterval(interval);
-     } else {
-         if (Object.keys(transcodingStatuses).length > 0) {
-             setTranscodingStatuses({});
-         }
-     }
-  }, [films, activeUser]);
+     if (!transcodageEnCours) return;
+     const interval = setInterval(async () => {
+         fetchFilms(true);
+         try {
+             const res = await fetch('/api/films/transcoding-status');
+             if (res.ok) setTranscodingStatuses(await res.json());
+         } catch (e) {}
+     }, 5000);
+     return () => clearInterval(interval);
+  }, [transcodageEnCours, activeUser]);
+
+  // Etat derive, plus de remise a zero par Effect : hors transcodage on expose un
+  // objet vide dont l'identite reste stable d'un rendu a l'autre.
+  const statutsTranscodage = transcodageEnCours ? transcodingStatuses : AUCUN_STATUT;
 
   if (isLoading) {
     return <Loader />;
@@ -378,9 +383,9 @@ export default function App() {
   const FilmPlayerRoute = () => {
       const { id } = useParams();
       const film = films.find(f => f.id === id);
+      // Pas de hook dans un bloc conditionnel : une redirection se fait avec <Navigate>.
       if (!film) {
-          useEffect(() => { navigate('/', { replace: true }) }, []);
-          return null;
+          return <Navigate to="/" replace />;
       }
       return (
         <div className={`min-h-[100dvh] w-full overflow-x-hidden ${amoledActive ? 'bg-white dark:bg-black' : 'bg-zinc-50 dark:bg-[#16181c]'} text-zinc-900 dark:text-white font-sans selection:bg-primary-500/30 transition-colors`}>
@@ -601,6 +606,7 @@ export default function App() {
                films={films} 
                onPlay={(f) => navigate('/film/' + f.id)} 
                onUpdateUser={setActiveUser}
+               transcodingStatuses={statutsTranscodage}
                searchQuery={searchQuery}
                setSearchQuery={setSearchQuery}
                selectedGenre={selectedGenre}
