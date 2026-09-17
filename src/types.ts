@@ -53,3 +53,24 @@ export interface Film {
     requestedDeletionBy?: string;
     requestedDeletionAt?: number;
 }
+
+export interface UploadTask {
+  id: string;
+  file: File;
+  tmdbQuery: string;
+  tmdbYear?: string;
+  tmdbResults: any[];
+  selectedMeta: any | null;
+  // Vrai pendant l'assemblage cote serveur, apres l'envoi des morceaux.
+  finalisation?: boolean;
+  // Renseigne apres l'import : permet de corriger la fiche a posteriori.
+  filmId?: string;
+  correctionOuverte?: boolean;
+  status: "waiting" | "uploading" | "success" | "error" | "duplicate";
+  progress: number;
+  isSearching: boolean;
+  etaSeconds?: number | null;
+  versionType?: string;
+  replaceFilmId?: string;
+  replaceFilmTitle?: string;
+}
