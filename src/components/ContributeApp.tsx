@@ -110,9 +110,19 @@ export default function ContributeApp({
     fetchData();
   }, [fetchData]);
 
-  // `mode` ne change jamais sur une instance montee : /upload et /serveurs sont
-  // deux <Route> distinctes, donc deux instances. La valeur initiale du useState
-  // ci-dessus suffit, l'Effect de synchronisation qui existait ici etait mort.
+  // REGRESSION CORRIGEE : j'avais suppose que `mode` ne changeait jamais sur une
+  // instance montee, puisque /upload et /serveurs sont deux <Route> distinctes.
+  // C'est faux : les deux rendent <ContributeApp> a la meme position, donc React
+  // reconcilie par type, reutilise l'instance et se contente de changer la prop.
+  // Sans cette remise a zero, on arrivait sur la Salle des Serveurs avec l'onglet
+  // d'envoi encore actif. Ajustement pendant le rendu, pas un Effect : l'onglet
+  // est correct des le premier affichage, sans image intermediaire fausse.
+  const [modePrecedent, setModePrecedent] = useState(mode);
+
+  if (modePrecedent !== mode) {
+     setModePrecedent(mode);
+     setTab(mode === "upload" ? "upload" : "users");
+  }
 
   const generateInvite = async () => {
     try {
