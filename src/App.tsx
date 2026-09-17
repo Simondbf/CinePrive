@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Film, User } from './types';
 import { notify } from './lib/notify';
@@ -7,7 +7,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import AuthScreen from './components/AuthScreen';
 import Player from './components/Player';
 import ViewerApp from './components/ViewerApp';
-import ContributeApp from './components/ContributeApp';
+// Charge a la demande : sort du paquet principal avec ses sept onglets.
+const ContributeApp = lazy(() => import('./components/ContributeApp'));
 import InstallPrompt from './components/InstallPrompt';
 import Logo from './components/Logo';
 import EasterEgg from './components/EasterEgg';
@@ -630,10 +631,14 @@ export default function App() {
             />
           } />
           <Route path="/serveurs" element={
-            <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />
+            <Suspense fallback={<Loader />}>
+              <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="admin" onUploadStateChange={setIsUploading} />
+            </Suspense>
           } />
           <Route path="/upload" element={
-            <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" onUploadStateChange={setIsUploading} />
+            <Suspense fallback={<Loader />}>
+              <ContributeApp activeUser={activeUser} films={films} onRefresh={fetchFilms} mode="upload" onUploadStateChange={setIsUploading} />
+            </Suspense>
           } />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
