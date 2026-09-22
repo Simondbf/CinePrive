@@ -588,6 +588,9 @@ export default function App() {
                             >
                                <LogOut className="w-4 h-4" /> Se déconnecter
                             </button>
+                            <p className="px-4 py-2 text-[11px] text-zinc-400 dark:text-zinc-600 border-t border-zinc-100 dark:border-zinc-800">
+                                CinéPrivé v{__APP_VERSION__}
+                            </p>
                         </div>
                     </div>
                 )}

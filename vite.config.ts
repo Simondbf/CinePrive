@@ -4,11 +4,17 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import fs from 'fs';
 
-// Donne au cache du service worker un nom neuf a chaque construction du site.
-// Le service worker n'efface l'ancien cache que lorsque ce nom change : le
-// numero etait a incrementer a la main dans public/sw.js, et il a ete oublie
-// treize deploiements de suite, laissant s'empiler chez chaque membre les
-// fichiers de toutes les versions precedentes. Plus rien a faire a la main.
+// Version de l'application. Une seule source : le champ "version" de
+// package.json, au format majeure.mineure.correctif. Elle est affichee dans le
+// menu utilisateur et reprise dans le nom du cache du service worker.
+const VERSION: string = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')).version;
+
+// Nom du cache du service worker : la version lisible, suivie d'un tampon de
+// construction apres un "+" (notation standard des metadonnees de construction).
+// Le service worker n'efface l'ancien cache que lorsque ce nom change ; grace au
+// tampon, il change a chaque construction meme si l'on oublie de monter la
+// version — ce qui est arrive treize deploiements de suite avec l'ancien numero
+// a incrementer a la main.
 const nomCacheParConstruction = () => ({
   name: 'nom-cache-service-worker',
   apply: 'build' as const,
@@ -18,7 +24,7 @@ const nomCacheParConstruction = () => ({
     const contenu = fs.readFileSync(fichier, 'utf-8');
     const remplace = contenu.replace(
       /const CACHE_NAME = '[^']*';/,
-      `const CACHE_NAME = 'cineprive-${Date.now().toString(36)}';`,
+      `const CACHE_NAME = 'cineprive-v${VERSION}+${Date.now().toString(36)}';`,
     );
     if (remplace === contenu) {
       throw new Error("sw.js : ligne CACHE_NAME introuvable, le cache ne serait jamais renouvele.");
@@ -30,6 +36,9 @@ const nomCacheParConstruction = () => ({
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss(), nomCacheParConstruction()],
+    define: {
+      __APP_VERSION__: JSON.stringify(VERSION),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

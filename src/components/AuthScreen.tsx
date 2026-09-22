@@ -4,12 +4,6 @@ import { Loader2, KeyRound, Eye, EyeOff, LogIn } from 'lucide-react';
 import Logo from './Logo';
 
 // Nouvelle adresse publique de CinéPrivé, et detection de l'ancienne.
-const NOUVEAU_DOMAINE = 'cineprive.soleiljaune.be';
-const ancienDomaine =
-    typeof window !== 'undefined' &&
-    window.location.hostname !== NOUVEAU_DOMAINE &&
-    !window.location.hostname.startsWith('127.0.0.1') &&
-    !window.location.hostname.startsWith('localhost');
 
 interface Props {
   onLogin: (user: User) => void;
@@ -142,24 +136,6 @@ export default function AuthScreen({ onLogin }: Props) {
                   <Logo className="w-12 h-12 text-primary-600" />
                   CinéPrivé
               </h1>
-
-              {/* Le site a demenage : message affiche uniquement sur l'ancien
-                  domaine, detecte a partir du nom d'hote courant. */}
-              {ancienDomaine && (
-                  <div className="mb-6 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-900 dark:text-amber-200">
-                      <p className="font-semibold mb-1">Cette adresse va fermer</p>
-                      <p className="mb-3">
-                          CinéPrivé a démenagé. Merci de mettre à jour votre favori et
-                          de vous connecter désormais sur la nouvelle adresse.
-                      </p>
-                      <a
-                          href={`https://${NOUVEAU_DOMAINE}`}
-                          className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 font-medium text-white transition hover:bg-amber-700"
-                      >
-                          Aller sur {NOUVEAU_DOMAINE}
-                      </a>
-                  </div>
-              )}
 
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-xl shadow-xl">
                   <h2 className="text-2xl font-semibold mb-6 flex flex-col gap-1 text-center">
