@@ -358,7 +358,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
                         Retour
                     </button>
-                    {!film.jellyfinId && activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin') || hasRole(activeUser, 'technician')) && (
+                    {activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin') || hasRole(activeUser, 'technician')) && (
                         <button onClick={(e) => { 
                             e.stopPropagation();
                             fetch(`/api/films/${film.id}/remux`, { method: 'POST' })
@@ -384,7 +384,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     playsInline
                     crossOrigin="anonymous"
                 >
-                    <source src={film.jellyfinId ? `/api/stream/${film.jellyfinId}` : `/videos/${film.filename}`} />
+                    <source src={`/videos/${film.filename}`} />
                     {pistesSousTitres.map((piste) => (
                         <track
                             key={piste.index}

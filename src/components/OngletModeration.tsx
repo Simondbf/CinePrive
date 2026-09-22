@@ -117,7 +117,7 @@ export default function OngletModeration({
                                             <p className="text-xs text-primary-600 dark:text-primary-500 mt-1">Timecode: <span className="font-mono bg-primary-100 dark:bg-primary-900/50 px-1 py-0.5 rounded">{formatTimecode(r.timecode)}</span></p>
                                         </div>
                                         <button
-                                            onClick={() => setPreviewVideo({ url: f.jellyfinId ? `/api/stream/${f.jellyfinId}` : `/videos/${f.filename}`, timecode: Number.isFinite(r.timecode) ? r.timecode : 0 })}
+                                            onClick={() => setPreviewVideo({ url: `/videos/${f.filename}`, timecode: Number.isFinite(r.timecode) ? r.timecode : 0 })}
                                             className="text-xs font-medium bg-primary-200 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-3 py-1.5 rounded hover:bg-primary-300 dark:hover:bg-primary-900/60 transition-colors shrink-0 flex items-center gap-1"
                                         >
                                             <Video className="w-3 h-3" />

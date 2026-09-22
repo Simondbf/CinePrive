@@ -81,7 +81,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     const lists = useMemo(() => {
         if (searchQuery || selectedGenre) return []; // En mode recherche/genre on n'affiche que les resultats
 
-        const isProcessing = (f: Film) => f.status === 'PROCESSING' || (!f.jellyfinId && (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv')));
+        const isProcessing = (f: Film) => f.status === 'PROCESSING' || (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv'));
 
         // Nouveautes : dix jours, pas davantage — au-dela ce n'est plus une nouveaute.
         const dixJours = new Date();
@@ -158,7 +158,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
     }, [films, activeUser.myList, activeUser.seenFilms, searchQuery, selectedGenre, progress]);
 
     const displayedFilms = useMemo(() => {
-        const isProcessing = (f: Film) => f.status === 'PROCESSING' || (!f.jellyfinId && (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv')));
+        const isProcessing = (f: Film) => f.status === 'PROCESSING' || (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv'));
         
         if (searchQuery) return films.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
         if (selectedGenre) {

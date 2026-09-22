@@ -32,7 +32,6 @@ export interface Cast {
 export interface Film {
     id: string;
     tmdbId?: number;
-    jellyfinId?: string;
     title: string;
     synopsis: string;
     year: number;

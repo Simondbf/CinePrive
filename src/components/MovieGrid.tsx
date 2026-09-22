@@ -108,7 +108,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
       if (!stored.includes(film.id)) {
           localStorage.setItem(key, JSON.stringify([...stored, film.id]));
       }
-      notify("Le fichier source est en cours de téléchargement.\n\nNote Technique : Sur ce prototype (sans transcoding FFmpeg), la taille du fichier est la taille d'origine du fichier uploadé.\nSur le serveur complet avec Jellyfin, un transcodage compressé pourra être proposé pour les mobiles.", "Mode Hors-Ligne");
+      notify("Le téléchargement du film a commencé. Le fichier est à sa taille d'origine.", "Mode Hors-Ligne");
   };
 
   return (

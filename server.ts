@@ -8,7 +8,6 @@ import { createServer as createViteServer } from 'vite';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import { exec, spawn, execFile } from 'child_process';
 import nodemailer from 'nodemailer';
 
@@ -1319,29 +1318,6 @@ app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']),
     userToApprove.validatedBy = adminUser.username;
     userToApprove.validatedAt = Date.now();
     
-    // Phase 3: Sync to Jellyfin if configured
-    if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
-        try {
-            const tempPassword = Math.random().toString(36).slice(-8);
-            const jellyfinResponse = await fetch(`${process.env.JELLYFIN_URL}/Users/New`, {
-                method: 'POST',
-                headers: { 
-                    'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ Name: userToApprove.username, Password: tempPassword })
-            });
-
-            if (jellyfinResponse.ok) {
-                const jellyfinUser = await jellyfinResponse.json();
-                userToApprove.jellyfinId = jellyfinUser.Id;
-            } else {
-                console.error("Erreur lors de la création de l'utilisateur Jellyfin:", await jellyfinResponse.text());
-            }
-        } catch (e) {
-            console.error("Échec de la communication avec Jellyfin", e);
-        }
-    }
 
     saveDb();
     res.json({ success: true, user: { ...userToApprove, password: '' } });
@@ -1376,7 +1352,6 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
       filmsList = filmsList.filter((f: any) => !f.pendingDeletion && !f.isQuarantined);
   }
 
-  // Masquer la clé JELLYFIN_API_KEY des posterUrls pour les films existants
   const sanitizedFilms = filmsList.map((f: any) => {
     let sanitizedF = { ...f };
     const creator = db.users.find((u: any) => u.id === f.addedBy);
@@ -1384,17 +1359,9 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
         sanitizedF.addedBy = creator.name || creator.username;
     }
 
-    // Le relais /api/jellyfin/image, qui cachait la cle API Jellyfin des adresses
-    // d'affiche, a ete supprime. Une affiche portant la cle, ou pointant vers ce
-    // relais disparu, est donc retiree : mieux vaut un film sans affiche qu'une
-    // cle divulguee a tous les membres, ou une image cassee.
-    if (sanitizedF.posterUrl && (sanitizedF.posterUrl.includes('api_key=') || sanitizedF.posterUrl.startsWith('/api/jellyfin/image/'))) {
-      delete sanitizedF.posterUrl;
-    }
 
     if (!userHasRole(req.user, 'owner') && !userHasRole(req.user, 'admin') && !userHasRole(req.user, 'technician')) {
         delete sanitizedF.originalName;
-        delete sanitizedF.jellyfinId;
     }
 
     return sanitizedF;
@@ -1502,7 +1469,7 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner']), (req: any, res
     }
     
     // Si c'est un film local de type upload, on supprime le fichier physique
-    if (film.filename && !film.jellyfinId) {
+    if (film.filename) {
         const filePath = path.join(UPLOADS_DIR, film.filename);
         if (fs.existsSync(filePath)) {
             try {
@@ -2499,7 +2466,7 @@ app.get('/api/films/transcoding-status', requireAuth, async (req, res) => {
     }
 });
 
-// Distribution Vidéos Static & Proxy Jellyfin
+// Distribution des vidéos (lecture par plages, pour pouvoir avancer dans le film)
 app.get('/videos/:filename', requireAuth, (req, res) => {
     const safeName = path.basename(req.params.filename);
     const videoPath = resolveVideoPath(safeName);
@@ -2541,36 +2508,6 @@ app.get('/videos/:filename', requireAuth, (req, res) => {
     }
 });
 
-// Phase 3: Route /api/stream/:filmId via Jellyfin API
-app.get('/api/stream/:filmId', requireAuth, async (req: any, res, next) => {
-    const user = req.user;
-    const filmId = req.params.filmId;
-    
-    // Find film
-    const films = db.films || [];
-    
-    const film = films.find((f: any) => f.id === filmId || (f as any).jellyfinId === filmId);
-    if (!film) return res.status(404).json({ error: 'Film non trouvé' });
-
-    if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
-        const jellyfinId = (film as any).jellyfinId || film.id;
-        return createProxyMiddleware({
-            target: `${process.env.JELLYFIN_URL}/Videos/${jellyfinId}/stream`,
-            changeOrigin: true,
-            ignorePath: true,
-            on: {
-                proxyReq: (proxyReq) => {
-                    proxyReq.setHeader('X-Emby-Authorization', `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"`);
-                }
-            }
-        })(req, res, next);
-    } else {
-        // Fallback local
-        const filename = film.filename || film.id;
-        return res.redirect(`/videos/${filename}`);
-    }
-});
-
 
 // Force Download Route
 app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
@@ -2578,7 +2515,7 @@ app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     
     const films = db.films || [];
     
-    const film = films.find((f: any) => f.id === filmId || (f as any).jellyfinId === filmId);
+    const film = films.find((f: any) => f.id === filmId);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
 
     const safeName = path.basename(film.filename || '');
@@ -2600,7 +2537,7 @@ app.post('/api/admin/reparer-fichiers', requireAuth, requireRole(['owner', 'admi
     const repares: any[] = [];
 
     films.forEach((film: any) => {
-        if (film.status === 'AVAILABLE' && film.filename && !film.jellyfinId) {
+        if (film.status === 'AVAILABLE' && film.filename) {
             const safeName = path.basename(film.filename);
             const trouve = [UPLOADS_DIR, FILMS_DIR].some((dir) => fs.existsSync(path.join(dir, safeName)));
             if (!trouve) {
