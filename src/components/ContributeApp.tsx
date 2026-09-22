@@ -371,54 +371,44 @@ export default function ContributeApp({
     }
   };
 
-  const handleDeleteUser = async (userId: string, targetName: string) => {
-    if (hasRole(activeUser, "admin")) {
-      // Si simple admin -> suspension temporaire sans code
-      setDialogState({
-        isOpen: true,
-        title: "Suspendre l'utilisateur",
-        message: `Êtes-vous sûr de vouloir suspendre temporairement "${targetName}" ? Son compte sera bloqué et masqué, et le Patron devra valider son bannissement définitif.`,
-        onConfirm: async () => {
-          try {
-            const res = await fetch(`/api/users/${userId}`, {
-              method: "DELETE",
-            });
-            if (res.status === 403) {
-                notify("Vous ne passerez pas !", "Accès Interdit");
-                return;
-            }
-            if (res.ok) {
-              notify(
-                `La suspension de ${targetName} a été enregistrée.`,
-                "Succès",
-              );
-              fetchData();
-            } else {
-              const err = await res.json();
-              notify(
-                err.error || "Impossible de suspendre l'utilisateur",
-                "Erreur",
-              );
-            }
-          } catch (e) {
-            console.error(e);
-            notify("Erreur de connexion", "Erreur");
+  // Comme pour les films : deux actions, chacune appelee par son propre bouton.
+
+  // Admin : suspension immediate, soumise a la decision du proprietaire.
+  const handleSuspendUser = (userId: string, targetName: string) => {
+    setDialogState({
+      isOpen: true,
+      title: "Suspendre le membre",
+      message: `« ${targetName} » ne pourra plus accéder à la plateforme. Le Patron décidera ensuite de le réactiver ou de le bannir définitivement.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/users/${userId}/suspend`, { method: "POST" });
+          if (res.ok) {
+            notify(`« ${targetName} » est suspendu. Le Patron a été prévenu.`, "Succès");
+            fetchData();
+          } else {
+            const err = await res.json().catch(() => ({}));
+            notify(err.error || "Impossible de suspendre ce membre.", "Erreur");
           }
-        },
-      });
-    } else {
-      // Si Patron (owner) -> code de sécurité requis
-      triggerSecurityValidation(
-        "delete_user",
-        userId,
-        targetName,
-        "Bannir un utilisateur",
-        `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la suppression définitive de l'utilisateur "${targetName}" et de tous ses accès.`,
-        async () => {
-          fetchData();
-        },
-      );
-    }
+        } catch (e) {
+          console.error(e);
+          notify("Erreur de connexion", "Erreur");
+        }
+      },
+    });
+  };
+
+  // Proprietaire : bannissement definitif, code de securite requis.
+  const handleDeleteUser = async (userId: string, targetName: string) => {
+    triggerSecurityValidation(
+      "delete_user",
+      userId,
+      targetName,
+      "Bannir un utilisateur",
+      `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la suppression définitive de l'utilisateur "${targetName}" et de tous ses accès.`,
+      async () => {
+        fetchData();
+      },
+    );
   };
 
   // Verifie que chaque film marque disponible possede bien son fichier sur le
@@ -1413,7 +1403,7 @@ export default function ContributeApp({
 
 
 
-      {tab === "users" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && <OngletUtilisateurs activeUser={activeUser} usersList={usersList} invitesList={invitesList} settings={settings} customCodeInput={customCodeInput} setCustomCodeInput={setCustomCodeInput} maxUsesInput={maxUsesInput} setMaxUsesInput={setMaxUsesInput} pendingRoleChanges={pendingRoleChanges} setPendingRoleChanges={setPendingRoleChanges} generateInvite={generateInvite} deleteInvite={deleteInvite} handleChangeRole={handleChangeRole} handleRestoreUser={handleRestoreUser} handleDeleteUser={handleDeleteUser} handleToggleRegistration={handleToggleRegistration} />}
+      {tab === "users" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && <OngletUtilisateurs handleSuspendUser={handleSuspendUser} activeUser={activeUser} usersList={usersList} invitesList={invitesList} settings={settings} customCodeInput={customCodeInput} setCustomCodeInput={setCustomCodeInput} maxUsesInput={maxUsesInput} setMaxUsesInput={setMaxUsesInput} pendingRoleChanges={pendingRoleChanges} setPendingRoleChanges={setPendingRoleChanges} generateInvite={generateInvite} deleteInvite={deleteInvite} handleChangeRole={handleChangeRole} handleRestoreUser={handleRestoreUser} handleDeleteUser={handleDeleteUser} handleToggleRegistration={handleToggleRegistration} />}
 
       {tab === "stats" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && <OngletStatistiques stats={stats} />}
 

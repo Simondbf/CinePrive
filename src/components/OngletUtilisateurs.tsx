@@ -21,6 +21,7 @@ interface Props {
   handleChangeRole: (userId: string, newRole: string) => void;
   handleRestoreUser: (userId: string) => void;
   handleDeleteUser: (userId: string, targetName: string) => void;
+  handleSuspendUser: (userId: string, targetName: string) => void;
   handleToggleRegistration: () => void;
 }
 
@@ -47,6 +48,7 @@ export default function OngletUtilisateurs({
   handleChangeRole,
   handleRestoreUser,
   handleDeleteUser,
+  handleSuspendUser,
   handleToggleRegistration,
 }: Props) {
   const [codeCopie, setCodeCopie] = useState<string | null>(null);
@@ -322,12 +324,18 @@ export default function OngletUtilisateurs({
                                     Bannir déf.
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => handleRestoreUser(u.id)}
-                                  className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-805 transition-all font-medium text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded"
-                                >
-                                  Réactiver
-                                </button>
+                                {hasRole(activeUser, "owner") ? (
+                                  <button
+                                    onClick={() => handleRestoreUser(u.id)}
+                                    className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-805 transition-all font-medium text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded"
+                                  >
+                                    Réactiver
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-zinc-500 whitespace-nowrap">
+                                    En attente du Patron
+                                  </span>
+                                )}
                               </div>
                             </div>
                           ) : (
@@ -335,22 +343,25 @@ export default function OngletUtilisateurs({
                               <span className="text-zinc-400 cursor-default">
                                 Actif
                               </span>
-                              {(hasRole(activeUser, "owner") ||
-                                hasRole(activeUser, "admin")) &&
-                                u.id !== activeUser.id && (
+                              {/* Proprietaire : bannissement definitif. Admin : suspension
+                                  soumise au proprietaire, jamais sur un autre admin. */}
+                              {u.id !== activeUser.id && !hasRole(u, "owner") && (
+                                hasRole(activeUser, "owner") ? (
                                   <button
-                                    onClick={() =>
-                                      handleDeleteUser(
-                                        u.id,
-                                        u.name || u.username,
-                                      )
-                                    }
-                                    disabled={!hasRole(activeUser, "owner")}
-                                    className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleDeleteUser(u.id, u.name || u.username)}
+                                    className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2"
                                   >
                                     Bannir
                                   </button>
-                                )}
+                                ) : hasRole(activeUser, "admin") && !hasRole(u, "admin") ? (
+                                  <button
+                                    onClick={() => handleSuspendUser(u.id, u.name || u.username)}
+                                    className="px-3 py-1 bg-amber-500/10 text-amber-600 font-medium rounded hover:bg-amber-500/20 text-xs ml-2"
+                                  >
+                                    Suspendre
+                                  </button>
+                                ) : null
+                              )}
                             </>
                           )}
                         </div>

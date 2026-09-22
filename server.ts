@@ -1131,20 +1131,6 @@ app.post('/api/register', async (req, res) => {
 
     db.users.push(newUser);
     
-    // L'equipe est prevenue de chaque inscription : sans validation, c'est le
-    // seul moyen de reperer un inscrit inattendu. Type "inscription" et non plus
-    // "register" : il n'y a rien a valider, donc pas de fenetre "Action requise".
-    if (!isFirstUser) {
-        if (!db.notifications) db.notifications = [];
-        db.notifications.push({
-            id: Date.now().toString(),
-            type: 'inscription',
-            referenceId: newUser.id,
-            message: `Nouvel inscrit : "${username}". Son compte est déjà actif.`,
-            readBy: [],
-            createdAt: Date.now()
-        });
-    }
     
     saveDb();
 
@@ -1264,7 +1250,8 @@ app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) 
     res.json({ success: true });
 });
 
-app.post('/api/users/:id/restore', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+// Reactiver un compte suspendu : c'est la decision finale, donc proprietaire seul.
+app.post('/api/users/:id/restore', requireAuth, requireRole(['owner']), (req: any, res) => {
     const { id } = req.params;
     const targetUser = db.users.find((u: any) => u.id === id);
     if (!targetUser) {
@@ -1277,6 +1264,45 @@ app.post('/api/users/:id/restore', requireAuth, requireRole(['owner', 'admin']),
     
     saveDb();
     res.json({ success: true, message: `Le compte de "${targetUser.username}" a été réactivé.` });
+});
+
+// Suspendre un membre : un admin soumet un bannissement au proprietaire. Le
+// compte est bloque sur-le-champ — le middleware d'authentification refuse
+// toute requete d'un compte pending_ban — jusqu'a la decision du proprietaire :
+// Reactiver, ou Bannir definitivement. Un admin ne peut suspendre ni le
+// proprietaire, ni un autre admin, ni lui-meme.
+// Toute l'interface ("Suspendu par...", Reactiver, Bannir def.) existait deja,
+// mais le client appelait DELETE, reserve au proprietaire : rien ne posait
+// jamais pending_ban.
+app.post('/api/users/:id/suspend', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const targetUser = db.users.find((u: any) => u.id === req.params.id);
+    if (!targetUser) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+    }
+    if (targetUser.id === req.user.id) {
+        return res.status(403).json({ error: "Vous ne pouvez pas effectuer cette action sur vous-même." });
+    }
+    if (userHasRole(targetUser, 'owner') || (userHasRole(targetUser, 'admin') && !userHasRole(req.user, 'owner'))) {
+        return res.status(403).json({ error: "Seul le Patron peut suspendre un administrateur." });
+    }
+
+    const nom = targetUser.name || targetUser.username;
+    targetUser.status = 'pending_ban';
+    targetUser.requestedBanBy = req.user.name || req.user.username;
+    targetUser.requestedBanAt = Date.now();
+
+    if (!db.notifications) db.notifications = [];
+    db.notifications.push({
+        id: Date.now().toString(),
+        type: 'bannissement',
+        referenceId: targetUser.id,
+        message: `${targetUser.requestedBanBy} demande le bannissement de "${nom}". Le compte est suspendu en attendant la décision du Patron.`,
+        readBy: [],
+        createdAt: Date.now()
+    });
+
+    saveDb();
+    res.json({ success: true, message: `Le compte de "${nom}" est suspendu. Le Patron décidera de la suite.` });
 });
 
 app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res) => {
@@ -1560,10 +1586,33 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
 // compte, bugs, votes) restent reservees a l'equipe. Chacun peut vider sa
 // boite : suppression reelle pour l'equipe, masquage personnel pour les
 // autres, afin qu'un membre n'efface pas la boite des cinquante autres.
+// Une notification vit une semaine. Le filtre d'affichage ci-dessous est exact
+// a la seconde ; la purge quotidienne fait le menage dans la base.
+const DUREE_VIE_NOTIF = 7 * 24 * 60 * 60 * 1000;
+const notifRecente = (n: any) => (n.createdAt || Number(n.id) || 0) >= Date.now() - DUREE_VIE_NOTIF;
+
+const purgerNotificationsExpirees = () => {
+    if (!db.notifications) return;
+    const avant = db.notifications.length;
+    db.notifications = db.notifications.filter(notifRecente);
+    if (db.notifications.length === avant) return;
+    // Les masquages personnels qui visaient des notifications disparues n'ont
+    // plus d'objet : sans ce nettoyage, ces listes grossiraient indefiniment.
+    const restantes = new Set(db.notifications.map((n: any) => n.id));
+    (db.users || []).forEach((u: any) => {
+        if (u.hiddenNotifs) u.hiddenNotifs = u.hiddenNotifs.filter((id: string) => restantes.has(id));
+    });
+    saveDb();
+    console.log(`[Notifications] ${avant - db.notifications.length} notification(s) de plus d'une semaine supprimee(s).`);
+};
+purgerNotificationsExpirees();
+cron.schedule('30 4 * * *', purgerNotificationsExpirees);
+
 const notifsVisiblesPour = (utilisateur: any) => {
     const equipe = utilisateur?.roles?.includes('owner') || utilisateur?.roles?.includes('admin');
     const masquees: string[] = utilisateur?.hiddenNotifs || [];
     return (db.notifications || [])
+        .filter(notifRecente)
         .filter((n: any) => equipe || n.type === 'upload')
         .filter((n: any) => !masquees.includes(n.id));
 };

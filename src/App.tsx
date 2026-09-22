@@ -255,7 +255,9 @@ export default function App() {
               const unread = ndata.filter((n: any) => !n.readBy.includes(activeUser.id));
               if (unread.length > 0) {
                   setHasUnread(true);
-                  const firstActionable = unread.find((n: any) => n.type === 'register' || n.type === 'request');
+                  // "register" n'existe plus (plus de validation des comptes). Une demande de
+                  // bannissement n'appelle une decision que du proprietaire.
+                  const firstActionable = unread.find((n: any) => n.type === 'request' || (n.type === 'bannissement' && hasRole(activeUser, 'owner')));
                   if (firstActionable && firstActionable.referenceId) {
                       notify(firstActionable.message, "Action Requise", {
                           label: "Voir (Admin)", 
