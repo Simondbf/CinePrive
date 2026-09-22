@@ -57,13 +57,17 @@ if (
 
 Sans elles, le service worker intercepte les requêtes partielles de la vidéo et **le lecteur reste bloqué à 00:00**. Sur Gringotts, l'absence de la garde sur `/api/` et `/_/` rendait le panneau PocketBase totalement inaccessible.
 
-### Incrémenter le cache à chaque déploiement
+### Renouveler le cache à chaque déploiement
+
+Le service worker n'efface l'ancien cache que lorsque `CACHE_NAME` change. Si la valeur ne bouge pas, selon la stratégie de cache, le navigateur continue de servir l'ancienne version, parfois plusieurs jours, sans le moindre signe visible — ou, au mieux, les fichiers de chaque version s'empilent indéfiniment chez les visiteurs. Symptôme typique : une console vide alors que la page ne se comporte pas comme prévu.
+
+**CinéPrivé — automatique depuis septembre 2026.** `vite.config.ts` réécrit `CACHE_NAME` dans `dist/sw.js` à chaque construction, et fait échouer la construction s'il ne trouve pas la ligne. La valeur écrite dans `public/sw.js` ne sert qu'en développement : **ne plus l'incrémenter à la main**. La règle manuelle avait été oubliée treize déploiements de suite.
+
+**Ailleurs**, tant que ce n'est pas automatisé, incrémenter à la main :
 
 ```js
-const CACHE_NAME = 'cineprive-v2';   // etait v1
+const CACHE_NAME = 'monsite-v2';   // etait v1
 ```
-
-Modifier un fichier sans changer cette valeur ne sert à rien : le navigateur continue de servir l'ancienne version, parfois plusieurs jours, sans le moindre signe visible. Symptôme typique : une console vide alors que la page ne se comporte pas comme prévu.
 
 Pour purger côté navigateur : DevTools → Application → Service Workers → Unregister, puis rechargement forcé. Sur Firefox, `Ctrl+Maj+R` ne suffit pas — il faut passer par `about:preferences#privacy` → Gérer les données.
 

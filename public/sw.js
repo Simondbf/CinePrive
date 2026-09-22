@@ -1,6 +1,7 @@
 // Service worker de CinéPrivé.
-// A incrementer a chaque deploiement touchant aux fichiers du site.
-const CACHE_NAME = 'cineprive-v12';
+// Nom remplace automatiquement a chaque construction (voir vite.config.ts) :
+// ne plus y toucher a la main. Cette valeur ne sert qu'en developpement.
+const CACHE_NAME = 'cineprive-v13';
 const PRECACHE = ['/', '/index.html', '/manifest.json', '/favicon.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
