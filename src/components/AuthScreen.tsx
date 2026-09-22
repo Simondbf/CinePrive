@@ -191,16 +191,30 @@ export default function AuthScreen({ onLogin }: Props) {
                                               className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                                           />
                                       </div>
-                                      {settings && settings.allowRegistrations === false && (
+                                      {/* Le champ est toujours affiche. Ferme aux inscriptions publiques, il est
+                                          obligatoire ; ouvert, il reste utile : un code administrateur ne se
+                                          saisissait nulle part, et son titulaire s'inscrivait en simple membre
+                                          en attente de validation. */}
+                                      {settings && (
                                           <div>
                                               <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-2">
                                                   <KeyRound className="w-4 h-4"/> Code d'invitation
+                                                  {settings.allowRegistrations !== false && (
+                                                      <span className="text-xs font-normal text-zinc-500">(facultatif)</span>
+                                                  )}
                                               </label>
-                                              <p className="text-xs text-zinc-500 mb-2">Obligatoire car les inscriptions publiques sont fermées. Cela valide votre compte !</p>
+                                              <p className="text-xs text-zinc-500 mb-2">
+                                                  {/* Pas de promesse de validation : un code ordinaire ouvre l'inscription
+                                                      mais le compte reste en attente. Seul un code administrateur (ADM-...)
+                                                      donne un compte actif immediatement. */}
+                                                  {settings.allowRegistrations === false
+                                                      ? "Obligatoire : les inscriptions publiques sont fermées."
+                                                      : "Si vous avez reçu un code, saisissez-le ici."}
+                                              </p>
                                               <input 
                                                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                                                   placeholder="Ex: XYZ-123"
-                                                  required
+                                                  required={settings.allowRegistrations === false}
                                                   className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
                                               />
                                           </div>

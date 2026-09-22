@@ -1428,6 +1428,24 @@ app.post('/api/films/:id/restore', requireAuth, requireRole(['owner', 'admin']),
     res.json({ success: true, message: `Le film "${film.title}" a été restauré.` });
 });
 
+// Mettre un film de cote : il disparait pour les membres, reste visible pour
+// l'equipe, et se retablit d'un clic. Seul le proprietaire peut ensuite le
+// detruire (DELETE, avec code de securite).
+// Le client appelait jusqu'ici DELETE pour les admins — route reservee au
+// proprietaire — et le bouton etait de toute facon desactive pour eux : toute
+// l'interface "Suspendu par..." existait, mais rien ne posait pendingDeletion.
+app.post('/api/films/:id/set-aside', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) {
+        return res.status(404).json({ error: "Film non trouvé" });
+    }
+    film.pendingDeletion = true;
+    film.requestedDeletionBy = req.user.name || req.user.username;
+    film.requestedDeletionAt = Date.now();
+    saveDb();
+    res.json({ success: true, message: `Le film "${film.title}" a été mis de côté.` });
+});
+
 app.post('/api/films/:id/report', requireAuth, (req: any, res) => {
     const { id } = req.params;
     const { timecode } = req.body;

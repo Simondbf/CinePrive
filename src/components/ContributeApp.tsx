@@ -478,51 +478,46 @@ export default function ContributeApp({
     }
   };
 
-  const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
-    if (hasRole(activeUser, "admin") || hasRole(activeUser, "technician")) {
-      // Si simple admin/technician -> suppression temporaire sans code
-      setDialogState({
-        isOpen: true,
-        title: "Suspendre le film",
-        message: `Êtes-vous sûr de vouloir suspendre le film "${filmTitle}" ? Il sera masqué pour les membres, et le Patron devra de valider sa destruction définitive.`,
-        onConfirm: async () => {
-          try {
-            const res = await fetch(`/api/films/${filmId}`, {
-              method: "DELETE",
-            });
-            if (res.status === 403) {
-                notify("Vous ne passerez pas !", "Accès Interdit");
-                return;
-            }
-            if (res.ok) {
-              notify(
-                `Le film "${filmTitle}" a été suspendu temporairement.`,
-                "Succès",
-              );
-              onRefresh(true);
-            } else {
-              const err = await res.json();
-              notify(err.error || "Impossible de suspendre le film", "Erreur");
-            }
-          } catch (e) {
-            console.error(e);
-            notify("Erreur de connexion", "Erreur");
+  // Deux actions distinctes, chacune appelee explicitement par son bouton.
+  // Avant, une seule fonction devinait l'intention d'apres le role : un compte
+  // cumulant proprietaire et admin aurait mis de cote au lieu de detruire.
+
+  // Reversible, sans code : owner et admin.
+  const handleSetAsideFilm = (filmId: string, filmTitle: string) => {
+    setDialogState({
+      isOpen: true,
+      title: "Mettre le film de côté",
+      message: `« ${filmTitle} » ne sera plus visible pour les membres. Il reste dans la bibliothèque et peut être rétabli à tout moment. Seul le propriétaire peut le supprimer définitivement.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/films/${filmId}/set-aside`, { method: "POST" });
+          if (res.ok) {
+            notify(`« ${filmTitle} » a été mis de côté.`, "Succès");
+            onRefresh(true);
+          } else {
+            const err = await res.json().catch(() => ({}));
+            notify(err.error || "Impossible de mettre le film de côté.", "Erreur");
           }
-        },
-      });
-    } else {
-      // Si Patron (owner) -> code de sécurité requis
-      triggerSecurityValidation(
-        "delete_film",
-        filmId,
-        filmTitle,
-        "Supprimer définitivement un film",
-        `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la destruction définitive du film "${filmTitle}" et de son fichier vidéo sur le serveur.`,
-        async () => {
-          onRefresh(true);
-        },
-      );
-    }
+        } catch (e) {
+          console.error(e);
+          notify("Erreur de connexion", "Erreur");
+        }
+      },
+    });
+  };
+
+  // Definitif, fichier video compris : proprietaire seul, code de securite requis.
+  const handleDeleteFilm = async (filmId: string, filmTitle: string) => {
+    triggerSecurityValidation(
+      "delete_film",
+      filmId,
+      filmTitle,
+      "Supprimer définitivement un film",
+      `Saisissez le code de validation reçu (par e-mail ou code Maître) pour confirmer la destruction définitive du film "${filmTitle}" et de son fichier vidéo sur le serveur.`,
+      async () => {
+        onRefresh(true);
+      },
+    );
   };
 
   const handleToggleRegistration = async () => {
@@ -1438,7 +1433,7 @@ export default function ContributeApp({
           </>
         ))}
 
-      {tab === "library" && <OngletBibliotheque activeUser={activeUser} films={films} filmsFiltres={filmsFiltres} usersList={usersList} onRefresh={onRefresh} rechercheFilm={rechercheFilm} setRechercheFilm={setRechercheFilm} verifEnCours={verifEnCours} resultatVerif={resultatVerif} isRefreshingAll={isRefreshingAll} lotInputRef={lotInputRef} replaceInputRef={replaceInputRef} setReplacingFilm={setReplacingFilm} handleVerifierFichiers={handleVerifierFichiers} handleRefreshAllMetadata={handleRefreshAllMetadata} handleRestoreFilm={handleRestoreFilm} handleDeleteFilm={handleDeleteFilm} formatDateSure={formatDateSure} />}
+      {tab === "library" && <OngletBibliotheque handleSetAsideFilm={handleSetAsideFilm} activeUser={activeUser} films={films} filmsFiltres={filmsFiltres} usersList={usersList} onRefresh={onRefresh} rechercheFilm={rechercheFilm} setRechercheFilm={setRechercheFilm} verifEnCours={verifEnCours} resultatVerif={resultatVerif} isRefreshingAll={isRefreshingAll} lotInputRef={lotInputRef} replaceInputRef={replaceInputRef} setReplacingFilm={setReplacingFilm} handleVerifierFichiers={handleVerifierFichiers} handleRefreshAllMetadata={handleRefreshAllMetadata} handleRestoreFilm={handleRestoreFilm} handleDeleteFilm={handleDeleteFilm} formatDateSure={formatDateSure} />}
 
 
 

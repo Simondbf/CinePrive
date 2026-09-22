@@ -23,6 +23,7 @@ interface Props {
   handleRefreshAllMetadata: () => void;
   handleRestoreFilm: (filmId: string) => void;
   handleDeleteFilm: (filmId: string, filmTitle: string) => void;
+  handleSetAsideFilm: (filmId: string, filmTitle: string) => void;
   formatDateSure: (valeur: any) => string;
 }
 
@@ -44,6 +45,7 @@ export default function OngletBibliotheque({
   handleRefreshAllMetadata,
   handleRestoreFilm,
   handleDeleteFilm,
+  handleSetAsideFilm,
   formatDateSure,
 }: Props) {
   return (
@@ -188,7 +190,7 @@ export default function OngletBibliotheque({
                           {f.pendingDeletion ? (
                             <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
                               <span className="text-[10px] bg-amber-500/10 text-amber-500 font-semibold px-2 py-1 rounded border border-amber-500/10 whitespace-nowrap">
-                                ⚠️ Suspendu par{" "}
+                                ⚠️ Mis de côté par{" "}
                                 {f.requestedDeletionBy || "Admin"}
                               </span>
                               <div className="flex gap-1.5 mt-1 sm:mt-0">
@@ -243,13 +245,24 @@ export default function OngletBibliotheque({
                               >
                                 <RefreshCw className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                onClick={() => handleDeleteFilm(f.id, f.title)}
-                                disabled={!hasRole(activeUser, "owner")}
-                                className="text-primary-500 hover:text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-950/60 transition-all font-medium text-xs bg-primary-50 dark:bg-primary-950/30 px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Supprimer
-                              </button>
+                              {hasRole(activeUser, "owner", "admin") && (
+                                <button
+                                  onClick={() => handleSetAsideFilm(f.id, f.title)}
+                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950/60 transition-all font-medium text-xs bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1.5 rounded"
+                                  title="Masquer aux membres — réversible"
+                                >
+                                  Mettre de côté
+                                </button>
+                              )}
+                              {hasRole(activeUser, "owner") && (
+                                <button
+                                  onClick={() => handleDeleteFilm(f.id, f.title)}
+                                  className="text-primary-500 hover:text-primary-700 hover:bg-primary-100 dark:hover:bg-primary-950/60 transition-all font-medium text-xs bg-primary-50 dark:bg-primary-950/30 px-2.5 py-1.5 rounded"
+                                  title="Suppression définitive, fichier vidéo compris"
+                                >
+                                  Supprimer
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
