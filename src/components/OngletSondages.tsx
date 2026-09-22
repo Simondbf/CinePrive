@@ -154,8 +154,9 @@ export default function OngletSondages({
                       <h4 className="font-medium text-zinc-900 dark:text-white capitalize">
                         {title} ({totalVotes} votes)
                       </h4>
-                      {(hasRole(activeUser, "owner") ||
-                        hasRole(activeUser, "admin")) && (
+                      {/* Modifier, reinitialiser, supprimer : proprietaire seul, comme cote
+                          serveur. Un admin voyait ces boutons et recevait un refus. */}
+                      {hasRole(activeUser, "owner") && (
                         <div className="flex items-center gap-2">
                           {totalVotes === 0 && (
                             <button

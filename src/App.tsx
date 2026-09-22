@@ -509,7 +509,10 @@ export default function App() {
                 <ListChecks className="w-4 h-4" /> <span>Sondages</span>
             </button>
 
-            {hasRole(activeUser, 'owner') && (
+            {/* Owner et admin. Reserve jusqu'ici au seul proprietaire : aucun admin,
+                nomme a la main ou arrive par un code, ne voyait l'entree. Les actions
+                qui leur sont interdites sont grisees ou masquees dans les onglets. */}
+            {hasRole(activeUser, 'owner', 'admin') && (
                 <button 
                     onClick={() => setViewMode('admin')}
                     className={`hidden xl:flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded transition ${viewMode === 'admin' ? 'text-white bg-primary-600 border border-primary-600' : 'text-zinc-600 dark:text-zinc-400 hover:text-primary-600 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800'}`}
@@ -557,7 +560,7 @@ export default function App() {
                                 <button onClick={() => { setShowPolls(true); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                      <ListChecks className="w-4 h-4" /> Sondages
                                 </button>
-                                {hasRole(activeUser, 'owner') && (
+                                {hasRole(activeUser, 'owner', 'admin') && (
                                      <button onClick={() => { setViewMode('admin'); setShowUserMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-primary-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-3">
                                          <Shield className="w-4 h-4" /> Salle des Serveurs
                                      </button>
