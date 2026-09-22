@@ -24,6 +24,7 @@ export default function AuthScreen({ onLogin }: Props) {
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [inviteCode, setInviteCode] = useState('');
+    const [afficherCode, setAfficherCode] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -191,30 +192,22 @@ export default function AuthScreen({ onLogin }: Props) {
                                               className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white truncate"
                                           />
                                       </div>
-                                      {/* Le champ est toujours affiche. Ferme aux inscriptions publiques, il est
-                                          obligatoire ; ouvert, il reste utile : un code administrateur ne se
-                                          saisissait nulle part, et son titulaire s'inscrivait en simple membre
-                                          en attente de validation. */}
-                                      {settings && (
+                                      {/* Inscriptions fermees : le code est obligatoire, le champ reste donc
+                                          visible. Ouvertes : il est replie en bas du formulaire, derriere
+                                          un lien "J'ai un code d'invitation". */}
+                                      {settings && settings.allowRegistrations === false && (
                                           <div>
                                               <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-1 flex items-center gap-2">
                                                   <KeyRound className="w-4 h-4"/> Code d'invitation
-                                                  {settings.allowRegistrations !== false && (
-                                                      <span className="text-xs font-normal text-zinc-500">(facultatif)</span>
-                                                  )}
                                               </label>
-                                              <p className="text-xs text-zinc-500 mb-2">
-                                                  {/* Pas de promesse de validation : un code ordinaire ouvre l'inscription
-                                                      mais le compte reste en attente. Seul un code administrateur (ADM-...)
-                                                      donne un compte actif immediatement. */}
-                                                  {settings.allowRegistrations === false
-                                                      ? "Obligatoire : les inscriptions publiques sont fermées."
-                                                      : "Si vous avez reçu un code, saisissez-le ici."}
-                                              </p>
+                                              {/* Pas de promesse de validation : un code ordinaire ouvre l'inscription
+                                                  mais le compte reste en attente. Seul un code administrateur (ADM-...)
+                                                  donne un compte actif immediatement. */}
+                                              <p className="text-xs text-zinc-500 mb-2">Obligatoire : les inscriptions publiques sont fermées.</p>
                                               <input 
                                                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                                                   placeholder="Ex: XYZ-123"
-                                                  required={settings.allowRegistrations === false}
+                                                  required
                                                   className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
                                               />
                                           </div>
@@ -268,6 +261,42 @@ export default function AuthScreen({ onLogin }: Props) {
                                   </div>
                               )}
                           </>
+                      )}
+
+                      {/* Inscriptions ouvertes : le code ne sert qu'aux codes administrateur, qui
+                          donnent un compte actif d'emblee. Replie derriere un lien discret, a la
+                          maniere d'un code promo en boutique. */}
+                      {!isLogin && !isForgotPassword && settings && settings.allowRegistrations !== false && (
+                          afficherCode ? (
+                              <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                      <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                          <KeyRound className="w-4 h-4"/> Code d'invitation
+                                      </label>
+                                      <button
+                                          type="button"
+                                          onClick={() => { setAfficherCode(false); setInviteCode(''); }}
+                                          className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline"
+                                      >
+                                          Retirer
+                                      </button>
+                                  </div>
+                                  <input
+                                      value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                                      placeholder="Ex: XYZ-123"
+                                      autoFocus
+                                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-4 py-3 pr-10 focus:ring-1 focus:ring-primary-500 outline-none text-zinc-900 dark:text-white placeholder-zinc-500/30 font-mono uppercase truncate"
+                                  />
+                              </div>
+                          ) : (
+                              <button
+                                  type="button"
+                                  onClick={() => setAfficherCode(true)}
+                                  className="text-sm text-primary-600 dark:text-primary-500 hover:underline flex items-center gap-1.5"
+                              >
+                                  <KeyRound className="w-4 h-4" /> J'ai un code d'invitation
+                              </button>
+                          )
                       )}
 
                       {error && <p className="text-primary-500 text-sm font-medium">{error}</p>}

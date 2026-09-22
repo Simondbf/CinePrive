@@ -355,6 +355,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                         </div>
                         {/* Lecture : l'action principale de la fiche. */}
                         <div className="mt-5">
+                            <div className="flex flex-col sm:flex-row gap-3">
                             <button
                                 onClick={() => { const film = infoFilm; fermerFiche(); onPlay(film); }}
                                 disabled={infoFilm.status !== 'AVAILABLE'}
@@ -363,6 +364,19 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                 <Play className="w-5 h-5" fill="currentColor" />
                                 Lecture
                             </button>
+                            {/* Meme lien que l'icone de la grille : le serveur envoie le
+                                fichier en piece jointe, le navigateur l'enregistre. */}
+                            <a
+                                href={infoFilm.status !== 'AVAILABLE' ? '#' : `/api/download/${infoFilm.id}`}
+                                download={infoFilm.status !== 'AVAILABLE' ? undefined : (infoFilm.originalName || infoFilm.title)}
+                                onClick={(e) => handleDownload(e, infoFilm)}
+                                aria-disabled={infoFilm.status !== 'AVAILABLE'}
+                                className={`inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 px-6 py-3 text-base font-medium transition ${infoFilm.status !== 'AVAILABLE' ? 'opacity-40 cursor-not-allowed' : 'hover:bg-zinc-50 dark:hover:bg-zinc-700'}`}
+                            >
+                                <Download className="w-5 h-5" />
+                                Télécharger
+                            </a>
+                            </div>
                             {infoFilm.status !== 'AVAILABLE' && (
                                 <p className="mt-2 text-xs text-zinc-500">{messageIndisponible(infoFilm)}</p>
                             )}

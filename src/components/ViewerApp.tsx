@@ -17,6 +17,18 @@ interface Props {
     setSelectedGenre: (s: string | null) => void;
 }
 
+// Tris des grilles de resultats. A annee egale, ou sans annee connue, on
+// retombe sur le titre ; les films sans annee passent a la fin.
+const parTitre = (a: Film, b: Film) => (a.title || '').localeCompare(b.title || '', 'fr');
+const parAnnee = (a: Film, b: Film) => {
+    const ya = Number(a.year) || Infinity;
+    const yb = Number(b.year) || Infinity;
+    return ya !== yb ? ya - yb : parTitre(a, b);
+};
+
+// Ces deux rubriques ont leur propre ordre, qui fait leur sens : la date d'ajout.
+const RUBRIQUES_PAR_DATE_AJOUT = ["🎬 Nouveautés", "⏳ Bientôt disponible"];
+
 export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, transcodingStatuses, searchQuery, setSearchQuery, selectedGenre, setSelectedGenre }: Props) {
     const [progress, setProgress] = useState<Record<string, number>>({});
 
@@ -157,12 +169,25 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
         return blocs;
     }, [films, activeUser.myList, activeUser.seenFilms, searchQuery, selectedGenre, progress]);
 
+    // Tri choisi par le membre et memorise sur cet appareil. Lu une fois a
+    // l'initialisation, ecrit dans le gestionnaire du bouton : pas d'Effect.
+    const cleTri = `triFilms_${activeUser.id}`;
+    const [tri, setTri] = useState<'alpha' | 'annee'>(() => {
+        try { return localStorage.getItem(cleTri) === 'annee' ? 'annee' : 'alpha'; } catch { return 'alpha'; }
+    });
+    const choisirTri = (t: 'alpha' | 'annee') => {
+        setTri(t);
+        try { localStorage.setItem(cleTri, t); } catch { /* stockage indisponible : le choix vaut pour la session */ }
+    };
+    const vueTriable = !!searchQuery || (!!selectedGenre && !RUBRIQUES_PAR_DATE_AJOUT.includes(selectedGenre));
+
     const displayedFilms = useMemo(() => {
+        const trier = (liste: Film[]) => [...liste].sort(tri === 'annee' ? parAnnee : parTitre);
         const isProcessing = (f: Film) => f.status === 'PROCESSING' || (f.filename?.toLowerCase().endsWith('.mkv') || f.originalName?.toLowerCase().endsWith('.mkv'));
         
-        if (searchQuery) return films.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
+        if (searchQuery) return trier(films.filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase())));
         if (selectedGenre) {
-            if (selectedGenre === "📌 Ma Liste") return films.filter(f => activeUser.myList?.includes(f.id));
+            if (selectedGenre === "📌 Ma Liste") return trier(films.filter(f => activeUser.myList?.includes(f.id)));
             if (selectedGenre === "🎬 Nouveautés") {
                 const limite = new Date();
                 limite.setDate(limite.getDate() - 10);
@@ -172,26 +197,42 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                 return films.filter(f => isProcessing(f)).sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
             }
             if (selectedGenre === "👁️ Déjà vus") {
-                return films.filter(f => (activeUser.seenFilms || []).includes(f.id) && !isProcessing(f))
-                            .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'fr'));
+                return trier(films.filter(f => (activeUser.seenFilms || []).includes(f.id) && !isProcessing(f)));
             }
             if (selectedGenre === "🎞️ Tous les films") {
-                return films.filter(f => !isProcessing(f)).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'fr'));
+                return trier(films.filter(f => !isProcessing(f)));
             }
-            return films.filter(f => !isProcessing(f) && (f.genres || [f.genre]).includes(selectedGenre));
+            return trier(films.filter(f => !isProcessing(f) && (f.genres || [f.genre]).includes(selectedGenre)));
         }
         return [];
-    }, [films, searchQuery, selectedGenre, activeUser.myList, activeUser.seenFilms]);
+    }, [films, searchQuery, selectedGenre, activeUser.myList, activeUser.seenFilms, tri]);
 
     return (
         <div className="p-6 lg:p-12 pb-24 max-w-[1600px] mx-auto space-y-8 lg:space-y-10">
             {/* Corps de l'interface */}
             {(searchQuery || selectedGenre) ? (
                 <div>
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                         <h3 className="text-xl font-medium text-zinc-900 dark:text-white">
                             {searchQuery ? `Résultats pour "${searchQuery}" (${displayedFilms.length})` : `Catégorie : ${selectedGenre} (${displayedFilms.length})`}
                         </h3>
+                        <div className="flex items-center gap-4">
+                        {vueTriable && displayedFilms.length > 1 && (
+                            <div role="group" aria-label="Ordre d'affichage" className="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 p-0.5 text-sm">
+                                {([['alpha', 'A → Z'], ['annee', 'Par année']] as const).map(([valeur, libelle]) => (
+                                    <button
+                                        key={valeur}
+                                        onClick={() => choisirTri(valeur)}
+                                        aria-pressed={tri === valeur}
+                                        className={`px-3 py-1 rounded-md transition ${tri === valeur
+                                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-black'
+                                            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                                    >
+                                        {libelle}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         {selectedGenre && (
                             <button 
                                 onClick={() => setSelectedGenre(null)}
@@ -200,6 +241,7 @@ export default function ViewerApp({ activeUser, films, onPlay, onUpdateUser, tra
                                 Retour à l'accueil
                             </button>
                         )}
+                        </div>
                     </div>
                     {displayedFilms.length > 0 ? (
                          <MovieGrid films={displayedFilms} activeUser={activeUser} onPlay={onPlay} onToggleList={toggleMyList} onToggleSeen={toggleSeen} transcodingStatuses={transcodingStatuses} isCompleteGrid={true} />
