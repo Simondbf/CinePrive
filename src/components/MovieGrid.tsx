@@ -41,6 +41,22 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
   };
   const [loadingListId, setLoadingListId] = useState<string | null>(null);
   const [infoFilm, setInfoFilm] = useState<Film | null>(null);
+
+  // Fermer la fiche arrete aussi la bande-annonce : l'iframe est demontee.
+  const fermerFiche = () => { setInfoFilm(null); setCleBA(null); setErreurBA(null); };
+
+  // Seule la file nocturne impose d'attendre le lendemain ; la file rapide
+  // tourne en permanence.
+  const messageIndisponible = (film: Film): string => {
+    const status = transcodingStatuses?.[film.id];
+    if (status?.file === 'nuit') {
+      return status.state === 'active'
+        ? "Le réencodage de ce film est en cours. Il devrait être disponible d'ici demain matin."
+        : "Ce format demande un réencodage complet, fait la nuit pour ne pas gêner les autres. Le film sera disponible demain matin.";
+    }
+    if (status?.state === 'active') return "La conversion de ce film est en cours. Encore quelques minutes.";
+    return "Le film est en cours de préparation. Réessayez dans quelques minutes.";
+  };
   const [editingGenre, setEditingGenre] = useState(false);
   const [newGenre, setNewGenre] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -119,24 +135,16 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 {/* Poster Box */}
                 <div 
                     onClick={() => {
-                        if (film.status !== 'AVAILABLE') {
-                            const status = transcodingStatuses?.[film.id];
-                            // Seule la file nocturne impose d'attendre le
-                            // lendemain ; la file rapide tourne en permanence.
-                            let texte = "Le film est en cours de préparation. Réessayez dans quelques minutes.";
-                            if (status?.file === 'nuit') {
-                                texte = status.state === 'active'
-                                    ? "Le réencodage de ce film est en cours. Il devrait être disponible d'ici demain matin."
-                                    : "Ce format demande un réencodage complet, fait la nuit pour ne pas gêner les autres. Le film sera disponible demain matin.";
-                            } else if (status?.state === 'active') {
-                                texte = "La conversion de ce film est en cours. Encore quelques minutes.";
-                            }
-                            notify(texte, "Film pas encore disponible");
-                        } else {
+                        // La rangee "Reprendre la lecture" relance directement, comme
+                        // sur les plateformes de streaming. Partout ailleurs, le clic
+                        // ouvre la fiche : synopsis, bande-annonce, bouton Lecture.
+                        if (onRemoveFromContinueWatching && film.status === 'AVAILABLE') {
                             onPlay(film);
+                        } else {
+                            setInfoFilm(film);
                         }
                     }}
-                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm ${film.status !== 'AVAILABLE' ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-primary-500'}`}
+                    className={`aspect-[2/3] bg-zinc-800 rounded-lg overflow-hidden relative border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm cursor-pointer hover:border-primary-500 ${film.status !== 'AVAILABLE' ? 'opacity-80' : ''}`}
                 >
                     {film.posterUrl ? (
                         <img src={film.posterUrl} alt={film.title} className="w-full h-full object-cover" />
@@ -277,7 +285,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
     <AnimatePresence>
         {infoFilm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setInfoFilm(null); setCleBA(null); setErreurBA(null); }} />
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={fermerFiche} />
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.95, y: -20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -286,7 +294,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                 >
                     <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                         <h2 className="text-lg font-bold text-zinc-900 dark:text-white">À propos du film</h2>
-                        <button onClick={() => { setInfoFilm(null); setCleBA(null); setErreurBA(null); }} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition">
+                        <button onClick={fermerFiche} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -345,6 +353,21 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                 {infoFilm.synopsis || "Aucun synopsis disponible pour ce film."}
                             </p>
                         </div>
+                        {/* Lecture : l'action principale de la fiche. */}
+                        <div className="mt-5">
+                            <button
+                                onClick={() => { const film = infoFilm; fermerFiche(); onPlay(film); }}
+                                disabled={infoFilm.status !== 'AVAILABLE'}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 hover:bg-zinc-700 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black px-8 py-3 text-base font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                <Play className="w-5 h-5" fill="currentColor" />
+                                Lecture
+                            </button>
+                            {infoFilm.status !== 'AVAILABLE' && (
+                                <p className="mt-2 text-xs text-zinc-500">{messageIndisponible(infoFilm)}</p>
+                            )}
+                        </div>
+
                         {/* Bande-annonce integree : l'ancienne version ouvrait un
                             onglet, souvent bloque par le navigateur. */}
                         <div className="mt-5">
@@ -363,7 +386,7 @@ export default function MovieGrid({ films, activeUser, onPlay, onToggleList, tra
                                     <button
                                         onClick={() => chargerBandeAnnonce(infoFilm)}
                                         disabled={chargementBA}
-                                        className="inline-flex items-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-60"
+                                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-medium transition disabled:opacity-60"
                                     >
                                         {chargementBA ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
                                         Bande-annonce
