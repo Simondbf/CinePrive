@@ -1253,15 +1253,6 @@ app.post('/api/auth/change-password', requireAuth, async (req: any, res) => {
     res.json({ success: true });
 });
 
-// Admin : Promouvoir un utilisateur
-app.post('/api/users/:id/upgrade', requireAuth, requireRole(['owner']), (req, res) => {
-    const userToUpgrade = db.users.find((u: any) => u.id === req.params.id);
-    if (!userToUpgrade) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-
-    userToUpgrade.roles = ['admin'];
-    saveDb();
-    res.json({ success: true });
-});
 
 app.post('/api/users/:id/role', requireAuth, requireRole(['owner']), (req, res) => {
     const { role } = req.body;
@@ -1393,12 +1384,12 @@ app.get('/api/films', requireAuth, async (req: any, res) => {
         sanitizedF.addedBy = creator.name || creator.username;
     }
 
-    if (sanitizedF.posterUrl && sanitizedF.posterUrl.includes('?api_key=')) {
-      const parts = sanitizedF.posterUrl.split('/Items/');
-      if (parts.length > 1) {
-        const itemId = parts[1].split('/')[0];
-        sanitizedF.posterUrl = `/api/jellyfin/image/${itemId}`;
-      }
+    // Le relais /api/jellyfin/image, qui cachait la cle API Jellyfin des adresses
+    // d'affiche, a ete supprime. Une affiche portant la cle, ou pointant vers ce
+    // relais disparu, est donc retiree : mieux vaut un film sans affiche qu'une
+    // cle divulguee a tous les membres, ou une image cassee.
+    if (sanitizedF.posterUrl && (sanitizedF.posterUrl.includes('api_key=') || sanitizedF.posterUrl.startsWith('/api/jellyfin/image/'))) {
+      delete sanitizedF.posterUrl;
     }
 
     if (!userHasRole(req.user, 'owner') && !userHasRole(req.user, 'admin') && !userHasRole(req.user, 'technician')) {
@@ -1533,61 +1524,6 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner']), (req: any, res
     res.json({ success: true, deleted: true, message: `Le film "${film.title}" a été supprimé définitivement.` });
 });
 
-app.post('/api/jellyfin/sync', requireAuth, requireRole(['owner']), async (req, res) => {
-    if (!process.env.JELLYFIN_URL || !process.env.JELLYFIN_API_KEY) {
-        return res.status(400).json({ error: "Jellyfin n'est pas configuré" });
-    }
-    
-    try {
-        // 1. Récupérer les utilisateurs pour trouver l'admin (les clés API globales sont souvent rattachées à un utilisateur)
-        const usersResp = await fetch(`${process.env.JELLYFIN_URL}/Users`, {
-            headers: { 'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"` }
-        });
-        const users = await usersResp.json();
-        const admin = users.find((u: any) => u.Policy.IsAdministrator);
-        
-        if (!admin) return res.status(500).json({ error: "Administrateur Jellyfin introuvable" });
-
-        // 2. Fetch les items récursivement
-        const itemsResp = await fetch(`${process.env.JELLYFIN_URL}/Users/${admin.Id}/Items?Recursive=true&IncludeItemTypes=Movie,Series,Video&Fields=Path,Overview,PremiereDate,Genres,Studios`, {
-            headers: { 'X-Emby-Authorization': `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"` }
-        });
-        const itemsData = await itemsResp.json();
-        
-        let addedCount = 0;
-        
-        itemsData.Items.forEach((item: any) => {
-            // Check si on a déjà ce film
-            const existing = db.films.find((f: any) => f.jellyfinId === item.Id);
-            if (!existing) {
-                const isSeries = item.Type === "Series";
-                db.films.push({
-                    id: 'jf_' + item.Id,
-                    jellyfinId: item.Id,
-                    title: item.Name,
-                    synopsis: item.Overview || 'Aucun synopsis disponible.',
-                    year: item.PremiereDate ? new Date(item.PremiereDate).getFullYear() : new Date().getFullYear(),
-                    genre: item.Genres && item.Genres.length > 0 ? item.Genres[0] : (isSeries ? 'Série' : 'Film'),
-                    director: isSeries ? 'Série' : 'Jellyfin',
-                    duration: isSeries ? (item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 600000000) + ' min par ep.' : 'Série TV') : (item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 600000000) + ' min' : 'Inconnu'),
-                    posterUrl: `/api/jellyfin/image/${item.Id}`,
-                    addedBy: 'Admin',
-                    addedAt: new Date().toISOString(),
-                    filename: '',
-                    originalName: item.Path || item.Name,
-                    status: 'AVAILABLE'
-                });
-                addedCount++;
-            }
-        });
-        
-        saveDb();
-        res.json({ success: true, count: addedCount, films: db.films });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: "Erreur lors de la synchronisation Jellyfin" });
-    }
-});
 
 // Progression de lecture
 app.post('/api/progress', requireAuth, (req: any, res) => {
@@ -2635,23 +2571,6 @@ app.get('/api/stream/:filmId', requireAuth, async (req: any, res, next) => {
     }
 });
 
-// Proxy d'images Jellyfin pour masquer la clé d'API
-app.get('/api/jellyfin/image/:itemId', requireAuth, (req: any, res, next) => {
-    if (process.env.JELLYFIN_URL && process.env.JELLYFIN_API_KEY) {
-        return createProxyMiddleware({
-            target: `${process.env.JELLYFIN_URL}/Items/${req.params.itemId}/Images/Primary`,
-            changeOrigin: true,
-            ignorePath: true,
-            on: {
-                proxyReq: (proxyReq) => {
-                    proxyReq.setHeader('X-Emby-Authorization', `MediaBrowser Token="${process.env.JELLYFIN_API_KEY}"`);
-                }
-            }
-        })(req, res, next);
-    } else {
-        res.status(404).json({ error: 'Jellyfin non configuré' });
-    }
-});
 
 // Force Download Route
 app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
@@ -2672,30 +2591,6 @@ app.get('/api/download/:filmId', requireAuth, async (req: any, res) => {
     }
 });
 
-
-app.get('/api/admin/audit-fichiers', requireAuth, requireRole(['owner']), (req, res) => {
-    const missingFiles: any[] = [];
-    const films = db.films || [];
-    
-    films.forEach((film: any) => {
-        if (film.status === 'AVAILABLE' && film.filename && !film.jellyfinId) {
-            const safeName = path.basename(film.filename);
-            let found = false;
-            for (const dir of [UPLOADS_DIR, FILMS_DIR]) {
-                const p = path.join(dir, safeName);
-                if (fs.existsSync(p)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                missingFiles.push(film);
-            }
-        }
-    });
-    
-    res.json({ missingCount: missingFiles.length, missingFiles });
-});
 
 // Marque en ERROR tous les films dont le fichier a disparu du disque.
 // Ils cessent ainsi d'etre proposes a la lecture, ce qui evite le lecteur
