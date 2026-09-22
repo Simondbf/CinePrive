@@ -19,10 +19,18 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(cookieParser());
 
+// Adresse reelle du visiteur. Avec trust proxy a 1 (plus haut), Express la tire
+// de X-Forwarded-For en ne faisant confiance qu'au dernier intermediaire, nginx :
+// c'est l'adresse que nginx a lui-meme ajoutee, impossible a falsifier.
+// L'ancien code lisait d'abord CF-Connecting-IP, puis la PREMIERE entree de
+// X-Forwarded-For. Derriere l'ancien proxy, qui reecrivait ces en-tetes, c'etait
+// juste ; derriere nginx, le visiteur les ecrit lui-meme. Ne pas les reintroduire. Il suffisait d'en changer a
+// chaque essai pour ne jamais declencher le verrouillage apres cinq mots de
+// passe faux, calcule par nom d'utilisateur ET par adresse.
+const ipClient = (req: any): string => req.ip || req.socket?.remoteAddress || 'unknown';
+
 app.use('/api', (req, res, next) => {
-    let ipStr = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
-    if (Array.isArray(ipStr)) ipStr = ipStr[0];
-    const ip = typeof ipStr === 'string' ? ipStr.split(',')[0].trim() : 'unknown';
+    const ip = ipClient(req);
     console.log(`[HTTP] ${ip} - ${req.method} ${req.url}`);
     next();
 });
@@ -338,10 +346,11 @@ app.post('/api/security/request-code', requireAuth, requireRole(['owner', 'admin
     });
 });
 
-// Sécurité : Bloquer l'IP nue (Autoriser uniquement via Cloudflare avec le bon nom de domaine)
+// Sécurité : refuser l'accès par l'adresse IP nue, n'accepter que le nom de domaine.
+// Double protection : le conteneur n'ecoute que sur 127.0.0.1 et la configuration
+// nginx par defaut rejette deja les requetes qui ne visent aucun domaine connu.
 app.use((req, res, next) => {
-    // Si l'application tourne derrière un proxy (Cloudflare), 
-    // le header 'x-forwarded-host' ou 'host' contiendra le domaine d'origine
+    // Derriere nginx, le domaine demande arrive dans l'en-tete Host.
     const host = req.headers['x-forwarded-host'] || req.headers.host;
     
     // Si nous ne sommes pas en dev et si le host pointe vers l'IP pure au lieu du nom de domaine
@@ -1150,9 +1159,7 @@ const loginAttempts: Record<string, { count: number, lockedUntil: number }> = {}
 
 app.post('/api/login', async (req, res) => {
     const { username, password, rememberMe } = req.body;
-    let ipStr = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress || 'unknown';
-    if (Array.isArray(ipStr)) ipStr = ipStr[0];
-    const ip = typeof ipStr === 'string' ? ipStr.split(',')[0].trim() : 'unknown';
+    const ip = ipClient(req);
     const lockKey = `${(username || '').toLowerCase()}_${ip}`;
     
     let attempts = loginAttempts[lockKey] || { count: 0, lockedUntil: 0 };
@@ -2175,7 +2182,8 @@ app.post('/api/films/:id/relink', requireAuth, requireRole(['owner', 'admin', 't
     }
 });
 
-// Upload Video par paquets (Chunking pour contourner Cloudflare)
+// Envoi des vidéos par paquets de 2 Mo : permet la barre de progression et
+// l'annulation, et évite de faire transiter plusieurs gigaoctets en une requête.
 app.post('/api/films/upload-chunk', requireAuth, upload.single('chunk'), async (req: any, res) => {
     const { uploadId, chunkIndex } = req.body;
     const chunkFile = req.file;
