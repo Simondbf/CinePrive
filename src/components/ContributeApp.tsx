@@ -557,18 +557,6 @@ export default function ContributeApp({
     }
   };
 
-  const handleApproveUser = async (userId: string) => {
-    try {
-      await fetch(`/api/users/${userId}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      fetchData();
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleDeleteRequest = async (requestId: string) => {
     try {
@@ -1189,8 +1177,7 @@ export default function ContributeApp({
               className={`px-4 py-2 font-medium rounded transition-colors ${tab === "users" ? "bg-primary-600 text-white" : "text-zinc-600 dark:text-zinc-500 hover:text-black dark:hover:text-zinc-300"}`}
               onClick={() => setTab("users")}
             >
-              Membres ({usersList.filter((u) => u.status === "pending").length}{" "}
-              en attente)
+              Membres
             </button>
           )}
           {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && (
@@ -1318,18 +1305,7 @@ export default function ContributeApp({
       <AdminPanelNav />
 
       {tab === "upload" &&
-        (activeUser.status === "pending" ? (
-          <div className="p-12 text-center bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-            <h3 className="text-xl font-medium text-primary-600 mb-2">
-              Accès Restreint
-            </h3>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Votre compte est en attente de vérification par un administrateur.
-              L'ajout de contenu est temporairement bloqué, mais vous pouvez
-              totalement écumer la bibliothèque et visionner les films !
-            </p>
-          </div>
-        ) : (
+        (
           <>
             <div className="flex flex-col gap-6">
               <div className="hidden lg:flex items-center justify-between gap-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
@@ -1431,13 +1407,13 @@ export default function ContributeApp({
               )}
             </div>
           </>
-        ))}
+        )}
 
       {tab === "library" && <OngletBibliotheque handleSetAsideFilm={handleSetAsideFilm} activeUser={activeUser} films={films} filmsFiltres={filmsFiltres} usersList={usersList} onRefresh={onRefresh} rechercheFilm={rechercheFilm} setRechercheFilm={setRechercheFilm} verifEnCours={verifEnCours} resultatVerif={resultatVerif} isRefreshingAll={isRefreshingAll} lotInputRef={lotInputRef} replaceInputRef={replaceInputRef} setReplacingFilm={setReplacingFilm} handleVerifierFichiers={handleVerifierFichiers} handleRefreshAllMetadata={handleRefreshAllMetadata} handleRestoreFilm={handleRestoreFilm} handleDeleteFilm={handleDeleteFilm} formatDateSure={formatDateSure} />}
 
 
 
-      {tab === "users" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && <OngletUtilisateurs activeUser={activeUser} usersList={usersList} invitesList={invitesList} settings={settings} customCodeInput={customCodeInput} setCustomCodeInput={setCustomCodeInput} maxUsesInput={maxUsesInput} setMaxUsesInput={setMaxUsesInput} pendingRoleChanges={pendingRoleChanges} setPendingRoleChanges={setPendingRoleChanges} generateInvite={generateInvite} deleteInvite={deleteInvite} handleChangeRole={handleChangeRole} handleApproveUser={handleApproveUser} handleRestoreUser={handleRestoreUser} handleDeleteUser={handleDeleteUser} handleToggleRegistration={handleToggleRegistration} />}
+      {tab === "users" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && <OngletUtilisateurs activeUser={activeUser} usersList={usersList} invitesList={invitesList} settings={settings} customCodeInput={customCodeInput} setCustomCodeInput={setCustomCodeInput} maxUsesInput={maxUsesInput} setMaxUsesInput={setMaxUsesInput} pendingRoleChanges={pendingRoleChanges} setPendingRoleChanges={setPendingRoleChanges} generateInvite={generateInvite} deleteInvite={deleteInvite} handleChangeRole={handleChangeRole} handleRestoreUser={handleRestoreUser} handleDeleteUser={handleDeleteUser} handleToggleRegistration={handleToggleRegistration} />}
 
       {tab === "stats" && (hasRole(activeUser, "owner") || hasRole(activeUser, "admin")) && <OngletStatistiques stats={stats} />}
 

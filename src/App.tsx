@@ -533,11 +533,6 @@ export default function App() {
             )}
 
             <div ref={userMenuRef} className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-800 relative h-full">
-                {activeUser.status === 'pending' && (
-                    <span className="hidden xl:inline text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-500 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-700/50 mr-2">
-                        Compte en attente
-                    </span>
-                )}
                 <div 
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className={`w-9 h-9 rounded-full shrink-0 ${activeUser.color || 'bg-primary-600'} flex items-center justify-center font-bold text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700 cursor-pointer overflow-hidden bg-cover bg-center`}

@@ -19,7 +19,6 @@ interface Props {
   generateInvite: (role?: "admin") => void;
   deleteInvite: (code: string) => void;
   handleChangeRole: (userId: string, newRole: string) => void;
-  handleApproveUser: (userId: string) => void;
   handleRestoreUser: (userId: string) => void;
   handleDeleteUser: (userId: string, targetName: string) => void;
   handleToggleRegistration: () => void;
@@ -46,7 +45,6 @@ export default function OngletUtilisateurs({
   generateInvite,
   deleteInvite,
   handleChangeRole,
-  handleApproveUser,
   handleRestoreUser,
   handleDeleteUser,
   handleToggleRegistration,
@@ -79,9 +77,9 @@ export default function OngletUtilisateurs({
                       Ouverture des inscriptions
                     </p>
                     <p className="text-sm text-zinc-500">
-                      Autoriser ou non les nouvelles demandes de compte. Même si
-                      ouvert, les comptes doivent être approuvés manuellement
-                      par la suite.
+                      Ouvert : n'importe qui peut créer un compte et accède
+                      immédiatement aux films. Fermé : seules les personnes
+                      munies d'un code d'invitation peuvent s'inscrire.
                     </p>
                   </div>
                   <button
@@ -305,32 +303,7 @@ export default function OngletUtilisateurs({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          {u.status === "pending" ? (
-                            <>
-                              <button
-                                onClick={() => handleApproveUser(u.id)}
-                                className="px-3 py-1 bg-green-500/10 text-green-600 font-medium rounded hover:bg-green-500/20"
-                              >
-                                Approuver
-                              </button>
-                              {(hasRole(activeUser, "owner") ||
-                                hasRole(activeUser, "admin")) &&
-                                u.id !== activeUser.id && (
-                                  <button
-                                    onClick={() =>
-                                      handleDeleteUser(
-                                        u.id,
-                                        u.name || u.username,
-                                      )
-                                    }
-                                    disabled={!hasRole(activeUser, "owner")}
-                                    className="px-3 py-1 bg-primary-500/10 text-primary-600 font-medium rounded hover:bg-primary-500/20 text-xs ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    Refuser
-                                  </button>
-                                )}
-                            </>
-                          ) : u.status === "pending_ban" ? (
+                          {u.status === "pending_ban" ? (
                             <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
                               <span className="text-[10px] bg-primary-500/10 text-primary-500 font-semibold px-2 py-1 rounded border border-primary-500/15 whitespace-nowrap">
                                 ⚠️ Suspendu par {u.requestedBanBy || "Admin"}

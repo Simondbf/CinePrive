@@ -1122,20 +1122,25 @@ app.post('/api/register', async (req, res) => {
         color: colors[db.users.length % colors.length],
         role,
         roles: [role],
-        status: (isFirstUser || inviteAdmin) ? 'active' : 'pending',
+        // Plus d'etape de validation : tout compte est actif des l'inscription.
+        // C'est l'ouverture des inscriptions qui decide qui peut entrer : fermees,
+        // il faut un code d'invitation.
+        status: 'active',
         myList: []
     };
 
     db.users.push(newUser);
     
-    // Notification for admins
-    if (newUser.status === 'pending') {
+    // L'equipe est prevenue de chaque inscription : sans validation, c'est le
+    // seul moyen de reperer un inscrit inattendu. Type "inscription" et non plus
+    // "register" : il n'y a rien a valider, donc pas de fenetre "Action requise".
+    if (!isFirstUser) {
         if (!db.notifications) db.notifications = [];
         db.notifications.push({
             id: Date.now().toString(),
-            type: 'register',
+            type: 'inscription',
             referenceId: newUser.id,
-            message: `Un nouvel utilisateur ("${username}") s'est inscrit avec succès et attend validation.`,
+            message: `Nouvel inscrit : "${username}". Son compte est déjà actif.`,
             readBy: [],
             createdAt: Date.now()
         });
@@ -1191,9 +1196,6 @@ app.post('/api/login', async (req, res) => {
 
         if (passwordMatch) {
             delete loginAttempts[lockKey];
-            if (user.status === 'pending') {
-                return res.status(403).json({ error: "Votre compte est en attente d'approbation par le Patron." });
-            }
             if (user.status === 'pending_ban') {
                 return res.status(403).json({ error: "Votre compte est temporairement suspendu en attente de la validation finale du Patron." });
             }
@@ -1307,21 +1309,6 @@ app.delete('/api/users/:id', requireAuth, requireRole(['owner']), (req: any, res
     res.json({ success: true, deleted: true, message: `L'utilisateur "${targetUser.username}" a été banni définitivement.` });
 });
 
-// Admin : Approuver un utilisateur
-app.post('/api/users/:id/approve', requireAuth, requireRole(['owner', 'admin']), async (req: any, res) => {
-    const adminUser = req.user;
-
-    const userToApprove = db.users.find((u: any) => u.id === req.params.id);
-    if (!userToApprove) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-
-    userToApprove.status = 'active';
-    userToApprove.validatedBy = adminUser.username;
-    userToApprove.validatedAt = Date.now();
-    
-
-    saveDb();
-    res.json({ success: true, user: { ...userToApprove, password: '' } });
-});
 
 app.post('/api/users/:id/mylist', requireAuth, (req, res) => {
     const user = db.users.find((u: any) => u.id === req.params.id);

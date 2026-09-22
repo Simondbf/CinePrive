@@ -6,7 +6,7 @@ export interface User {
     name: string;
     color: string;
     role: 'owner' | 'admin' | 'technician' | 'user';
-    status?: 'pending' | 'active' | 'pending_ban';
+    status?: 'active' | 'pending_ban';
     requestedBanBy?: string;
     requestedBanAt?: number;
     myList: string[]; // Liste des IDs de films à voir
