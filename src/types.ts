@@ -89,3 +89,16 @@ export interface EtatDialogue {
   isAlert?: boolean;
   closeOnConfirm?: boolean;
 }
+
+export interface Invitation {
+  code: string;
+  used: boolean;
+  maxUses?: number;
+  currentUses?: number;
+  // "admin" : usage unique, expire au bout de 7 jours, donne le role
+  // administrateur des l'inscription sans passer par la validation.
+  role?: 'admin' | 'user';
+  expiresAt?: number;
+  usedBy?: string;
+  createdAt?: number;
+}

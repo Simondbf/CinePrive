@@ -996,18 +996,42 @@ app.post('/api/settings/security/regenerate', requireAuth, requireRole(['owner']
 
 // Invites
 app.get('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => res.json(db.invites || []));
-app.post('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
-    let newCode = req.body.customCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+app.post('/api/invites', requireAuth, requireRole(['owner', 'admin']), (req: any, res) => {
+    const role = req.body.role === 'admin' ? 'admin' : 'user';
+
+    // Un code administrateur donne les droits d'administration des l'inscription,
+    // sans passer par la validation. Reserve au proprietaire : un administrateur
+    // ne peut pas changer les roles (la route /role est reservee au proprietaire),
+    // il ne doit pas pouvoir contourner cette limite en fabriquant des invitations.
+    if (role === 'admin' && !userHasRole(req.user, 'owner')) {
+        return res.status(403).json({ error: "Seul le propriétaire peut créer un code administrateur." });
+    }
+
     if (!db.invites) db.invites = [];
-    db.invites.push({ 
-        code: newCode, 
-        used: false, 
-        maxUses: req.body.maxUses || 1, // Default to 1 instead of unlimited
+    const invitation: any = {
+        used: false,
         currentUses: 0,
-        createdAt: Date.now() 
-    });
+        createdAt: Date.now(),
+        role,
+        createdBy: req.user.username,
+    };
+
+    if (role === 'admin') {
+        // Trois garde-fous. Jamais de code personnalise : "MARIE2026" se devine.
+        // Une seule utilisation, quoi que demande l'interface. Et une date limite :
+        // un code qui traine dans une conversation transferee ne doit pas rester
+        // valable indefiniment.
+        invitation.code = 'ADM-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+        invitation.maxUses = 1;
+        invitation.expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    } else {
+        invitation.code = req.body.customCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+        invitation.maxUses = req.body.maxUses || 1; // Default to 1 instead of unlimited
+    }
+
+    db.invites.push(invitation);
     saveDb();
-    res.json({ success: true, code: newCode });
+    res.json({ success: true, code: invitation.code });
 });
 app.delete('/api/invites/:code', requireAuth, requireRole(['owner', 'admin']), (req, res) => {
     if (!db.invites) db.invites = [];
@@ -1025,23 +1049,21 @@ app.get('/api/users', requireAuth, requireRole(['owner', 'admin']), (req, res) =
 app.post('/api/register', async (req, res) => {
     let { username, password, email, name, inviteCode, rememberMe } = req.body;
     
-    let bypassWithCode = false;
+    // L'invitation est verifiee ici mais consommee plus bas, apres les controles
+    // du pseudo. Avant, un pseudo deja pris brulait le code au passage et il
+    // fallait en regenerer un — genant pour un code a usage unique.
+    let invitation: any = null;
     if (inviteCode && db.invites) {
-        const inviteIndex = db.invites.findIndex((i: any) => i.code.toLowerCase() === inviteCode.toLowerCase() && !i.used);
-        if (inviteIndex >= 0) {
-            bypassWithCode = true;
-            // Gérer les tickets multi-uses
-            const currentUses = db.invites[inviteIndex].currentUses || 0;
-            const maxUses = db.invites[inviteIndex].maxUses || 1;
-            
-            db.invites[inviteIndex].currentUses = currentUses + 1;
-            if (db.invites[inviteIndex].currentUses >= maxUses) {
-                db.invites[inviteIndex].used = true; // Consommer le code s'il a atteint la limite
-            }
-        } else {
+        invitation = db.invites.find((i: any) => i.code.toLowerCase() === String(inviteCode).toLowerCase() && !i.used);
+        if (!invitation) {
             return res.status(400).json({ error: "Code d'invitation invalide ou épuisé." });
         }
+        if (invitation.expiresAt && Date.now() > invitation.expiresAt) {
+            return res.status(400).json({ error: "Ce code d'invitation a expiré. Demandez-en un nouveau." });
+        }
     }
+    const bypassWithCode = !!invitation;
+    const inviteAdmin = invitation?.role === 'admin';
 
     if (db.settings && db.settings.allowRegistrations === false && !bypassWithCode) {
         return res.status(403).json({ error: "Les inscriptions sont fermées. Fournissez un code d'invitation." });
@@ -1071,8 +1093,26 @@ app.post('/api/register', async (req, res) => {
     
     // Attribuer des couleurs aléatoires
     const colors = ['bg-amber-600', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-orange-600'];
+
+    // Consommation de l'invitation : toutes les verifications sont passees, et on
+    // est encore AVANT le premier await. Node traite ce bloc d'un seul tenant, donc
+    // deux inscriptions simultanees ne peuvent pas utiliser le meme code unique.
+    // Le placer apres bcrypt.hash aurait ouvert cette fenetre.
+    if (invitation) {
+        invitation.currentUses = (invitation.currentUses || 0) + 1;
+        if (invitation.currentUses >= (invitation.maxUses || 1)) invitation.used = true;
+        if (inviteAdmin) {
+            invitation.usedBy = username;
+            invitation.usedAt = Date.now();
+        }
+    }
     
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Le 1er inscrit est proprietaire. Un code administrateur donne directement le
+    // role admin et un compte actif : le proprietaire s'est deja porte garant en
+    // creant le code, une validation supplementaire n'aurait pas de sens.
+    const role = isFirstUser ? 'owner' : (inviteAdmin ? 'admin' : 'user');
     
     const newUser = {
         id: uuidv4(),
@@ -1081,8 +1121,9 @@ app.post('/api/register', async (req, res) => {
         email: email || '',
         name,
         color: colors[db.users.length % colors.length],
-        role: isFirstUser ? 'owner' : 'user', // Le 1er est propriétaire !
-        status: isFirstUser ? 'active' : 'pending',
+        role,
+        roles: [role],
+        status: (isFirstUser || inviteAdmin) ? 'active' : 'pending',
         myList: []
     };
 

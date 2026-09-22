@@ -3,7 +3,7 @@ import AideImportModal from './AideImportModal';
 import { apiGet } from '../lib/api';
 import React, { useState, useEffect, useRef } from "react";
 import { notify } from "../lib/notify";
-import { Film, User, UploadTask } from "../types";
+import { Film, User, UploadTask, Invitation } from "../types";
 import CarteTache from "./CarteTache";
 import OngletStatistiques from "./OngletStatistiques";
 import OngletModeration from "./OngletModeration";
@@ -60,9 +60,7 @@ export default function ContributeApp({
   >(mode === "upload" ? "upload" : "users");
   const [usersList, setUsersList] = useState<User[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
-  const [invitesList, setInvitesList] = useState<
-    { code: string; used: boolean; maxUses?: number; currentUses?: number }[]
-  >([]);
+  const [invitesList, setInvitesList] = useState<Invitation[]>([]);
   const [pollResults, setPollResults] = useState<any>({});
   const [settings, setSettings] = useState<{
     allowRegistrations: boolean;
@@ -124,13 +122,20 @@ export default function ContributeApp({
      setTab(mode === "upload" ? "upload" : "users");
   }
 
-  const generateInvite = async () => {
+  // Avec role "admin", le serveur fabrique un code aleatoire ADM-..., a usage
+  // unique et valable 7 jours, et ignore code personnalise et nombre
+  // d'utilisations. Il refuse si l'appelant n'est pas proprietaire.
+  const generateInvite = async (role?: "admin") => {
     try {
       const bodyPayload: any = {};
-      if (customCodeInput.trim())
-        bodyPayload.customCode = customCodeInput.trim();
-      if (maxUsesInput && parseInt(maxUsesInput) > 0)
-        bodyPayload.maxUses = parseInt(maxUsesInput);
+      if (role === "admin") {
+        bodyPayload.role = "admin";
+      } else {
+        if (customCodeInput.trim())
+          bodyPayload.customCode = customCodeInput.trim();
+        if (maxUsesInput && parseInt(maxUsesInput) > 0)
+          bodyPayload.maxUses = parseInt(maxUsesInput);
+      }
 
       const res = await fetch("/api/invites", {
         method: "POST",
@@ -139,12 +144,14 @@ export default function ContributeApp({
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        notify(err.error, "Erreur");
+        const err = await res.json().catch(() => ({}));
+        notify(err.error || "Impossible de créer le code.", "Erreur");
       } else {
-        setCustomCodeInput("");
-        setMaxUsesInput("");
-        fetch("/api/invites").then(r => r.json()).then(setInvitesList).catch(console.error);
+        if (role !== "admin") {
+          setCustomCodeInput("");
+          setMaxUsesInput("");
+        }
+        setInvitesList(await apiGet<Invitation[]>("/api/invites", []));
       }
     } catch (e) {
       console.error(e);

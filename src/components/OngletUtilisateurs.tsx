@@ -1,13 +1,14 @@
-import React from "react";
-import { Check } from "lucide-react";
-import { ReglagesServeur, User } from "../types";
+import React, { useState } from "react";
+import { Check, Copy, Shield } from "lucide-react";
+import { Invitation, ReglagesServeur, User } from "../types";
 import { hasRole, primaryRole } from "../lib/roles";
 
-// Onglet extrait de ContributeApp. Aucun etat propre : tout arrive par les props.
+// Onglet extrait de ContributeApp. Les donnees arrivent par les props ; le seul
+// etat local est le retour visuel du bouton "Copier", qui ne concerne que cet ecran.
 interface Props {
   activeUser: User;
   usersList: User[];
-  invitesList: { code: string; used: boolean; maxUses?: number; currentUses?: number }[];
+  invitesList: Invitation[];
   settings: ReglagesServeur;
   customCodeInput: string;
   setCustomCodeInput: React.Dispatch<React.SetStateAction<string>>;
@@ -15,13 +16,20 @@ interface Props {
   setMaxUsesInput: React.Dispatch<React.SetStateAction<string>>;
   pendingRoleChanges: Record<string, string>;
   setPendingRoleChanges: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  generateInvite: () => void;
+  generateInvite: (role?: "admin") => void;
   deleteInvite: (code: string) => void;
   handleChangeRole: (userId: string, newRole: string) => void;
   handleApproveUser: (userId: string) => void;
   handleRestoreUser: (userId: string) => void;
   handleDeleteUser: (userId: string, targetName: string) => void;
   handleToggleRegistration: () => void;
+}
+
+// Une date invalide ne doit pas faire tomber l'ecran.
+function dateCourte(t?: number): string {
+  if (!t) return "";
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 }
 
 export default function OngletUtilisateurs({
@@ -43,6 +51,21 @@ export default function OngletUtilisateurs({
   handleDeleteUser,
   handleToggleRegistration,
 }: Props) {
+  const [codeCopie, setCodeCopie] = useState<string | null>(null);
+
+  const copier = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCodeCopie(code);
+      setTimeout(() => setCodeCopie(null), 2000);
+    } catch {
+      // Presse-papiers refuse par le navigateur : le code reste lisible a l'ecran.
+    }
+  };
+
+  const codesAdmin = invitesList.filter((i) => i.role === "admin");
+  const codesMembres = invitesList.filter((i) => i.role !== "admin");
+
   return (
           <div className="space-y-6">
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
@@ -72,6 +95,76 @@ export default function OngletUtilisateurs({
                 </div>
               </div>
             </div>
+
+            {hasRole(activeUser, "owner") && (
+              <div className="bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-700/60 rounded-xl p-6">
+                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-white flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-amber-500" />
+                      Code administrateur
+                    </h3>
+                    <p className="text-sm text-zinc-500 mt-1 max-w-xl">
+                      La personne qui s'inscrit avec ce code devient administratrice immédiatement, sans validation.
+                      Usage unique, valable 7 jours. À transmettre par un canal privé : quiconque le possède obtient ces droits.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => generateInvite("admin")}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm font-medium shrink-0"
+                  >
+                    Créer un code administrateur
+                  </button>
+                </div>
+                {codesAdmin.length > 0 ? (
+                  <ul className="space-y-2">
+                    {codesAdmin.map((inv) => {
+                      const expire = !inv.used && !!inv.expiresAt && Date.now() > inv.expiresAt;
+                      return (
+                        <li
+                          key={inv.code}
+                          className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-amber-50 dark:bg-amber-900/10 p-3 rounded"
+                        >
+                          <span className="font-mono text-lg font-bold tracking-widest text-zinc-900 dark:text-white break-all">
+                            {inv.code}
+                          </span>
+                          <span className="flex flex-wrap items-center gap-4">
+                            {inv.used ? (
+                              <span className="text-zinc-500 text-sm">
+                                Utilisé{inv.usedBy ? ` par ${inv.usedBy}` : ""}
+                              </span>
+                            ) : expire ? (
+                              <span className="text-primary-500 text-sm font-medium">Expiré</span>
+                            ) : (
+                              <>
+                                <span className="text-green-600 text-sm font-medium">
+                                  Actif{inv.expiresAt ? ` jusqu'au ${dateCourte(inv.expiresAt)}` : ""}
+                                </span>
+                                <button
+                                  onClick={() => copier(inv.code)}
+                                  className="flex items-center gap-1 text-sm text-zinc-700 dark:text-zinc-300 hover:text-amber-600"
+                                >
+                                  {codeCopie === inv.code ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                  {codeCopie === inv.code ? "Copié" : "Copier"}
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => deleteInvite(inv.code)}
+                              className="text-zinc-500 hover:text-primary-500 text-xs underline"
+                            >
+                              Supprimer
+                            </button>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-zinc-500">Aucun code administrateur.</p>
+                )}
+              </div>
+            )}
 
             {hasRole(activeUser, "owner") && !settings.allowRegistrations && (
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
@@ -113,16 +206,16 @@ export default function OngletUtilisateurs({
                       ) : null}
                     </div>
                     <button
-                      onClick={generateInvite}
+                      onClick={() => generateInvite()}
                       className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black rounded text-sm font-medium"
                     >
                       Générer
                     </button>
                   </div>
                 </div>
-                {invitesList.length > 0 ? (
+                {codesMembres.length > 0 ? (
                   <ul className="space-y-2">
-                    {invitesList.map((inv) => (
+                    {codesMembres.map((inv) => (
                       <li
                         key={inv.code}
                         className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded"
