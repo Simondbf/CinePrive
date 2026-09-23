@@ -3,6 +3,7 @@ import { AlertTriangle, FileUp, Layers, Loader2, RefreshCw, Search, X } from "lu
 import { Film, User } from "../types";
 import { hasRole } from "../lib/roles";
 import { notify } from "../lib/notify";
+import CarteVersionsSecours from "./CarteVersionsSecours";
 
 // Onglet extrait de ContributeApp. Aucun etat propre : tout arrive par les props.
 interface Props {
@@ -50,6 +51,7 @@ export default function OngletBibliotheque({
 }: Props) {
   return (
         <div className="flex flex-col gap-4">
+          {hasRole(activeUser, "owner") && <CarteVersionsSecours />}
           {(hasRole(activeUser, "owner") || hasRole(activeUser, "admin") || hasRole(activeUser, "technician")) && (
               <div className="flex justify-end">
                 <button

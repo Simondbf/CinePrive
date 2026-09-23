@@ -681,6 +681,42 @@ const supprimerVersionSecours = (film: any) => {
     if (film) delete film.webm;
 };
 
+// Un visiteur qui attend devant son ecran passe devant la preparation de toute
+// la bibliotheque, qui peut durer des semaines. Plus le nombre est petit, plus
+// la priorite est haute.
+const PRIORITE_DEMANDE = 1;
+const PRIORITE_LOT = 100;
+
+// Identifiant de job fixe par film : une seule preparation a la fois pour un
+// meme film, et une demande urgente peut retrouver un job du lot et le faire
+// passer devant.
+const mettreEnFileSecours = async (film: any, priorite: number) => {
+    const jobId = `webm_${film.id}`;
+    const existant = await webmQueue.getJob(jobId).catch(() => null);
+    if (existant) {
+        const etat = await existant.getState();
+        if (etat === 'active') return;
+        if (etat === 'waiting' || etat === 'prioritized' || etat === 'delayed') {
+            if (priorite < (existant.opts.priority ?? Infinity)) {
+                await existant.changePriority({ priority: priorite });
+            }
+            return;
+        }
+        // Termine ou echoue : on repart de zero.
+        await existant.remove().catch(() => {});
+    }
+    await webmQueue.add('webm-job', { filmId: film.id, inputFilename: film.filename }, {
+        jobId,
+        priority: priorite,
+        removeOnComplete: { age: 3600 },
+        removeOnFail: { age: 86400 },
+    });
+};
+
+// L'identifiant du film se lit dans celui du job : "webm_<film>" ou, pour les
+// jobs d'avant cette version, "webm_<film>_<horodatage>".
+const filmDuJobSecours = (jobId: string) => String(jobId || '').slice(5).split('_')[0];
+
 const lireRetourJob = async (queue: any, jobId: string, returnvalue: any) => {
     let retour: any = returnvalue;
     if (typeof retour === 'string') { try { retour = JSON.parse(retour); } catch (e) {} }
@@ -707,8 +743,7 @@ webmEvents.on('completed', async ({ jobId, returnvalue }: any) => {
 });
 
 webmEvents.on('failed', async ({ jobId, failedReason }: any) => {
-    const job = await webmQueue.getJob(jobId).catch(() => null);
-    const film = job && db.films.find((f: any) => f.id === job.data.filmId);
+    const film = db.films.find((f: any) => f.id === filmDuJobSecours(jobId));
     console.error(`[Webm] Échec de la version de secours ${jobId} : ${failedReason}`);
     if (film) {
         film.webm = { statut: 'erreur', demandeLe: film.webm?.demandeLe };
@@ -2567,6 +2602,8 @@ app.post('/api/films/:id/webm', requireAuth, async (req: any, res) => {
         return res.json({ statut: 'pret', fichier: film.webm.fichier });
     }
     if (statut === 'attente') {
+        // Peut-etre en attente au fond du lot : on le fait passer devant.
+        try { await mettreEnFileSecours(film, PRIORITE_DEMANDE); } catch (e) { console.error('[Webm] Priorité inchangée :', e); }
         return res.json({ statut: 'attente' });
     }
     if (!film.filename || !resolveVideoPath(path.basename(film.filename))) {
@@ -2576,11 +2613,7 @@ app.post('/api/films/:id/webm', requireAuth, async (req: any, res) => {
     film.webm = { statut: 'attente', demandeLe: Date.now() };
     saveDb();
     try {
-        await webmQueue.add('webm-job', { filmId: film.id, inputFilename: film.filename }, {
-            jobId: `webm_${film.id}_${Date.now()}`,
-            removeOnComplete: { age: 3600 },
-            removeOnFail: 50,
-        });
+        await mettreEnFileSecours(film, PRIORITE_DEMANDE);
         console.log(`[Webm] Version de secours demandée pour "${film.title}".`);
         res.json({ statut: 'attente' });
     } catch (e) {
@@ -2589,6 +2622,72 @@ app.post('/api/films/:id/webm', requireAuth, async (req: any, res) => {
         saveDb();
         res.status(500).json({ error: "Impossible de lancer la préparation." });
     }
+});
+
+// Preparation d'avance des versions de secours de toute la bibliotheque.
+// L'espace disque est verifie AVANT : une version de secours pese a peu pres
+// comme l'original, et un disque plein ferait echouer les envois et les
+// conversions de tous les films.
+const etatVersionsSecours = () => {
+    const enLigne = (db.films || []).filter((f: any) =>
+        f.status === 'AVAILABLE' && f.filename && resolveVideoPath(path.basename(f.filename)));
+    const aFaire = enLigne.filter((f: any) => f.webm?.statut !== 'pret' && f.webm?.statut !== 'attente');
+    let tailleAFaire = 0;
+    for (const f of aFaire) {
+        try { tailleAFaire += fs.statSync(resolveVideoPath(path.basename(f.filename)) as string).size; } catch (e) {}
+    }
+    let libre: number | null = null;
+    try {
+        const disque = fs.statfsSync(UPLOADS_DIR);
+        libre = disque.bavail * disque.bsize;
+    } catch (e) {
+        console.error('[Webm] Espace libre impossible à mesurer :', e);
+    }
+    return {
+        aFaire,
+        resume: {
+            total: enLigne.length,
+            prets: enLigne.filter((f: any) => f.webm?.statut === 'pret').length,
+            enAttente: enLigne.filter((f: any) => f.webm?.statut === 'attente').length,
+            aFaire: aFaire.length,
+            dureeAFaireMinutes: aFaire.reduce((t: number, f: any) => t + (Number(f.runtime) || 0), 0),
+            tailleAFaire,
+            libre,
+            // Marge de 10 % : on ne remplit pas le disque a ras bord.
+            suffisant: libre !== null && libre > tailleAFaire * 1.1,
+        },
+    };
+};
+
+app.get('/api/admin/versions-secours', requireAuth, requireRole(['owner']), (req: any, res) => {
+    res.json(etatVersionsSecours().resume);
+});
+
+app.post('/api/admin/versions-secours', requireAuth, requireRole(['owner']), async (req: any, res) => {
+    const { aFaire, resume } = etatVersionsSecours();
+    if (resume.aFaire === 0) {
+        return res.json({ ...resume, lances: 0 });
+    }
+    if (resume.libre === null) {
+        return res.status(409).json({ ...resume, error: "L'espace libre du disque n'a pas pu être mesuré : rien n'a été lancé." });
+    }
+    if (!resume.suffisant) {
+        return res.status(409).json({ ...resume, error: "Pas assez d'espace libre sur le disque : rien n'a été lancé." });
+    }
+    let lances = 0;
+    for (const film of aFaire) {
+        try {
+            film.webm = { statut: 'attente', demandeLe: Date.now() };
+            await mettreEnFileSecours(film, PRIORITE_LOT);
+            lances++;
+        } catch (e) {
+            console.error(`[Webm] Mise en file impossible pour "${film.title}" :`, e);
+            delete film.webm;
+        }
+    }
+    saveDb();
+    console.log(`[Webm] Préparation d'avance lancée pour ${lances} film(s).`);
+    res.json({ ...etatVersionsSecours().resume, lances });
 });
 
 // Bouton "Convertir" du lecteur. Il manquait requireAuth : sans lui, le serveur
