@@ -17,6 +17,7 @@ interface Props {
 // sur une connexion lente, ou face a un fichier manquant, recevait un
 // diagnostic faux — et le developpeur qui le signalait aussi.
 const TEXTES_ERREUR = {
+    navigateur: ["Ce navigateur ne lit pas les vidéos standard", "Il ne prend pas en charge le format H.264, utilisé par tous les films de CinéPrivé. C'est le cas de certaines versions de Chromium. Ouvrez le site avec Firefox, Chrome, Edge ou Safari."],
     format: ["Ce navigateur ne sait pas lire ce film", "Le fichier vidéo est dans un format que ce navigateur ne décode pas. Une conversion le rendra lisible partout."],
     introuvable: ["Fichier introuvable", "Le fichier vidéo de ce film n'est plus sur le serveur."],
     reseau: ["Connexion interrompue", "La vidéo n'a pas pu être chargée. Vérifiez votre connexion, puis réessayez."],
@@ -223,6 +224,12 @@ export default function Player({ film, activeUser, onClose }: Props) {
         const media = (playerRef.current as any)?.media as HTMLVideoElement | undefined;
         // Code 2 : la connexion a ete coupee pendant le chargement.
         if (media?.error?.code === 2) { setPlaybackError('reseau'); return; }
+        // Le navigateur sait-il lire le format standard, video H.264 et son AAC ?
+        // Certaines versions de Chromium sont compilees sans ces codecs brevetes :
+        // elles refusent tous les films, alors que les fichiers sont parfaitement
+        // standard (verifie sur toute la bibliotheque en septembre 2026).
+        const formatStandard = document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
+        if (!formatStandard) { setPlaybackError('navigateur'); return; }
         // Sinon le navigateur n'a pas pu lire la source. Un fichier absent donne
         // exactement la meme erreur qu'un format non supporte : on demande un seul
         // octet au serveur pour les distinguer.
