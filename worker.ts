@@ -209,8 +209,14 @@ const processWebm = async (job: any) => {
             const args = ['-n', '19', 'ffmpeg',
                 '-y', '-i', inputPath,
                 '-map', '0:V:0', '-map', '0:a:0?',
+                // Reglage rapide, mesure en septembre 2026 : un film de 2 h est pret
+                // en une vingtaine de minutes sur quatre coeurs, contre environ cinq
+                // heures en qualite maximale. Plafond a 720p, sans jamais agrandir une
+                // video plus petite : suffisant sur un ordinateur, et cette version ne
+                // sert qu'aux navigateurs sans H.264 — les autres gardent l'original.
+                '-vf', "scale=-2:'min(720,ih)'",
                 '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '33',
-                '-deadline', 'good', '-cpu-used', '4', '-row-mt', '1', '-threads', '2',
+                '-deadline', 'realtime', '-cpu-used', '8', '-row-mt', '1', '-tile-columns', '2', '-threads', '4',
                 '-pix_fmt', 'yuv420p',
                 '-c:a', 'libopus', '-b:a', '128k', '-ac', '2',
                 // Les sous-titres sont servis a part par /api/films/:id/subtitles.
@@ -242,7 +248,8 @@ const processWebm = async (job: any) => {
     }
 };
 
-// Une seule a la fois : un encodage VP9 occupe deja deux coeurs.
+// Une seule a la fois : un encodage occupe deja les quatre coeurs, avec la
+// priorite la plus basse pour ceder la place a tout le reste.
 const webmWorker = new Worker('transcode-webm', processWebm, { connection: connection as any, concurrency: 1 });
 webmWorker.on('failed', (job, err) => {
     console.error(`[Webm] Le job ${job?.id} a échoué:`, err);

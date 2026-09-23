@@ -290,10 +290,12 @@ Compter les `useEffect` ajoutés. Pour chacun, répondre à : *quel système ext
 
 - le lecteur teste `canPlayType` ; s'il ne lit pas le H.264 mais lit le WebM, il ne tente jamais le MP4 et demande `POST /api/films/:id/webm` ;
 - la file `transcode-webm` du worker encode avec `nice -n 19`, dans un fichier `.part` renommé seulement à la fin ;
+- réglage rapide, choisi sur mesures : VP9 `-deadline realtime -cpu-used 8`, plafonné à 720p sans agrandir, quatre fils. Un film de 2 h est prêt en une vingtaine de minutes sur quatre cœurs, contre environ cinq heures en qualité maximale. Dix minutes pour un film entier ne sont pas atteignables sur ce serveur, même en 480p ;
 - l'état vit dans `film.webm` (`attente`, `pret`, `erreur`) ; la version de secours est supprimée avec le film et lors d'un remplacement de fichier.
 
 Par défaut, seuls les films réellement ouverts par un tel navigateur ont une version de secours. Le propriétaire peut aussi toutes les préparer d'avance depuis la Bibliothèque (`/api/admin/versions-secours`) :
 
 - l'espace libre du disque est mesuré **avant** (`fs.statfsSync`), avec 10 % de marge ; sans place suffisante, ou si la mesure échoue, rien n'est lancé — un disque plein ferait échouer les envois et les conversions de tous les films ;
 - chaque film a un identifiant de job fixe, `webm_<film>` : pas de doublon, et une demande urgente retrouve le job du lot ;
-- priorité 1 pour un visiteur qui attend, 100 pour le lot : un visiteur passe toujours devant des semaines de préparation.
+- priorité 1 pour un visiteur qui attend, 100 pour le lot : un visiteur passe toujours devant la préparation de toute la bibliothèque ;
+- le bouton « Préparer pour Linux » de chaque film est ouvert au propriétaire et aux admins.

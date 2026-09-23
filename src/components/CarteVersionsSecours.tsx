@@ -96,9 +96,13 @@ export default function CarteVersionsSecours() {
           <p className="text-zinc-700 dark:text-zinc-300">
             {resume.aFaire} film(s) à préparer
             {resume.dureeAFaireMinutes > 0 && <>, soit environ {formatDuree(resume.dureeAFaireMinutes)} de vidéo</>}.
-            L'encodage prend en gros une à deux fois la durée des films, un film à la fois : pour une
-            grande bibliothèque, comptez plusieurs semaines. Il tourne en arrière-plan sans gêner la
-            lecture, et un visiteur qui ouvre un film passe toujours devant.
+            {resume.dureeAFaireMinutes > 0 ? (
+              <> Comptez de l'ordre de {formatDuree(Math.round(resume.dureeAFaireMinutes / 5))} au total</>
+            ) : (
+              <> Comptez une vingtaine de minutes par film de deux heures</>
+            )}
+            , un film à la fois. L'encodage tourne en arrière-plan sans gêner la lecture, et un
+            visiteur qui ouvre un film passe toujours devant.
           </p>
           <p className="text-zinc-700 dark:text-zinc-300">
             Espace nécessaire : jusqu'à <span className="font-medium">{formatOctets(resume.tailleAFaire)}</span>

@@ -269,7 +269,7 @@ export default function OngletBibliotheque({
                               >
                                 <RefreshCw className="w-3.5 h-3.5" />
                               </button>
-                              {hasRole(activeUser, "owner") && (
+                              {hasRole(activeUser, "owner", "admin") && (
                                 f.webm?.statut === "pret" ? (
                                   <span className="text-[11px] font-medium text-green-600 dark:text-green-500 whitespace-nowrap" title="Version de secours prête pour les navigateurs sans H.264">
                                     Linux ✓

@@ -457,7 +457,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                             ? "Vérification en cours…"
                             : secours.statut === 'erreur'
                                 ? "La version adaptée à votre navigateur n'a pas pu être préparée. Vous pouvez relancer la préparation ; si l'échec se répète, prévenez le propriétaire du site."
-                                : "Votre navigateur ne lit pas le format habituel des films (H.264). Une version adaptée est en cours de préparation : comptez quelques heures. Revenez ensuite, ce film se lira normalement."}
+                                : "Votre navigateur ne lit pas le format habituel des films (H.264). Une version adaptée est en cours de préparation : comptez une vingtaine de minutes pour un film de deux heures, davantage si d'autres films sont déjà en préparation. Revenez ensuite, ce film se lira normalement."}
                     </p>
                     <div className="flex gap-3 pt-2">
                         <button onClick={onClose} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
