@@ -167,6 +167,87 @@ const processJob = async (job: any) => {
     }
 };
 
+// ---------------------------------------------------------------------------
+// Version de secours en WebM (video VP9, son Opus), fabriquee a la demande.
+//
+// Tous les films sont en MP4 H.264/AAC, le format le plus universel. Mais un
+// navigateur prive des codecs H.264 et AAC — frequent sous Linux, ou Firefox et
+// Chromium dependent de ceux du systeme — les refuse tous. VP9 et Opus sont
+// libres de brevets et integres a ces navigateurs. On ne fabrique cette version
+// que pour un film reellement ouvert par un tel navigateur : les autres membres
+// ne sont pas concernes, et l'espace disque ne grossit que pour ces films-la.
+// ---------------------------------------------------------------------------
+const processWebm = async (job: any) => {
+    const { filmId, inputFilename } = job.data;
+
+    const inputPath = [UPLOADS_DIR, FILMS_DIR]
+        .map((dossier) => path.join(dossier, inputFilename))
+        .find((chemin) => fs.existsSync(chemin));
+    if (!inputPath) {
+        throw new Error(`Fichier introuvable dans uploads/ comme dans Films/ : ${inputFilename}`);
+    }
+
+    const base = path.basename(inputFilename, path.extname(inputFilename));
+    const fichier = `${base}.secours.webm`;
+    const outputPath = path.join(UPLOADS_DIR, fichier);
+    // Encodage dans un fichier temporaire, renomme seulement a la fin : un
+    // fichier a moitie encode ne peut jamais etre servi.
+    const tempPath = `${outputPath}.part`;
+
+    const totalDuration = await new Promise<number>((resolve) => {
+        execFile('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
+            resolve(stdout ? parseFloat(stdout) : 0);
+        });
+    });
+
+    console.log(`[Webm] Début de la version de secours du film ${filmId} (${inputFilename}).`);
+
+    try {
+        await new Promise((resolve, reject) => {
+            // nice -n 19 : priorite processeur la plus basse. L'encodage tourne a
+            // toute heure, mais cede toujours la place a la lecture des films.
+            const args = ['-n', '19', 'ffmpeg',
+                '-y', '-i', inputPath,
+                '-map', '0:V:0', '-map', '0:a:0?',
+                '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '33',
+                '-deadline', 'good', '-cpu-used', '4', '-row-mt', '1', '-threads', '2',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'libopus', '-b:a', '128k', '-ac', '2',
+                // Les sous-titres sont servis a part par /api/films/:id/subtitles.
+                '-sn',
+                '-f', 'webm', tempPath,
+            ];
+            const processus = spawn('nice', args);
+
+            processus.stderr.on('data', async (data) => {
+                const timeMatch = data.toString().match(/time=(\d{2}:\d{2}:\d{2}\.\d{2})/);
+                if (timeMatch && totalDuration > 0) {
+                    const progress = Math.min(100, Math.round((parseTimeToSeconds(timeMatch[1]) / totalDuration) * 100));
+                    await job.updateProgress({ progress });
+                }
+            });
+            processus.on('error', reject);
+            processus.on('close', (code) => code === 0 ? resolve(null) : reject(new Error(`FFmpeg (WebM) a échoué avec le code ${code}`)));
+        });
+
+        if (!fs.existsSync(tempPath) || fs.statSync(tempPath).size < 1024) {
+            throw new Error(`Version de secours vide ou absente pour ${inputFilename}.`);
+        }
+        fs.renameSync(tempPath, outputPath);
+        console.log(`[Webm] Version de secours prête : ${fichier}`);
+        return { filmId, fichier };
+    } catch (err) {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        throw err;
+    }
+};
+
+// Une seule a la fois : un encodage VP9 occupe deja deux coeurs.
+const webmWorker = new Worker('transcode-webm', processWebm, { connection: connection as any, concurrency: 1 });
+webmWorker.on('failed', (job, err) => {
+    console.error(`[Webm] Le job ${job?.id} a échoué:`, err);
+});
+
 const worker = new Worker('transcode', processJob, { connection: connection as any });
 const fastWorker = new Worker('transcode-fast', processJob, { connection: connection as any });
 
@@ -177,4 +258,4 @@ fastWorker.on('failed', (job, err) => {
     console.error(`[FastWorker] Le job ${job?.id} a échoué:`, err);
 });
 
-console.log('[Worker] Démarré et en écoute sur les files BullMQ "transcode" et "transcode-fast"...');
+console.log('[Worker] Démarré et en écoute sur les files BullMQ "transcode", "transcode-fast" et "transcode-webm"...');

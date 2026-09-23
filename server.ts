@@ -587,6 +587,9 @@ export const transcodeQueue = new Queue('transcode', { connection: connection as
 export const transcodeFastQueue = new Queue('transcode-fast', { connection: connection as any });
 const transcodeEvents = new QueueEvents('transcode', { connection: connection as any });
 const transcodeFastEvents = new QueueEvents('transcode-fast', { connection: connection as any });
+// Versions de secours WebM, fabriquees a la demande (voir worker.ts).
+export const webmQueue = new Queue('transcode-webm', { connection: connection as any });
+const webmEvents = new QueueEvents('transcode-webm', { connection: connection as any });
 
 const handleTranscodeCompleted = async ({ jobId, returnvalue }: any, queue: any) => {
     let parsedReturn: any = returnvalue;
@@ -665,6 +668,53 @@ transcodeEvents.on('completed', (args) => handleTranscodeCompleted(args, transco
 transcodeFastEvents.on('completed', (args) => handleTranscodeCompleted(args, transcodeFastQueue));
 transcodeEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeQueue));
 transcodeFastEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeFastQueue));
+
+// Supprime la version de secours d'un film, s'il en a une.
+const supprimerVersionSecours = (film: any) => {
+    const fichier = film?.webm?.fichier;
+    if (fichier) {
+        const chemin = resolveVideoPath(path.basename(fichier));
+        if (chemin) {
+            try { fs.unlinkSync(chemin); } catch (e) { console.error(`[Webm] Suppression impossible de ${fichier}:`, e); }
+        }
+    }
+    if (film) delete film.webm;
+};
+
+const lireRetourJob = async (queue: any, jobId: string, returnvalue: any) => {
+    let retour: any = returnvalue;
+    if (typeof retour === 'string') { try { retour = JSON.parse(retour); } catch (e) {} }
+    if (!retour || typeof retour !== 'object') {
+        const job = await queue.getJob(jobId).catch(() => null);
+        retour = job?.returnvalue;
+        if (typeof retour === 'string') { try { retour = JSON.parse(retour); } catch (e) {} }
+    }
+    return retour;
+};
+
+webmEvents.on('completed', async ({ jobId, returnvalue }: any) => {
+    const retour = await lireRetourJob(webmQueue, jobId, returnvalue);
+    const film = db.films.find((f: any) => f.id === retour?.filmId);
+    if (!film) {
+        // Film supprime pendant l'encodage : le fichier produit n'a plus de proprietaire.
+        const orphelin = retour?.fichier && resolveVideoPath(path.basename(retour.fichier));
+        if (orphelin) { try { fs.unlinkSync(orphelin); } catch (e) {} }
+        return;
+    }
+    film.webm = { statut: 'pret', fichier: retour.fichier, demandeLe: film.webm?.demandeLe };
+    saveDb();
+    console.log(`[Webm] "${film.title}" est lisible sur les navigateurs sans codecs H.264.`);
+});
+
+webmEvents.on('failed', async ({ jobId, failedReason }: any) => {
+    const job = await webmQueue.getJob(jobId).catch(() => null);
+    const film = job && db.films.find((f: any) => f.id === job.data.filmId);
+    console.error(`[Webm] Échec de la version de secours ${jobId} : ${failedReason}`);
+    if (film) {
+        film.webm = { statut: 'erreur', demandeLe: film.webm?.demandeLe };
+        saveDb();
+    }
+});
 
 
 // Renvoie le traitement reellement applique, pour que l'interface annonce
@@ -1490,6 +1540,7 @@ app.delete('/api/films/:id', requireAuth, requireRole(['owner']), (req: any, res
             }
         }
     }
+    supprimerVersionSecours(film);
     
     db.films.splice(filmIndex, 1);
     
@@ -2480,6 +2531,8 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
             }
         }
 
+        // L'ancienne version de secours correspond a l'ancien fichier.
+        supprimerVersionSecours(oldFilm);
         oldFilm.filename = finalFilename;
         oldFilm.originalName = originalName || filename;
         oldFilm.status = 'PROCESSING'; // la verification ci-dessous le remet en ligne s'il est lisible partout
@@ -2499,6 +2552,42 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
     } catch (e) {
         console.error("Erreur replace-finalize:", e);
         res.status(500).json({ error: 'Erreur interne' });
+    }
+});
+
+// Un navigateur qui ne lit pas le MP4 standard demande la version de secours.
+// Tout membre connecte peut la demander : elle n'est fabriquee qu'une fois par
+// film, et une nouvelle demande apres un echec relance l'encodage.
+app.post('/api/films/:id/webm', requireAuth, async (req: any, res) => {
+    const film = db.films.find((f: any) => f.id === req.params.id);
+    if (!film) return res.status(404).json({ error: 'Film non trouvé' });
+
+    const statut = film.webm?.statut;
+    if (statut === 'pret' && film.webm.fichier && resolveVideoPath(path.basename(film.webm.fichier))) {
+        return res.json({ statut: 'pret', fichier: film.webm.fichier });
+    }
+    if (statut === 'attente') {
+        return res.json({ statut: 'attente' });
+    }
+    if (!film.filename || !resolveVideoPath(path.basename(film.filename))) {
+        return res.status(404).json({ error: "Le fichier vidéo de ce film est introuvable sur le serveur." });
+    }
+
+    film.webm = { statut: 'attente', demandeLe: Date.now() };
+    saveDb();
+    try {
+        await webmQueue.add('webm-job', { filmId: film.id, inputFilename: film.filename }, {
+            jobId: `webm_${film.id}_${Date.now()}`,
+            removeOnComplete: { age: 3600 },
+            removeOnFail: 50,
+        });
+        console.log(`[Webm] Version de secours demandée pour "${film.title}".`);
+        res.json({ statut: 'attente' });
+    } catch (e) {
+        console.error('[Webm] Mise en file impossible :', e);
+        film.webm = { statut: 'erreur', demandeLe: film.webm.demandeLe };
+        saveDb();
+        res.status(500).json({ error: "Impossible de lancer la préparation." });
     }
 });
 

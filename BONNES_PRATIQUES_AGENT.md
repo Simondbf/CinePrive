@@ -277,3 +277,19 @@ C'est aussi pour cela que `key` n'était pas la bonne réponse ici : remonter `C
 ### Avant de rendre du React
 
 Compter les `useEffect` ajoutés. Pour chacun, répondre à : *quel système extérieur est-ce que je synchronise ?* Si la réponse n'est pas immédiate, l'Effect n'a pas lieu d'être.
+
+---
+
+## 10. Formats vidéo
+
+**Le format des films est MP4, vidéo H.264 en 8 bits (`yuv420p`), son AAC.** C'est le plus universel : Windows, Mac, Android, iPhone, tous les navigateurs courants. Ne jamais convertir la bibliothèque vers un autre format « plus moderne » : WebM et AV1 ne sont pas lus par une partie des appareils Apple.
+
+**L'extension ne dit rien du contenu.** Un `.mp4` peut contenir une vidéo HEVC ou 10 bits, ou un son AC-3, qu'une partie des navigateurs refuse. Tout fichier envoyé passe donc par `compatibilite.ts` (`sonder`, `estLisiblePartout`), `.mp4` compris ; jusqu'en septembre 2026, les `.mp4` étaient mis en ligne sans examen.
+
+**Le seul cas que ce format ne couvre pas :** un navigateur privé des codecs H.264 et AAC, fréquent sous Linux où Firefox et Chromium dépendent de ceux du système. Cas réel de septembre 2026 : Firefox 140 sous Linux, à qui le serveur envoyait correctement la vidéo (réponses `206`, plusieurs mégaoctets) et qui ne savait pas la décoder. Pour lui, une **version de secours** WebM (VP9 + Opus) est fabriquée à la demande :
+
+- le lecteur teste `canPlayType` ; s'il ne lit pas le H.264 mais lit le WebM, il ne tente jamais le MP4 et demande `POST /api/films/:id/webm` ;
+- la file `transcode-webm` du worker encode avec `nice -n 19`, dans un fichier `.part` renommé seulement à la fin ;
+- l'état vit dans `film.webm` (`attente`, `pret`, `erreur`) ; la version de secours est supprimée avec le film et lors d'un remplacement de fichier.
+
+Seuls les films réellement ouverts par un tel navigateur ont une version de secours.

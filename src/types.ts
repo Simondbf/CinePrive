@@ -51,6 +51,9 @@ export interface Film {
     pendingDeletion?: boolean;
     requestedDeletionBy?: string;
     requestedDeletionAt?: number;
+    // Version de secours WebM (VP9 + Opus), fabriquee a la demande pour les
+    // navigateurs prives des codecs H.264/AAC, frequents sous Linux.
+    webm?: { statut: 'attente' | 'pret' | 'erreur'; fichier?: string; demandeLe?: number };
 }
 
 export interface UploadTask {

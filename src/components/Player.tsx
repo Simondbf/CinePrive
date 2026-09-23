@@ -27,6 +27,14 @@ const TEXTES_ERREUR = {
     lent: ["La vidéo tarde à arriver", "Le chargement prend anormalement longtemps. Vérifiez votre connexion, puis réessayez."],
 } as const;
 
+// Capacites du navigateur, evaluees une seule fois au chargement du module.
+const peutLire = (type: string) =>
+    typeof document !== 'undefined' && document.createElement('video').canPlayType(type) !== '';
+// Le format de tous les films : video H.264 et son AAC.
+const LIT_LE_STANDARD = peutLire('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
+// La version de secours : video VP9 et son Opus, libres de brevets.
+const LIT_LE_SECOURS = peutLire('video/webm; codecs="vp9, opus"');
+
 export default function Player({ film, activeUser, onClose }: Props) {
   const [showCast, setShowCast] = useState(false);
   const [playbackError, setPlaybackError] = useState<false | keyof typeof TEXTES_ERREUR>(false);
@@ -90,6 +98,29 @@ export default function Player({ film, activeUser, onClose }: Props) {
   };
 
   const isMkv = film.filename?.toLowerCase().endsWith('.mkv') || film.originalName?.toLowerCase().endsWith('.mkv');
+
+  // Version de secours. Un navigateur sans codecs H.264/AAC ne recoit jamais le
+  // MP4, qu'il refuserait : il lit la version WebM si elle existe, sinon on la
+  // demande au serveur et on affiche une attente plutot qu'une erreur.
+  const [secours, setSecours] = useState<{ statut: 'attente' | 'pret' | 'erreur'; fichier?: string } | null>(null);
+  const [tentativeSecours, setTentativeSecours] = useState(0);
+  const fichierSecours = (film.webm?.statut === 'pret' && film.webm.fichier) || (secours?.statut === 'pret' && secours.fichier) || null;
+  const besoinSecours = !LIT_LE_STANDARD && LIT_LE_SECOURS;
+  const utiliseSecours = besoinSecours && !!fichierSecours;
+  const attendSecours = besoinSecours && !fichierSecours;
+  const sourceVideo = utiliseSecours ? `/videos/${fichierSecours}` : `/videos/${film.filename}`;
+
+  // Demande de la version de secours : synchronisation avec le serveur,
+  // declenchee par l'affichage du lecteur sur un tel navigateur.
+  useEffect(() => {
+    if (!attendSecours) return;
+    let annule = false;
+    fetch(`/api/films/${film.id}/webm`, { method: 'POST' })
+      .then((r) => r.json())
+      .then((d) => { if (!annule) setSecours({ statut: d.statut || 'erreur', fichier: d.fichier }); })
+      .catch(() => { if (!annule) setSecours({ statut: 'erreur' }); });
+    return () => { annule = true; };
+  }, [film.id, attendSecours, tentativeSecours]);
 
   const handleReport = async () => {
       if (!playerRef.current) return;
@@ -233,11 +264,11 @@ export default function Player({ film, activeUser, onClose }: Props) {
         // que les fichiers sont parfaitement standard (verifie sur toute la
         // bibliotheque en septembre 2026).
         const formatStandard = document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
-        if (!formatStandard) { setPlaybackError('navigateur'); return; }
+        if (!formatStandard && !utiliseSecours) { setPlaybackError('navigateur'); return; }
         // Sinon le navigateur n'a pas pu lire la source. Un fichier absent donne
         // exactement la meme erreur qu'un format non supporte : on demande un seul
         // octet au serveur pour les distinguer.
-        fetch(`/videos/${film.filename}`, { headers: { Range: 'bytes=0-0' } })
+        fetch(sourceVideo, { headers: { Range: 'bytes=0-0' } })
             .then((r) => setPlaybackError(r.ok ? 'format' : 'introuvable'))
             .catch(() => setPlaybackError('reseau'));
     });
@@ -307,7 +338,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
             playerRef.current.destroy();
         }
     };
-  }, [activeUser.id, film.id, isMkv, sousTitresCharges]);
+  }, [activeUser.id, film.id, isMkv, sousTitresCharges, attendSecours]);
 
 
   return (
@@ -415,13 +446,42 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     <div className="w-10 h-10 border-[3px] border-primary-600/20 border-t-primary-600 rounded-full animate-spin" />
                 </div>
             )}
+            {attendSecours && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-zinc-950 z-30 space-y-4 px-6 text-center">
+                    <Settings className={`w-14 h-14 text-zinc-500 ${secours?.statut === 'erreur' ? '' : 'animate-spin'}`} style={{ animationDuration: '3s' }} />
+                    <h2 className="text-xl font-bold">
+                        {secours?.statut === 'erreur' ? "La préparation a échoué" : "Préparation pour votre navigateur"}
+                    </h2>
+                    <p className="text-zinc-400 max-w-lg">
+                        {secours === null
+                            ? "Vérification en cours…"
+                            : secours.statut === 'erreur'
+                                ? "La version adaptée à votre navigateur n'a pas pu être préparée. Vous pouvez relancer la préparation ; si l'échec se répète, prévenez le propriétaire du site."
+                                : "Votre navigateur ne lit pas le format habituel des films (H.264). Une version adaptée est en cours de préparation : comptez quelques heures. Revenez ensuite, ce film se lira normalement."}
+                    </p>
+                    <div className="flex gap-3 pt-2">
+                        <button onClick={onClose} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
+                            Retour
+                        </button>
+                        {secours?.statut === 'erreur' && (
+                            <button
+                                onClick={() => { setSecours(null); setTentativeSecours((n) => n + 1); }}
+                                className="px-6 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg font-medium transition text-white"
+                            >
+                                Relancer la préparation
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+            {!attendSecours && (
             <div className="w-full h-full [&>.plyr]:h-full [&>.plyr]:w-full [&_video]:max-h-screen">
                 <video
                     ref={videoRef}
                     playsInline
                     crossOrigin="anonymous"
                 >
-                    <source src={`/videos/${film.filename}`} />
+                    <source src={sourceVideo} type={utiliseSecours ? 'video/webm' : undefined} />
                     {pistesSousTitres.map((piste) => (
                         <track
                             key={piste.index}
@@ -433,6 +493,7 @@ export default function Player({ film, activeUser, onClose }: Props) {
                     ))}
                 </video>
             </div>
+            )}
         </div>
 
         {/* Cast Overlay */}
