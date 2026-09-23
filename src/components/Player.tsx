@@ -13,9 +13,19 @@ interface Props {
   onClose: () => void;
 }
 
+// Quatre causes distinctes affichaient toutes "format non supporte". Un membre
+// sur une connexion lente, ou face a un fichier manquant, recevait un
+// diagnostic faux — et le developpeur qui le signalait aussi.
+const TEXTES_ERREUR = {
+    format: ["Ce navigateur ne sait pas lire ce film", "Le fichier vidéo est dans un format que ce navigateur ne décode pas. Une conversion le rendra lisible partout."],
+    introuvable: ["Fichier introuvable", "Le fichier vidéo de ce film n'est plus sur le serveur."],
+    reseau: ["Connexion interrompue", "La vidéo n'a pas pu être chargée. Vérifiez votre connexion, puis réessayez."],
+    lent: ["La vidéo tarde à arriver", "Le chargement prend anormalement longtemps. Vérifiez votre connexion, puis réessayez."],
+} as const;
+
 export default function Player({ film, activeUser, onClose }: Props) {
   const [showCast, setShowCast] = useState(false);
-  const [playbackError, setPlaybackError] = useState(false);
+  const [playbackError, setPlaybackError] = useState<false | keyof typeof TEXTES_ERREUR>(false);
   const [pistesSousTitres, setPistesSousTitres] = useState<Array<{ index: number; srclang: string; label: string; url: string }>>([]);
   const [sousTitresCharges, setSousTitresCharges] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -141,11 +151,15 @@ export default function Player({ film, activeUser, onClose }: Props) {
     
     playerRef.current = player;
 
+    // Pas d'erreur tant que la video arrive encore. L'ancien delai de 8 secondes
+    // affichait "format non supporte" sur une simple connexion lente. Une vraie
+    // erreur de fichier est signalee par l'evenement 'error' plus bas ; ce delai
+    // sert seulement a ne pas laisser tourner le chargement indefiniment.
     const readyTimeout = setTimeout(() => {
         if (playerRef.current && (playerRef.current as any).media && (playerRef.current as any).media.readyState === 0) {
-            setPlaybackError(true);
+            setPlaybackError('lent');
         }
-    }, 8000);
+    }, 45000);
 
     // Handle global keyboard shortcuts for closing the player
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -206,8 +220,15 @@ export default function Player({ film, activeUser, onClose }: Props) {
     });
 
     player.on('error', () => {
-        setPlaybackError(true);
-        notify("Le format de ce fichier n'est pas pris en charge par votre navigateur, ou le fichier est en cours de traitement vidéo.", "Erreur de Lecture");
+        const media = (playerRef.current as any)?.media as HTMLVideoElement | undefined;
+        // Code 2 : la connexion a ete coupee pendant le chargement.
+        if (media?.error?.code === 2) { setPlaybackError('reseau'); return; }
+        // Sinon le navigateur n'a pas pu lire la source. Un fichier absent donne
+        // exactement la meme erreur qu'un format non supporte : on demande un seul
+        // octet au serveur pour les distinguer.
+        fetch(`/videos/${film.filename}`, { headers: { Range: 'bytes=0-0' } })
+            .then((r) => setPlaybackError(r.ok ? 'format' : 'introuvable'))
+            .catch(() => setPlaybackError('reseau'));
     });
 
     let hasSeeked = false;
@@ -350,22 +371,27 @@ export default function Player({ film, activeUser, onClose }: Props) {
         {playbackError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-zinc-950/90 z-40 space-y-4">
                 <Settings className="w-16 h-16 text-zinc-500 mb-4 animate-pulse" />
-                <h2 className="text-xl font-bold">Erreur de lecture</h2>
+                <h2 className="text-xl font-bold text-center px-4">{TEXTES_ERREUR[playbackError][0]}</h2>
                 <p className="text-zinc-400 text-center max-w-lg px-4">
-                    Ce format n'est pas supporté par votre navigateur actuel ou la conversion a échoué.
+                    {TEXTES_ERREUR[playbackError][1]}
                 </p>
                 <div className="flex gap-4">
                     <button onClick={(e) => { e.stopPropagation(); handleClose(); }} className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium transition">
                         Retour
                     </button>
-                    {activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin') || hasRole(activeUser, 'technician')) && (
+                    {/* La conversion ne sert qu'a un probleme de format. L'ancien bouton
+                        annoncait "demande envoyee" sans lire la reponse du serveur. */}
+                    {playbackError === 'format' && activeUser && (hasRole(activeUser, 'owner') || hasRole(activeUser, 'admin') || hasRole(activeUser, 'technician')) && (
                         <button onClick={(e) => { 
                             e.stopPropagation();
                             fetch(`/api/films/${film.id}/remux`, { method: 'POST' })
-                              .then(() => notify("Une demande de conversion en MP4 a été envoyée au serveur. Revenez plus tard.", "Conversion en cours"))
+                              .then(async (r) => {
+                                  const d = await r.json().catch(() => ({}));
+                                  notify(d.message || d.error || "La conversion n'a pas pu être lancée.", r.ok ? "Conversion" : "Erreur");
+                              })
                               .catch(() => notify("Erreur de connexion", "Erreur"));
                         }} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg font-medium transition text-white">
-                            Convertir en MP4 (Serveur)
+                            Convertir pour tous les navigateurs
                         </button>
                     )}
                 </div>

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { sonder, estLisiblePartout, videoCopiable } from './compatibilite';
 import express from 'express';
 import path from 'path';
 import multer from 'multer';
@@ -648,7 +649,11 @@ const handleTranscodeFailed = async ({ jobId, failedReason }: any, queue: any) =
         const job = await queue.getJob(jobId);
         if (job && job.data.filmId) {
             const film = db.films.find((f: any) => f.id === job.data.filmId);
-            if (film) {
+            if (film && job.data.dejaEnLigne) {
+                // Le worker ne supprime la source qu'apres une conversion reussie :
+                // le fichier d'origine est intact, le film reste regardable.
+                console.error(`[Queue] Reconversion échouée pour "${film.title}" : il reste en ligne avec son fichier d'origine.`);
+            } else if (film) {
                 film.status = 'ERROR';
                 saveDb();
             }
@@ -661,44 +666,27 @@ transcodeFastEvents.on('completed', (args) => handleTranscodeCompleted(args, tra
 transcodeEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeQueue));
 transcodeFastEvents.on('failed', (args) => handleTranscodeFailed(args, transcodeFastQueue));
 
-const probeStreams = (inputPath: string): Promise<{ video: string, audio: string }> => {
-    return new Promise((resolve) => {
-        execFile('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'csv=p=0', inputPath], (err, stdout) => {
-            let video = '';
-            let audio = '';
-            if (stdout) {
-                const lines = stdout.trim().split('\n');
-                for (const line of lines) {
-                    const parts = line.split(',');
-                    if (parts.length === 2) {
-                        const [type, codec] = parts;
-                        if (type === 'video' && !video) video = (codec || '').trim().toLowerCase();
-                        if (type === 'audio' && !audio) audio = (codec || '').trim().toLowerCase();
-                    }
-                }
-            }
-            resolve({ video, audio });
-        });
-    });
-};
 
 // Renvoie le traitement reellement applique, pour que l'interface annonce
 // un delai exact au lieu d'un message unique parlant toujours de la nuit :
 //   'immediat' : rien a faire, le film est deja lisible
 //   'rapide'   : remuxage sur la file rapide, jamais mise en pause
 //   'nuit'     : encodage lourd, file active seulement de 01h00 a 06h45
-export const enqueueTranscode = async (filmId: string, inputFilename: string): Promise<'immediat' | 'rapide' | 'nuit'> => {
+// dejaEnLigne : film deja disponible que l'on reconvertit (rattrapage, bouton
+// "Convertir"). Il reste visible pendant la conversion, et un echec le laisse
+// disponible avec son fichier d'origine, intact, au lieu de le faire disparaitre.
+export const enqueueTranscode = async (filmId: string, inputFilename: string, dejaEnLigne = false): Promise<'immediat' | 'rapide' | 'nuit'> => {
     try {
         await transcodeQueue.remove(filmId);
         await transcodeFastQueue.remove(filmId);
     } catch(e) {}
 
-    const inputPath = path.join(UPLOADS_DIR, inputFilename);
-    const { video, audio } = await probeStreams(inputPath);
+    const inputPath = resolveVideoPath(path.basename(inputFilename)) || path.join(UPLOADS_DIR, inputFilename);
+    const flux = await sonder(inputPath);
     
-    // Si c'est déjà un MP4 parfaitement compatible, on passe direct en AVAILABLE
-    if (inputFilename.toLowerCase().endsWith('.mp4') && video === 'h264' && (audio === 'aac' || audio === '')) {
-        console.log(`[Queue] Film ${filmId} déjà 100% compatible (MP4/H264/AAC). Transcodage annulé.`);
+    // Lisible par tous les navigateurs : en ligne tout de suite.
+    if (estLisiblePartout(inputFilename, flux)) {
+        console.log(`[Queue] Film ${filmId} déjà lisible partout (MP4, H.264 8 bits, ${flux.audio || 'sans son'}). Aucune conversion.`);
         const film = db.films.find((f: any) => f.id === filmId);
         if (film) {
             film.status = 'AVAILABLE';
@@ -708,13 +696,15 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string): P
         return 'immediat';
     }
 
-    const isH264 = video === 'h264';
+    // Video recopiable : seul l'emballage ou le son change, c'est rapide.
+    const isH264 = videoCopiable(flux);
+    console.log(`[Queue] Film ${filmId} : vidéo ${flux.video || '?'} (${flux.pixFmt || '?'}), audio ${flux.audio || 'aucun'} → conversion ${isH264 ? 'rapide' : 'de nuit'}.`);
 
     if (isH264) {
         console.log(`[Queue] Remuxing rapide détecté (H264). Ajout à la file rapide (qui n'est jamais en pause).`);
         await transcodeFastQueue.add(
             'transcode-job', 
-            { filmId, inputFilename }, 
+            { filmId, inputFilename, dejaEnLigne }, 
             { 
                 jobId: `${filmId}_${Date.now()}`,
                 removeOnComplete: { age: 3600 },
@@ -725,7 +715,7 @@ export const enqueueTranscode = async (filmId: string, inputFilename: string): P
         console.log(`[Queue] Encodage lourd requis. Ajout à la file nocturne.`);
         await transcodeQueue.add(
             'transcode-job', 
-            { filmId, inputFilename }, 
+            { filmId, inputFilename, dejaEnLigne }, 
             { 
                 jobId: `${filmId}_${Date.now()}`,
                 removeOnComplete: { age: 3600 },
@@ -1593,10 +1583,52 @@ app.delete('/api/requests/:id', requireAuth, requireRole(['owner', 'admin']), (r
 // compte, bugs, votes) restent reservees a l'equipe. Chacun peut vider sa
 // boite : suppression reelle pour l'equipe, masquage personnel pour les
 // autres, afin qu'un membre n'efface pas la boite des cinquante autres.
+// Rattrapage unique. Jusqu'en septembre 2026, tout .mp4 etait mis en ligne sans
+// verifier son contenu : des films en HEVC, en 10 bits ou avec un son AC-3 ne se
+// lisaient que chez une partie des membres. Au premier demarrage, on repasse
+// une fois sur toute la bibliotheque et on envoie en conversion ceux qui ne
+// sont pas lisibles partout. Ils restent en ligne pendant la conversion ; un
+// echec les laisse en ligne avec leur fichier d'origine.
+setTimeout(async () => {
+    try {
+        if (!db.settings) db.settings = {};
+        if (db.settings.rattrapageCompatibilite) return;
+        const enLigne = (db.films || []).filter((f: any) => f.status === 'AVAILABLE' && f.filename);
+        let envoyes = 0;
+        for (const film of enLigne) {
+            const chemin = resolveVideoPath(path.basename(film.filename));
+            if (!chemin) continue;
+            const flux = await sonder(chemin);
+            // Analyse impossible (stockage momentanement injoignable...) : on ne
+            // prend aucun risque, le film n'est pas touche.
+            if (!flux.video) continue;
+            if (estLisiblePartout(film.filename, flux)) continue;
+            await enqueueTranscode(film.id, film.filename, true);
+            envoyes++;
+        }
+        db.settings.rattrapageCompatibilite = Date.now();
+        saveDb();
+        console.log(`[Rattrapage] ${enLigne.length} film(s) vérifié(s), ${envoyes} envoyé(s) en conversion.`);
+    } catch (e) {
+        console.error('[Rattrapage] Interrompu, il sera relancé au prochain démarrage :', e);
+    }
+}, 30000);
+
 // Une notification vit une semaine. Le filtre d'affichage ci-dessous est exact
 // a la seconde ; la purge quotidienne fait le menage dans la base.
 const DUREE_VIE_NOTIF = 7 * 24 * 60 * 60 * 1000;
-const notifRecente = (n: any) => (n.createdAt || Number(n.id) || 0) >= Date.now() - DUREE_VIE_NOTIF;
+// createdAt est un nombre pour certaines notifications et un texte ISO pour
+// d'autres (arrivees de films, signalements de bug). Comparer un texte a un
+// nombre donnait toujours "trop vieux" : ces notifications disparaissaient des
+// leur creation et etaient effacees a chaque redemarrage.
+const dateNotif = (n: any): number => {
+    if (typeof n.createdAt === 'number') return n.createdAt;
+    const depuisTexte = Date.parse(n.createdAt);
+    if (!isNaN(depuisTexte)) return depuisTexte;
+    const depuisId = Number(n.id);
+    return isNaN(depuisId) ? 0 : depuisId;
+};
+const notifRecente = (n: any) => dateNotif(n) >= Date.now() - DUREE_VIE_NOTIF;
 
 const purgerNotificationsExpirees = () => {
     if (!db.notifications) return;
@@ -2314,8 +2346,6 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             }
         }
 
-        const isMp4 = finalFilename.toLowerCase().endsWith('.mp4');
-
         const filmData = {
             id: uuidv4(),
             tmdbId: metadata.id,
@@ -2334,7 +2364,9 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
             addedAt: new Date().toISOString(),
             filename: finalFilename,
             originalName: originalName || filename,
-            status: isMp4 ? 'AVAILABLE' : 'PROCESSING'
+            // Toujours en preparation au depart, meme en .mp4 : la verification
+            // ci-dessous le met en ligne aussitot s'il est lisible partout.
+            status: 'PROCESSING'
         };
 
         const existingFilmIndex = db.films.findIndex(f => f.tmdbId && f.tmdbId === metadata.id);
@@ -2385,14 +2417,15 @@ app.post('/api/films/upload-finalize', requireAuth, express.json(), async (req: 
 
         // On attend le verdict (une simple lecture d'en-tetes par ffprobe) pour
         // pouvoir annoncer un delai exact a celui qui vient d'envoyer le film.
-        let traitement: 'immediat' | 'rapide' | 'nuit' = 'immediat';
-        if (!isMp4) {
-            try {
-                traitement = await enqueueTranscode(film.id, finalFilename);
-            } catch (e) {
-                console.error("Enqueue transcode error", e);
-                traitement = 'nuit';
-            }
+        // Tous les fichiers passent par la verification, .mp4 compris : l'extension
+        // ne dit rien du contenu. Jusqu'ici, un .mp4 etait mis en ligne sans
+        // examen, et un film en HEVC ou avec un son AC-3 ne se lisait que chez
+        // une partie des membres.
+        let traitement: 'immediat' | 'rapide' | 'nuit' = 'nuit';
+        try {
+            traitement = await enqueueTranscode(film.id, finalFilename);
+        } catch (e) {
+            console.error("Enqueue transcode error", e);
         }
 
         const reloadedFilm = db.films.find((f: any) => f.id === film.id) || film;
@@ -2440,8 +2473,6 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
             fs.unlinkSync(chunkPath);
         }
 
-        const isMp4 = finalFilename.toLowerCase().endsWith('.mp4');
-
         if (oldFilm.filename) {
             const oldPath = path.join(UPLOADS_DIR, oldFilm.filename);
             if (fs.existsSync(oldPath)) {
@@ -2451,15 +2482,17 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
 
         oldFilm.filename = finalFilename;
         oldFilm.originalName = originalName || filename;
-        oldFilm.status = isMp4 ? 'AVAILABLE' : 'PROCESSING';
+        oldFilm.status = 'PROCESSING'; // la verification ci-dessous le remet en ligne s'il est lisible partout
         oldFilm.modifiedBy = req.user.name || req.user.username;
         oldFilm.modifiedById = req.user.id;
         oldFilm.modifiedAt = new Date().toISOString();
 
         saveDb();
         
-        if (!isMp4) {
-            enqueueTranscode(oldFilm.id, finalFilename);
+        try {
+            await enqueueTranscode(oldFilm.id, finalFilename);
+        } catch (e) {
+            console.error("Enqueue transcode error (remplacement)", e);
         }
 
         res.json({ success: true, film: oldFilm });
@@ -2469,17 +2502,26 @@ app.post('/api/films/:id/replace-finalize', requireAuth, requireRole(['owner', '
     }
 });
 
-app.post('/api/films/:id/remux', requireRole(['owner', 'admin', 'technician']), (req: any, res) => {
+// Bouton "Convertir" du lecteur. Il manquait requireAuth : sans lui, le serveur
+// ne sait pas qui appelle et requireRole refusait toujours. Le bouton affichait
+// pourtant "demande envoyee" sans lire la reponse — il n'a jamais rien converti.
+app.post('/api/films/:id/remux', requireAuth, requireRole(['owner', 'admin', 'technician']), async (req: any, res) => {
     const film = db.films.find((f: any) => f.id === req.params.id);
     if (!film) return res.status(404).json({ error: 'Film non trouvé' });
-    
-    // Only transcode if it's an MKV and not already MP4
-    if (film.filename && film.filename.toLowerCase().endsWith('.mkv')) {
-        res.json({ success: true, message: 'Fichier ajouté à la file de transcodage' });
-        // Enqueue the task
-        enqueueTranscode(film.id, film.filename);
-    } else {
-        res.json({ success: false, message: 'Ce format n\'a pas besoin de conversion ou est déjà en MP4' });
+    if (!film.filename || !resolveVideoPath(path.basename(film.filename))) {
+        return res.status(404).json({ error: "Le fichier vidéo de ce film est introuvable sur le serveur." });
+    }
+    try {
+        const verdict = await enqueueTranscode(film.id, film.filename, film.status === 'AVAILABLE');
+        const message = verdict === 'immediat'
+            ? "Ce fichier est déjà lisible sur tous les navigateurs : le problème vient d'ailleurs."
+            : verdict === 'rapide'
+                ? "Conversion lancée. Le film sera lisible partout d'ici quelques minutes."
+                : "Conversion lancée. La vidéo doit être entièrement réencodée : ce sera fait cette nuit.";
+        res.json({ success: true, verdict, message });
+    } catch (e) {
+        console.error("Remux enqueue error", e);
+        res.status(500).json({ error: "Impossible de lancer la conversion." });
     }
 });
 

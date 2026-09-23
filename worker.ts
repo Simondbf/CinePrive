@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 import path from 'path';
 import { spawn, exec, execFile } from 'child_process';
 import fs from 'fs';
+import { sonder, estLisiblePartout, videoCopiable } from './compatibilite';
 
 const connection = new IORedis({
     host: process.env.REDIS_HOST || '127.0.0.1',
@@ -11,6 +12,7 @@ const connection = new IORedis({
 });
 
 const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
+const FILMS_DIR = path.join(process.cwd(), 'data', 'Films');
 
 const parseTimeToSeconds = (timeStr: string) => {
     const parts = timeStr.split(':');
@@ -22,23 +24,36 @@ const parseTimeToSeconds = (timeStr: string) => {
 
 const processJob = async (job: any) => {
     const { filmId, inputFilename } = job.data;
-    const inputPath = path.join(UPLOADS_DIR, inputFilename);
+    // Le fichier peut vivre dans uploads/ ou dans Films/ : on le cherche aux deux.
+    const inputPath = [UPLOADS_DIR, FILMS_DIR]
+        .map((dossier) => path.join(dossier, inputFilename))
+        .find((chemin) => fs.existsSync(chemin));
+    if (!inputPath) {
+        throw new Error(`Fichier introuvable dans uploads/ comme dans Films/ : ${inputFilename}`);
+    }
     const ext = path.extname(inputFilename).toLowerCase();
 
-    // Le fichier est déjà au bon format : aucun traitement nécessaire.
-    if (ext === '.mp4') {
-        console.log(`[Worker] ${inputFilename} est déjà en MP4, transcodage ignoré.`);
+    const flux = await sonder(inputPath);
+    if (!flux.video) {
+        throw new Error(`Analyse impossible de ${inputFilename} : aucune piste vidéo reconnue.`);
+    }
+
+    // Deja lisible par tous les navigateurs : rien a faire.
+    if (estLisiblePartout(inputFilename, flux)) {
+        console.log(`[Worker] ${inputFilename} est déjà lisible sur tous les navigateurs, aucun traitement.`);
         return { filmId, newFilename: inputFilename };
     }
 
-    const outputFilename = `${path.basename(inputFilename, ext)}.mp4`;
+    // Un .mp4 a convertir ne peut pas etre ecrit sous son propre nom : la sortie
+    // ecraserait la source. D'ou le suffixe ".lecture". L'ancien code evitait ce
+    // piege en ignorant TOUT .mp4 — y compris ceux dont le contenu (video HEVC ou
+    // 10 bits, son AC-3...) n'etait lisible que par une partie des navigateurs.
+    const base = path.basename(inputFilename, ext);
+    const outputFilename = ext === '.mp4' ? `${base}.lecture.mp4` : `${base}.mp4`;
     const outputPath = path.join(UPLOADS_DIR, outputFilename);
 
     if (path.resolve(outputPath) === path.resolve(inputPath)) {
         throw new Error(`Sécurité : entrée et sortie identiques (${inputPath}).`);
-    }
-    if (path.resolve(outputPath) === path.resolve(inputPath)) {
-        throw new Error('[Worker] SÉCURITÉ : fichier sortie identique à source.');
     }
 
     console.log(`[Worker] DÉMARRAGE de FFmpeg pour le film ID: ${filmId}...`);
@@ -61,40 +76,28 @@ const processJob = async (job: any) => {
         });
     });
 
-    const videoCodecStr = await new Promise<string>((resolve) => {
-        execFile('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
-             resolve((stdout || '').trim());
-        });
-    });
-
-    const audioCodecStr = await new Promise<string>((resolve) => {
-        execFile('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', inputPath], (err, stdout) => {
-             resolve((stdout || '').trim());
-        });
-    });
-
-    const isH264 = videoCodecStr.toLowerCase() === 'h264';
-    const isAac = audioCodecStr.toLowerCase() === 'aac';
-    const audioAction = isAac ? 'copy' : 'aac';
-
-    console.log(`[Worker] Analyse : codec vidéo = ${videoCodecStr}. Remuxing rapide : ${isH264 ? 'OUI' : 'NON'}`);
-    console.log(`[Worker] Analyse : codec audio = ${audioCodecStr}. Action audio : ${audioAction}`);
+    const copierVideo = videoCopiable(flux);
+    const audioAction = flux.audio === 'aac' ? 'copy' : 'aac';
+    console.log(`[Worker] Analyse : vidéo ${flux.video} (${flux.pixFmt}), audio ${flux.audio || 'aucun'}. Vidéo ${copierVideo ? 'recopiée' : 'réencodée'}, audio ${audioAction === 'copy' ? 'recopié' : 'converti en AAC'}.`);
 
     try {
         await new Promise((resolve, reject) => {
-            const args = isH264 ? [
-                '-y', '-i', inputPath,
-                '-map', '0:v:0', '-map', '0:a', '-map', '0:s?',
+            // 0:V majuscule = premiere vraie piste video, jamais une jaquette.
+            // Le "?" de 0:a? et 0:s? evite l'echec d'un film sans son ou sans sous-titres.
+            const communs = ['-y', '-i', inputPath, '-map', '0:V:0', '-map', '0:a?', '-map', '0:s?'];
+            const args = copierVideo ? [
+                ...communs,
                 '-c:v', 'copy',
                 '-c:a', audioAction,
                 '-c:s', 'mov_text',
                 '-movflags', '+faststart',
                 outputPath
             ] : [
-                '-y', '-i', inputPath,
-                '-map', '0:v:0', '-map', '0:a', '-map', '0:s?',
+                ...communs,
                 '-threads', '2',
-                '-c:v', 'libx264', '-preset', 'fast',
+                // yuv420p force le 8 bits : sans lui, une source 10 bits donnait une
+                // sortie H.264 10 bits, toujours illisible en navigateur.
+                '-c:v', 'libx264', '-preset', 'fast', '-pix_fmt', 'yuv420p',
                 '-c:a', audioAction,
                 '-c:s', 'mov_text',
                 '-movflags', '+faststart',
