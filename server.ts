@@ -2606,8 +2606,22 @@ app.post('/api/films/:id/webm', requireAuth, async (req: any, res) => {
         try { await mettreEnFileSecours(film, PRIORITE_DEMANDE); } catch (e) { console.error('[Webm] Priorité inchangée :', e); }
         return res.json({ statut: 'attente' });
     }
-    if (!film.filename || !resolveVideoPath(path.basename(film.filename))) {
+    const cheminSource = resolveVideoPath(path.basename(film.filename || ''));
+    if (!film.filename || !cheminSource) {
         return res.status(404).json({ error: "Le fichier vidéo de ce film est introuvable sur le serveur." });
+    }
+
+    // Une version de secours pese a peu pres comme l'original : on ne la lance
+    // pas si le disque ne peut pas l'accueillir. Si l'espace ne peut pas etre
+    // mesure, on laisse passer pour un seul film — refuser rendrait la version
+    // de secours impossible pour tout le monde — mais on le signale.
+    try {
+        const disque = fs.statfsSync(UPLOADS_DIR);
+        if (disque.bavail * disque.bsize < fs.statSync(cheminSource).size * 1.1) {
+            return res.status(409).json({ error: "Pas assez d'espace libre sur le disque pour préparer ce film." });
+        }
+    } catch (e) {
+        console.error(`[Webm] Espace libre non mesuré pour "${film.title}", préparation lancée quand même :`, e);
     }
 
     film.webm = { statut: 'attente', demandeLe: Date.now() };

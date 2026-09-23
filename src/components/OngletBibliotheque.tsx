@@ -49,6 +49,28 @@ export default function OngletBibliotheque({
   handleSetAsideFilm,
   formatDateSure,
 }: Props) {
+  // Preparation de la version de secours d'un film choisi a la main. Meme route
+  // que la demande d'un visiteur sous Linux : pas de doublon possible.
+  const preparerPourLinux = async (film: Film) => {
+    try {
+      const r = await fetch(`/api/films/${film.id}/webm`, { method: "POST" });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        notify(
+          d.statut === "pret"
+            ? `« ${film.title} » est déjà prêt pour les navigateurs sans H.264.`
+            : `« ${film.title} » est en préparation pour les navigateurs sans H.264.`,
+          "Versions pour Linux",
+        );
+        onRefresh(true);
+      } else {
+        notify(d.error || "La préparation n'a pas pu être lancée.", "Erreur");
+      }
+    } catch {
+      notify("Erreur de connexion", "Erreur");
+    }
+  };
+
   return (
         <div className="flex flex-col gap-4">
           {hasRole(activeUser, "owner") && <CarteVersionsSecours />}
@@ -247,6 +269,23 @@ export default function OngletBibliotheque({
                               >
                                 <RefreshCw className="w-3.5 h-3.5" />
                               </button>
+                              {hasRole(activeUser, "owner") && (
+                                f.webm?.statut === "pret" ? (
+                                  <span className="text-[11px] font-medium text-green-600 dark:text-green-500 whitespace-nowrap" title="Version de secours prête pour les navigateurs sans H.264">
+                                    Linux ✓
+                                  </span>
+                                ) : f.webm?.statut === "attente" ? (
+                                  <span className="text-[11px] text-zinc-500 whitespace-nowrap">Linux : en préparation</span>
+                                ) : (
+                                  <button
+                                    onClick={() => preparerPourLinux(f)}
+                                    className="text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all font-medium text-xs border border-zinc-200 dark:border-zinc-700 px-2.5 py-1.5 rounded whitespace-nowrap"
+                                    title="Préparer une version lisible par les navigateurs sans H.264, fréquents sous Linux"
+                                  >
+                                    {f.webm?.statut === "erreur" ? "Réessayer (Linux)" : "Préparer pour Linux"}
+                                  </button>
+                                )
+                              )}
                               {hasRole(activeUser, "owner", "admin") && (
                                 <button
                                   onClick={() => handleSetAsideFilm(f.id, f.title)}
